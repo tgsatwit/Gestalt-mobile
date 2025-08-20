@@ -6,21 +6,28 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "extra": {
+      "elevenLabsApiKey": "${ELEVENLABS_API_KEY}",
+      "languageCoachAgentId": "${LANGUAGE_COACH_AGENT_ID}",
+      "parentSupportAgentId": "${PARENT_SUPPORT_AGENT_ID}",
+      "childModeAgentId": "${CHILD_MODE_AGENT_ID}"
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.gestalts"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.gestalts"
     },
     "web": {
       "favicon": "./assets/favicon.png"
