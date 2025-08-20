@@ -7,7 +7,7 @@ export type JournalEntry = { id: string; content: string; createdAtISO: string; 
 export type Milestone = { id: string; title: string; dateISO: string; notes?: string };
 export type AppointmentNote = { id: string; specialist?: string; question: string; createdAtISO: string };
 export type PlaySession = { id: string; activity: string; notes?: string; createdAtISO: string };
-export type ChildProfile = { id: string; childName: string; birthDateISO?: string; stage?: string };
+export type ChildProfile = { id: string; childName: string; parentName?: string; birthDateISO?: string; stage?: string };
 
 export type MemoriesState = {
 	journal: JournalEntry[];
