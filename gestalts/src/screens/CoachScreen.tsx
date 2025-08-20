@@ -704,16 +704,14 @@ export default function CoachScreen() {
 										onPress={() => handleSuggestedPrompt(prompt)}
 										activeOpacity={0.7}
 										style={{
-											backgroundColor: tokens.color.bg.muted,
-											paddingHorizontal: tokens.spacing.gap.md,
-											paddingVertical: tokens.spacing.gap.sm,
-											borderRadius: tokens.radius.pill,
-											borderWidth: 1,
-											borderColor: 'rgba(124,58,237,0.1)'
+											backgroundColor: 'rgba(124,58,237,0.08)',
+											paddingHorizontal: tokens.spacing.gap.sm,
+											paddingVertical: 6,
+											borderRadius: tokens.radius.pill
 										}}
 									>
 										<Text style={{
-											fontSize: tokens.font.size.sm,
+											fontSize: tokens.font.size.xs,
 											color: tokens.color.text.secondary,
 											fontWeight: '400'
 										}}>
@@ -751,7 +749,7 @@ export default function CoachScreen() {
 								style={{
 									flexDirection: 'row',
 									alignItems: 'center',
-									backgroundColor: tokens.color.bg.muted,
+									backgroundColor: 'rgba(124,58,237,0.05)',
 									paddingHorizontal: tokens.spacing.gap.sm,
 									paddingVertical: tokens.spacing.gap.xs,
 									borderRadius: tokens.radius.lg
@@ -776,7 +774,7 @@ export default function CoachScreen() {
 							<View style={{
 								flexDirection: 'row',
 								alignItems: 'center',
-								backgroundColor: tokens.color.bg.muted,
+								backgroundColor: 'rgba(124,58,237,0.05)',
 								borderRadius: tokens.radius.pill,
 								padding: 2
 							}}>
@@ -844,7 +842,7 @@ export default function CoachScreen() {
 									<View style={{ 
 										flex: 1,
 										height: 44,
-										backgroundColor: tokens.color.bg.muted,
+										backgroundColor: 'rgba(124,58,237,0.05)',
 										borderRadius: tokens.radius.lg,
 										flexDirection: 'row',
 										alignItems: 'center',
@@ -914,12 +912,12 @@ export default function CoachScreen() {
 											multiline
 											style={{
 												fontSize: tokens.font.size.sm,
-												color: tokens.color.text.primary,
+												color: tokens.color.text.secondary,
 												maxHeight: 80,
 												minHeight: 44,
 												paddingHorizontal: tokens.spacing.gap.md,
 												paddingVertical: tokens.spacing.gap.sm,
-												backgroundColor: tokens.color.bg.muted,
+												backgroundColor: 'rgba(124,58,237,0.05)',
 												borderRadius: tokens.radius.lg
 											}}
 											placeholderTextColor={tokens.color.text.secondary}
