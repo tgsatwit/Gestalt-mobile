@@ -1002,7 +1002,7 @@ export default function CoachScreen() {
 								onPress={startNewConversation}
 								style={{
 									backgroundColor: 'white',
-									paddingVertical: tokens.spacing.gap.sm,
+									paddingVertical: tokens.spacing.gap.xs,
 									paddingHorizontal: tokens.spacing.gap.md,
 									borderRadius: tokens.radius.lg,
 									borderWidth: 1,
@@ -1041,9 +1041,10 @@ export default function CoachScreen() {
 										onPress={() => loadConversation(conv.id)}
 										style={{
 											backgroundColor: currentConversationId === conv.id ? tokens.color.bg.muted : 'white',
-											padding: tokens.spacing.gap.sm,
+											paddingHorizontal: tokens.spacing.gap.sm,
+											paddingVertical: tokens.spacing.gap.xs,
 											borderRadius: tokens.radius.lg,
-											marginBottom: tokens.spacing.gap.sm,
+											marginBottom: tokens.spacing.gap.xs,
 											borderWidth: 1,
 											borderColor: currentConversationId === conv.id ? tokens.color.brand.gradient.start : tokens.color.border.default
 										}}
