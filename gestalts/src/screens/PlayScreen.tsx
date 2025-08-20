@@ -13,7 +13,7 @@ export default function PlayScreen() {
 
 	return (
 		<>
-			<AppHeader title="Play" />
+			<AppHeader title="Play" showMenu={true} />
 			<ScrollView contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 40 }} style={{ backgroundColor: 'white' }}>
 				<Text weight="semibold" style={{ fontSize: tokens.font.size.h2, marginBottom: tokens.spacing.gap.md }}>Play Analyzer</Text>
 				<Text color="secondary" style={{ marginBottom: 12 }}>Record a play interaction to reflect on what worked and build language.</Text>

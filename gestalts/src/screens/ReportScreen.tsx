@@ -13,7 +13,7 @@ export default function ReportScreen() {
 	const report = generateReport({ profile, journal, milestones, appointmentNotes });
 	return (
 		<>
-			<AppHeader title="Report" />
+			<AppHeader title="Report" showMenu={true} />
 			<ScrollView contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 40 }} style={{ backgroundColor: 'white' }}>
 				<Text weight="semibold" style={{ fontSize: tokens.font.size.h2, marginBottom: tokens.spacing.gap.md }}>Report</Text>
 				<Text color="secondary" style={{ marginBottom: 12 }}>A one-click summary to share with specialists or schools.</Text>

@@ -43,7 +43,7 @@ export const font = {
 		secondary: 'Inter',
 		accent: 'OoohBaby',
 	},
-	size: { h1: 34, h2: 30, h3: 24, body: 16, small: 14, caption: 12 },
+	size: { h1: 34, h2: 30, h3: 24, xl: 20, lg: 18, body: 16, sm: 14, small: 14, xs: 12, caption: 12 },
 };
 
 export type ThemeTokens = {
