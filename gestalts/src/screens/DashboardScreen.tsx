@@ -53,7 +53,7 @@ export default function DashboardScreen() {
 			icon: 'arrow-forward',
 			quickActions: [
 				{ title: 'Play Analyzer', icon: 'sync', color: '#7C3AED', navigateTo: 'Play' },
-				{ title: 'Storybook', icon: 'book-open', color: '#7C3AED', navigateTo: 'Stories' },
+				{ title: 'Storybook', icon: 'book-outline', color: '#7C3AED', navigateTo: 'Stories' },
 				{ title: 'Knowledge', icon: 'bulb-outline', color: '#7C3AED', navigateTo: 'Knowledge' }
 			]
 		},
@@ -74,11 +74,20 @@ export default function DashboardScreen() {
 	const [scrollY] = useState(new Animated.Value(0));
 	const [showProfileMenu, setShowProfileMenu] = useState(false);
 	const profileMenuAnim = useRef(new Animated.Value(0)).current;
+	const [showAddMenu, setShowAddMenu] = useState(false);
+	const addMenuAnim = useRef(new Animated.Value(0)).current;
 
 	const profileMenuOptions = [
 		{ title: 'Child Profile', icon: 'person-outline', navigateTo: 'ChildProfile' },
 		{ title: 'Specialist', icon: 'medical-outline', navigateTo: 'Specialist' },
 		{ title: 'My Profile', icon: 'settings-outline', navigateTo: 'MyProfile' }
+	];
+
+	const addMenuOptions = [
+		{ title: 'Appointment Note', icon: 'calendar-outline', navigateTo: 'AddAppointmentNote' },
+		{ title: 'Milestone', icon: 'flag-outline', navigateTo: 'AddMilestone' },
+		{ title: 'Journal Entry', icon: 'create-outline', navigateTo: 'AddJournal' },
+		{ title: 'Add a Gestalt', icon: 'list-outline', navigateTo: 'AddGestalt' }
 	];
 
 	const toggleProfileMenu = () => {
@@ -90,9 +99,36 @@ export default function DashboardScreen() {
 				useNativeDriver: true,
 			}).start(() => setShowProfileMenu(false));
 		} else {
+			// Close add menu if open
+			if (showAddMenu) {
+				toggleAddMenu();
+			}
 			// Open menu
 			setShowProfileMenu(true);
 			Animated.timing(profileMenuAnim, {
+				toValue: 1,
+				duration: 300,
+				useNativeDriver: true,
+			}).start();
+		}
+	};
+
+	const toggleAddMenu = () => {
+		if (showAddMenu) {
+			// Close menu
+			Animated.timing(addMenuAnim, {
+				toValue: 0,
+				duration: 300,
+				useNativeDriver: true,
+			}).start(() => setShowAddMenu(false));
+		} else {
+			// Close profile menu if open
+			if (showProfileMenu) {
+				toggleProfileMenu();
+			}
+			// Open menu
+			setShowAddMenu(true);
+			Animated.timing(addMenuAnim, {
 				toValue: 1,
 				duration: 300,
 				useNativeDriver: true,
@@ -465,16 +501,16 @@ export default function DashboardScreen() {
 
 							{/* Quick Action Tiles - For sections with colored tiles */}
 							{section.quickActions && (
-								<ScrollView 
-									horizontal 
-									showsHorizontalScrollIndicator={false}
-									contentContainerStyle={{
+								sectionIndex === 0 ? (
+									<View style={{
+										flexDirection: 'row',
+										justifyContent: 'center',
+										alignItems: 'center',
 										paddingHorizontal: tokens.spacing.gap.md,
 										paddingVertical: tokens.spacing.gap.sm,
-										gap: sectionIndex === 0 ? tokens.spacing.gap.md : tokens.spacing.gap.xs
-									}}
-								>
-									{section.quickActions.map((action, index) => (
+										gap: tokens.spacing.gap.md
+									}}>
+										{section.quickActions.map((action, index) => (
 										<TouchableOpacity
 											key={index}
 											activeOpacity={0.8}
@@ -629,7 +665,166 @@ export default function DashboardScreen() {
 											</Text>
 										</TouchableOpacity>
 									))}
-								</ScrollView>
+									</View>
+								) : (
+									<ScrollView 
+										horizontal 
+										showsHorizontalScrollIndicator={false}
+										contentContainerStyle={{
+											paddingHorizontal: tokens.spacing.gap.md,
+											paddingVertical: tokens.spacing.gap.sm,
+											gap: tokens.spacing.gap.xs
+										}}
+									>
+										{section.quickActions.map((action, index) => (
+											<TouchableOpacity
+												key={index}
+												activeOpacity={0.8}
+												style={{
+													alignItems: 'center',
+													width: 85
+												}}
+											>
+												{/* Backdrop shadow */}
+												<View style={{
+													position: 'absolute',
+													width: 68,
+													height: 68,
+													borderRadius: 20,
+													backgroundColor: 'rgba(0,0,0,0.08)',
+													top: 2,
+													left: 8,
+													zIndex: 0
+												}} />
+												<View style={{
+													width: 68,
+													height: 68,
+													borderRadius: 20,
+													shadowColor: '#7C3AED',
+													shadowOffset: { width: 0, height: 6 },
+													shadowOpacity: 0.2,
+													shadowRadius: 12,
+													elevation: 8,
+													marginBottom: tokens.spacing.gap.xs,
+													position: 'relative',
+													alignItems: 'center',
+													justifyContent: 'center',
+													overflow: 'visible'
+												}}>
+													{/* Dynamic gradient background */}
+													<LinearGradient
+														colors={[
+															'rgba(255,255,255,0.95)', 
+															'rgba(255,255,255,0.85)', 
+															'rgba(255,255,255,0.9)'
+														]}
+														start={{ x: 0, y: 0 }}
+														end={{ x: 1, y: 1 }}
+														style={{
+															position: 'absolute',
+															top: 0,
+															left: 0,
+															right: 0,
+															bottom: 0,
+															borderRadius: 20
+														}}
+													/>
+													
+													{/* Glass border */}
+													<View style={{
+														position: 'absolute',
+														top: 0,
+														left: 0,
+														right: 0,
+														bottom: 0,
+														borderRadius: 20,
+														borderWidth: 1.5,
+														borderColor: 'rgba(255,255,255,0.5)'
+													}} />
+													
+													{/* Glass reflection overlay */}
+													<LinearGradient
+														colors={[
+															'rgba(255,255,255,0.4)',
+															'rgba(255,255,255,0.2)',
+															'rgba(255,255,255,0.0)'
+														]}
+														start={{ x: 0, y: 0 }}
+														end={{ x: 1, y: 1 }}
+														style={{
+															position: 'absolute',
+															top: 0,
+															left: 0,
+															right: 0,
+															height: '60%',
+															borderTopLeftRadius: 20,
+															borderTopRightRadius: 20
+														}}
+													/>
+													
+													{/* Inner glass highlight */}
+													<View style={{
+														position: 'absolute',
+														top: 2,
+														left: 2,
+														right: 2,
+														bottom: 2,
+														borderRadius: 18,
+														borderWidth: 1,
+														borderColor: 'rgba(255,255,255,0.2)'
+													}} />
+													
+													<Ionicons 
+														name={action.icon as any} 
+														size={32} 
+														color={action.color} 
+														style={{ zIndex: 1 }}
+													/>
+													
+													{/* Count badge */}
+													{action.count !== undefined && action.count > 0 && (
+														<View style={{
+															position: 'absolute',
+															top: -6,
+															right: -6,
+															backgroundColor: '#EF4444',
+															borderRadius: 12,
+															width: 24,
+															height: 24,
+															alignItems: 'center',
+															justifyContent: 'center',
+															borderWidth: 2,
+															borderColor: 'white',
+															shadowColor: '#000',
+															shadowOffset: { width: 0, height: 2 },
+															shadowOpacity: 0.2,
+															shadowRadius: 4,
+															elevation: 8,
+															zIndex: 10
+														}}>
+															<Text style={{
+																color: 'white',
+																fontSize: 10,
+																fontWeight: '700'
+															}}>
+																{action.count}
+															</Text>
+														</View>
+													)}
+												</View>
+												<Text style={{
+													fontSize: tokens.font.size.xs,
+													color: '#5B21B6',
+													textAlign: 'center',
+													fontWeight: '500',
+													lineHeight: tokens.font.size.xs * 1.2
+												}}>
+													{action.title}
+												</Text>
+											</TouchableOpacity>
+										))}
+									</ScrollView>
+								)
 							)}
 
 						</View>
@@ -770,7 +965,7 @@ export default function DashboardScreen() {
 					</TouchableOpacity>
 					
 					{/* Add Memory Button */}
-					<TouchableOpacity style={{ alignItems: 'center', width: 60 }}>
+					<TouchableOpacity onPress={toggleAddMenu} style={{ alignItems: 'center', width: 60 }}>
 						<Ionicons name="add-outline" size={22} color={tokens.color.text.secondary} />
 						<Text style={{ 
 							fontSize: 10, 
@@ -834,6 +1029,27 @@ export default function DashboardScreen() {
 				</Animated.View>
 			)}
 
+			{/* Add Menu Overlay */}
+			{showAddMenu && (
+				<Animated.View
+					style={{
+						position: 'absolute',
+						top: 0,
+						left: 0,
+						right: 0,
+						bottom: 0,
+						backgroundColor: 'rgba(0,0,0,0.1)',
+						opacity: addMenuAnim
+					}}
+				>
+					<TouchableOpacity 
+						style={{ flex: 1 }}
+						onPress={toggleAddMenu}
+						activeOpacity={1}
+					/>
+				</Animated.View>
+			)}
+
 			{/* Animated Profile Dropdown Menu */}
 			{showProfileMenu && (
 				<Animated.View
@@ -891,16 +1107,92 @@ export default function DashboardScreen() {
 								alignItems: 'center',
 								justifyContent: 'center',
 								paddingHorizontal: tokens.spacing.gap.lg,
-								paddingVertical: tokens.spacing.gap.md,
+								paddingVertical: tokens.spacing.gap.lg,
 								borderBottomWidth: index !== profileMenuOptions.length - 1 ? 0.5 : 0,
 								borderBottomColor: 'rgba(124,58,237,0.1)',
 								backgroundColor: 'transparent'
 							}}
 						>
 							<Text style={{
-								fontSize: 10,
-								color: tokens.color.text.secondary,
-								fontWeight: '500',
+								fontSize: tokens.font.size.sm,
+								color: tokens.color.text.primary,
+								fontWeight: '600',
+								textAlign: 'center'
+							}}>
+								{option.title}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</Animated.View>
+			)}
+
+			{/* Animated Add Dropdown Menu */}
+			{showAddMenu && (
+				<Animated.View
+					style={{
+						position: 'absolute',
+						bottom: 85, // Just above the bottom nav
+						left: tokens.spacing.containerX + 60, // Position above Add button
+						backgroundColor: 'white',
+						borderRadius: tokens.radius.xl,
+						shadowColor: '#000',
+						shadowOffset: { width: 0, height: 8 },
+						shadowOpacity: 0.15,
+						shadowRadius: 20,
+						elevation: 15,
+						overflow: 'hidden',
+						minWidth: 180,
+						transform: [
+							{
+								translateY: addMenuAnim.interpolate({
+									inputRange: [0, 1],
+									outputRange: [20, 0],
+								})
+							},
+							{
+								scale: addMenuAnim.interpolate({
+									inputRange: [0, 1],
+									outputRange: [0.95, 1],
+								})
+							}
+						],
+						opacity: addMenuAnim
+					}}
+				>
+					{/* Glass effect background */}
+					<LinearGradient
+						colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.9)']}
+						style={{
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0,
+						}}
+					/>
+					
+					{addMenuOptions.map((option, index) => (
+						<TouchableOpacity
+							key={option.title}
+							onPress={() => {
+								console.log('Navigate to:', option.navigateTo);
+								toggleAddMenu();
+							}}
+							activeOpacity={0.7}
+							style={{
+								alignItems: 'center',
+								justifyContent: 'center',
+								paddingHorizontal: tokens.spacing.gap.lg,
+								paddingVertical: tokens.spacing.gap.lg,
+								borderBottomWidth: index !== addMenuOptions.length - 1 ? 0.5 : 0,
+								borderBottomColor: 'rgba(124,58,237,0.1)',
+								backgroundColor: 'transparent'
+							}}
+						>
+							<Text style={{
+								fontSize: tokens.font.size.sm,
+								color: tokens.color.text.primary,
+								fontWeight: '600',
 								textAlign: 'center'
 							}}>
 								{option.title}
