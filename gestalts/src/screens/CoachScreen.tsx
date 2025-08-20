@@ -8,12 +8,18 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import Constants from 'expo-constants';
-import { 
-  ElevenLabsConversationalAI, 
-  ConversationMessage, 
-  AGENT_CONFIGS, 
-  AgentConfig 
-} from '../services/elevenLabsService';
+// Temporarily comment out ElevenLabs SDK to test basic functionality
+// import { useConversation } from '@elevenlabs/react-native';
+import { AGENT_CONFIGS, ElevenLabsConversationalAI } from '../services/elevenLabsHTTPService';
+
+interface ConversationMessage {
+  id: string;
+  role: 'user' | 'agent';
+  content: string;
+  timestamp: string;
+  isStreaming?: boolean;
+  audioUrl?: string;
+}
 
 const MODES = ['Language Coach', 'Parent Support', 'Child Mode'] as const;
 type Mode = typeof MODES[number];
@@ -52,7 +58,6 @@ export default function CoachScreen() {
 	
 	// Refs
 	const scrollViewRef = useRef<ScrollView>(null);
-	const aiServiceRef = useRef<ElevenLabsConversationalAI | null>(null);
 	const historySlideAnim = useRef(new Animated.Value(300)).current; // Start off-screen
 	const historyOverlayOpacity = useRef(new Animated.Value(0)).current;
 	
@@ -75,13 +80,12 @@ export default function CoachScreen() {
 		}
 	}, [route.params]);
 
-	// Initialize AI service when mode changes
+	// ElevenLabs HTTP service
+	const [elevenLabsService, setElevenLabsService] = useState<ElevenLabsConversationalAI | null>(null);
+
+	// Initialize conversation when mode changes
 	useEffect(() => {
-		initializeAIService();
-		return () => {
-			// Cleanup on unmount or mode change
-			aiServiceRef.current?.cleanup();
-		};
+		startConversation();
 	}, [mode]);
 
 	// Auto-scroll to bottom when new messages arrive
@@ -89,39 +93,52 @@ export default function CoachScreen() {
 		scrollViewRef.current?.scrollToEnd({ animated: true });
 	}, [conversation, streamingContent]);
 
+	// Cleanup service on unmount
+	useEffect(() => {
+		return () => {
+			if (elevenLabsService) {
+				elevenLabsService.cleanup();
+			}
+		};
+	}, [elevenLabsService]);
 
-	const initializeAIService = async () => {
+	const startConversation = async () => {
 		setIsConnecting(true);
 		
 		try {
-			// Get API key from environment variables
-			const API_KEY = Constants.expoConfig?.extra?.elevenLabsApiKey || 'your-api-key-here';
-			
 			const agentConfig = AGENT_CONFIGS[mode];
+			console.log('Starting conversation with agent:', agentConfig.agentId);
 			
-			const config = {
-				apiKey: API_KEY,
+			// Get API key from environment
+			const apiKey = Constants.expoConfig?.extra?.elevenLabsApiKey || 'sk_85547fd02516d6dd30b819b6fed5708ae70521dfc774769b';
+			
+			// Initialize HTTP service
+			const service = new ElevenLabsConversationalAI({
+				apiKey,
 				agentId: agentConfig.agentId
-			};
-
-			aiServiceRef.current = new ElevenLabsConversationalAI(config);
+			});
 			
 			// Set up callbacks
-			aiServiceRef.current.setOnMessageCallback((message) => {
+			service.setOnMessageCallback((message: ConversationMessage) => {
+				console.log('ElevenLabs message:', message);
 				setConversation(prev => [...prev, message]);
 			});
-
-			aiServiceRef.current.setOnStreamingCallback((content, isComplete) => {
+			
+			service.setOnStreamingCallback((content: string, isComplete: boolean) => {
 				if (isComplete) {
-					setStreamingContent('');
 					setIsStreamingActive(false);
+					setStreamingContent('');
 				} else {
-					setStreamingContent(content);
 					setIsStreamingActive(true);
+					setStreamingContent(content);
 				}
 			});
-
-			await aiServiceRef.current.initializeConnection();
+			
+			// Connect to service
+			await service.initializeConnection();
+			setElevenLabsService(service);
+			setIsConnecting(false);
+			setCurrentConversationId(`conversation-${Date.now()}`);
 			
 			// Send initial greeting
 			const greeting = getModeConfig(mode).greeting;
@@ -134,10 +151,33 @@ export default function CoachScreen() {
 			setConversation([greetingMessage]);
 			
 		} catch (error) {
-			console.error('Error initializing AI service:', error);
-			Alert.alert('Connection Error', 'Unable to connect to AI coach. Please check your connection and try again.');
-		} finally {
+			console.error('Error starting conversation:', error);
 			setIsConnecting(false);
+			Alert.alert('Connection Error', 'Unable to connect to AI coach. Please check your connection and try again.');
+		}
+	};
+
+	const handleSendMessage = async () => {
+		if (!input.trim() || !elevenLabsService) return;
+
+		setHasUserInteracted(true);
+
+		// Add user message to conversation
+		const userMessage: ConversationMessage = {
+			id: Date.now().toString(),
+			role: 'user',
+			content: input.trim(),
+			timestamp: new Date().toISOString()
+		};
+		setConversation(prev => [...prev, userMessage]);
+
+		try {
+			// Send message to ElevenLabs using HTTP service
+			await elevenLabsService.sendTextMessage(input.trim());
+			setInput('');
+		} catch (error) {
+			console.error('Error sending message:', error);
+			Alert.alert('Error', 'Failed to send message. Please try again.');
 		}
 	};
 
@@ -158,28 +198,6 @@ export default function CoachScreen() {
 					greeting: `Hello! I\'m excited to chat with ${profile?.childName || 'you'} today. What would you like to talk about or play?`,
 					placeholder: 'Ask me anything...',
 				};
-		}
-	};
-
-	const handleSendMessage = async () => {
-		if (!input.trim() || !aiServiceRef.current) return;
-
-		// Mark as interacted to hide suggested prompts
-		setHasUserInteracted(true);
-
-		try {
-			if (isVoiceMode) {
-				// Voice mode - this would typically be handled by voice recording
-				await aiServiceRef.current.sendTextMessage(input.trim());
-			} else {
-				// Text mode
-				await aiServiceRef.current.sendTextMessage(input.trim());
-			}
-			
-			setInput('');
-		} catch (error) {
-			console.error('Error sending message:', error);
-			Alert.alert('Error', 'Failed to send message. Please try again.');
 		}
 	};
 
@@ -216,25 +234,25 @@ export default function CoachScreen() {
 	};
 
 	const handleVoiceRecording = async () => {
-		if (!aiServiceRef.current) return;
-
 		if (isRecording) {
 			// Stop recording
 			try {
 				stopWaveAnimation();
-				await aiServiceRef.current.stopVoiceRecording();
 				setIsRecording(false);
 				// Mark as interacted when voice recording completes
 				setHasUserInteracted(true);
+				// Note: ElevenLabs SDK handles voice recording automatically
+				console.log('Voice recording stopped');
 			} catch (error) {
 				console.error('Error stopping recording:', error);
 				Alert.alert('Recording Error', 'Failed to stop recording. Please try again.');
 			}
 		} else {
 			try {
-				await aiServiceRef.current.startVoiceRecording();
 				setIsRecording(true);
 				startWaveAnimation();
+				// Note: ElevenLabs SDK handles voice recording automatically
+				console.log('Voice recording started');
 			} catch (error) {
 				console.error('Error starting recording:', error);
 				Alert.alert('Recording Error', 'Failed to start recording. Please check microphone permissions.');
@@ -243,7 +261,7 @@ export default function CoachScreen() {
 	};
 
 
-	const handleModeChange = (newMode: Mode) => {
+	const handleModeChange = async (newMode: Mode) => {
 		setMode(newMode);
 		setShowModeSelector(false);
 		// Clear conversation when switching modes
@@ -252,6 +270,15 @@ export default function CoachScreen() {
 		setIsStreamingActive(false);
 		// Reset interaction state when switching modes
 		setHasUserInteracted(false);
+		
+		// End current session and start new one with different agent
+		try {
+			if (elevenLabsConversation) {
+				await elevenLabsConversation.endSession();
+			}
+		} catch (error) {
+			console.error('Error ending session:', error);
+		}
 	};
 
 	const getSuggestedPrompts = (currentMode: Mode) => {
@@ -780,9 +807,8 @@ export default function CoachScreen() {
 							}}>
 								<TouchableOpacity
 									onPress={() => {
-										if (isRecording && aiServiceRef.current) {
-											aiServiceRef.current.stopVoiceRecording().catch(console.error);
-											setIsRecording(false);
+										if (isRecording) {
+											handleVoiceRecording();
 										}
 										setIsVoiceMode(true);
 									}}
@@ -805,9 +831,8 @@ export default function CoachScreen() {
 								
 								<TouchableOpacity
 									onPress={() => {
-										if (isRecording && aiServiceRef.current) {
-											aiServiceRef.current.stopVoiceRecording().catch(console.error);
-											setIsRecording(false);
+										if (isRecording) {
+											handleVoiceRecording();
 										}
 										setIsVoiceMode(false);
 									}}
