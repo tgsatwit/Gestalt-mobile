@@ -66,7 +66,7 @@ export default function DashboardScreen() {
 				{ title: 'Journal', icon: 'create-outline', color: '#7C3AED', navigateTo: 'Journal', count: journal.length },
 				{ title: 'Milestones', icon: 'flag-outline', color: '#7C3AED', navigateTo: 'Milestones', count: milestones.length },
 				{ title: 'Gestalt Lists', icon: 'list-outline', color: '#7C3AED', navigateTo: 'GestaltLists' },
-				{ title: 'Reports', icon: 'analytics-outline', color: '#7C3AED', navigateTo: 'Reports' }
+				{ title: 'Reports', icon: 'document-text-outline', color: '#7C3AED', navigateTo: 'Reports' }
 			]
 		}
 	];
@@ -982,7 +982,7 @@ export default function DashboardScreen() {
 					
 					{/* View Memories Button */}
 					<TouchableOpacity style={{ alignItems: 'center', width: 60 }}>
-						<Ionicons name="book-outline" size={22} color={tokens.color.text.secondary} />
+						<Ionicons name="albums-outline" size={22} color={tokens.color.text.secondary} />
 						<Text style={{ 
 							fontSize: 10, 
 							color: tokens.color.text.secondary, 

@@ -92,20 +92,20 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
     {
       name: 'Coach',
       label: 'Ask Jessie',
-      icon: 'chatbubbles',
+      icon: 'mic',
       iconColor: '#7C3AED'
     },
     {
       name: 'Memories',
       label: 'Memories',
-      icon: 'book',
+      icon: 'albums',
       iconColor: '#7C3AED',
       count: journal.length + milestones.length + appointmentNotes.length
     },
     {
       name: 'Play',
       label: 'Play Analysis',
-      icon: 'game-controller',
+      icon: 'sync',
       iconColor: '#7C3AED',
       count: playSessions.length
     },
