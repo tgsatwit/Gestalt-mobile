@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { GlassView } from '../components/GlassView';
 
 export default function DashboardScreen() {
 	const { tokens } = useTheme();
@@ -398,66 +399,20 @@ export default function DashboardScreen() {
 			</View>
 
 			{/* Liquid Glass Background Section */}
-			<View 
+			<GlassView 
+				intensity={0.08}
 				style={{ 
-					backgroundColor: 'rgba(255,255,255,0.15)',
 					borderTopLeftRadius: 32,
 					borderTopRightRadius: 32,
 					marginTop: -16,
 					paddingTop: 16,
-					shadowColor: 'rgba(124,58,237,0.3)',
-					shadowOffset: { width: 0, height: -8 },
-					shadowOpacity: 0.4,
-					shadowRadius: 24,
-					elevation: 15,
-					borderTopWidth: 2,
+					backgroundColor: 'rgba(255, 255, 255, 0.05)',
+					borderTopWidth: 1,
 					borderLeftWidth: 1,
 					borderRightWidth: 1,
-					borderColor: 'rgba(255,255,255,0.3)',
-					overflow: 'hidden',
-					// Add backdrop filter effect through opacity layers
-					backdropFilter: 'blur(20px)'
+					borderColor: 'rgba(255, 255, 255, 0.2)'
 				}}
 			>
-				{/* Simplified liquid glass background */}
-				<LinearGradient
-					colors={[
-						'rgba(255,255,255,0.85)',
-						'rgba(255,255,255,0.75)',
-						'rgba(255,255,255,0.8)'
-					]}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 1 }}
-					style={{
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						bottom: 0,
-						borderTopLeftRadius: 32,
-						borderTopRightRadius: 32
-					}}
-				/>
-				
-				{/* Subtle top highlight */}
-				<LinearGradient
-					colors={[
-						'rgba(255,255,255,0.4)',
-						'rgba(255,255,255,0.1)',
-						'rgba(255,255,255,0.0)'
-					]}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 0, y: 1 }}
-					style={{
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						height: 60,
-						borderTopLeftRadius: 32,
-						borderTopRightRadius: 32
-					}}
-				/>
 				{/* Learn & Grow Section */}
 				<View style={{ paddingTop: tokens.spacing.gap.sm }}>
 					{sections.map((section, sectionIndex) => (
@@ -472,7 +427,7 @@ export default function DashboardScreen() {
 										<Text style={{
 											fontSize: tokens.font.size.h3,
 											fontWeight: '700',
-											color: '#5B21B6',
+											color: 'white',
 											textAlign: 'center'
 										}}>
 											{section.title}
@@ -545,30 +500,39 @@ export default function DashboardScreen() {
 												justifyContent: 'center',
 												overflow: 'visible'
 											}}>
-												{/* Dynamic gradient background */}
-												<LinearGradient
-													colors={sectionIndex === 0 ? [
-														'#6B21A8',
-														'#7C3AED',
-														'#6B21A8'
-													] : [
-														'rgba(255,255,255,0.95)', 
-														'rgba(255,255,255,0.85)', 
-														'rgba(255,255,255,0.9)'
-													]}
-													start={{ x: 0, y: 0 }}
-													end={{ x: 1, y: 1 }}
+												{/* Enhanced Liquid Glass Background */}
+												<View
 													style={{
 														position: 'absolute',
 														top: 0,
 														left: 0,
 														right: 0,
 														bottom: 0,
-														borderRadius: sectionIndex === 0 ? 28 : 20
+														borderRadius: sectionIndex === 0 ? 28 : 20,
+														backgroundColor: 'rgba(255, 255, 255, 0.15)',
+														// Add backdrop blur effect
+														backdropFilter: 'blur(10px)',
+														// Inner shadow for depth
+														shadowColor: 'rgba(0,0,0,0.1)',
+														shadowOffset: { width: 0, height: 2 },
+														shadowOpacity: 1,
+														shadowRadius: 4
 													}}
 												/>
 												
-												{/* Glass border */}
+												{/* Liquid Glass Highlight */}
+												<View style={{
+													position: 'absolute',
+													top: 0,
+													left: 0,
+													right: 0,
+													height: '45%',
+													borderRadius: sectionIndex === 0 ? 28 : 20,
+													backgroundColor: 'rgba(255, 255, 255, 0.3)',
+													opacity: 0.8
+												}} />
+												
+												{/* Enhanced Glass Border */}
 												<View style={{
 													position: 'absolute',
 													top: 0,
@@ -577,34 +541,10 @@ export default function DashboardScreen() {
 													bottom: 0,
 													borderRadius: sectionIndex === 0 ? 28 : 20,
 													borderWidth: 1.5,
-													borderColor: sectionIndex === 0 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.5)'
+													borderColor: 'rgba(255, 255, 255, 0.4)'
 												}} />
 												
-												{/* Glass reflection overlay */}
-												<LinearGradient
-													colors={sectionIndex === 0 ? [
-														'rgba(255,255,255,0.6)',
-														'rgba(255,255,255,0.2)',
-														'rgba(255,255,255,0.1)'
-													] : [
-														'rgba(255,255,255,0.4)',
-														'rgba(255,255,255,0.2)',
-														'rgba(255,255,255,0.0)'
-													]}
-													start={{ x: 0, y: 0 }}
-													end={{ x: 1, y: 1 }}
-													style={{
-														position: 'absolute',
-														top: 0,
-														left: 0,
-														right: 0,
-														height: '60%',
-														borderTopLeftRadius: sectionIndex === 0 ? 28 : 20,
-														borderTopRightRadius: sectionIndex === 0 ? 28 : 20
-													}}
-												/>
-												
-												{/* Inner glass highlight */}
+												{/* Inner Glass Ring */}
 												<View style={{
 													position: 'absolute',
 													top: 2,
@@ -612,14 +552,15 @@ export default function DashboardScreen() {
 													right: 2,
 													bottom: 2,
 													borderRadius: sectionIndex === 0 ? 26 : 18,
-													borderWidth: 1,
-													borderColor: sectionIndex === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)'
+													borderWidth: 0.5,
+													borderColor: 'rgba(255, 255, 255, 0.2)'
 												}} />
+												
 												
 												<Ionicons 
 													name={action.icon as any} 
 													size={sectionIndex === 0 ? 42 : 32} 
-													color={sectionIndex === 0 ? 'white' : action.color} 
+													color='white' 
 													style={{ zIndex: 1 }}
 												/>
 												
@@ -656,7 +597,7 @@ export default function DashboardScreen() {
 											</View>
 											<Text style={{
 												fontSize: tokens.font.size.xs,
-												color: '#5B21B6',
+												color: 'white',
 												textAlign: 'center',
 												fontWeight: '500',
 												lineHeight: tokens.font.size.xs * 1.2
@@ -711,26 +652,39 @@ export default function DashboardScreen() {
 													justifyContent: 'center',
 													overflow: 'visible'
 												}}>
-													{/* Dynamic gradient background */}
-													<LinearGradient
-														colors={[
-															'rgba(255,255,255,0.95)', 
-															'rgba(255,255,255,0.85)', 
-															'rgba(255,255,255,0.9)'
-														]}
-														start={{ x: 0, y: 0 }}
-														end={{ x: 1, y: 1 }}
+													{/* Enhanced Liquid Glass Background */}
+													<View
 														style={{
 															position: 'absolute',
 															top: 0,
 															left: 0,
 															right: 0,
 															bottom: 0,
-															borderRadius: 20
+															borderRadius: 20,
+															backgroundColor: 'rgba(255, 255, 255, 0.15)',
+															// Add backdrop blur effect
+															backdropFilter: 'blur(10px)',
+															// Inner shadow for depth
+															shadowColor: 'rgba(0,0,0,0.1)',
+															shadowOffset: { width: 0, height: 2 },
+															shadowOpacity: 1,
+															shadowRadius: 4
 														}}
 													/>
 													
-													{/* Glass border */}
+													{/* Liquid Glass Highlight */}
+													<View style={{
+														position: 'absolute',
+														top: 0,
+														left: 0,
+														right: 0,
+														height: '45%',
+														borderRadius: 20,
+														backgroundColor: 'rgba(255, 255, 255, 0.3)',
+														opacity: 0.8
+													}} />
+													
+													{/* Enhanced Glass Border */}
 													<View style={{
 														position: 'absolute',
 														top: 0,
@@ -739,30 +693,10 @@ export default function DashboardScreen() {
 														bottom: 0,
 														borderRadius: 20,
 														borderWidth: 1.5,
-														borderColor: 'rgba(255,255,255,0.5)'
+														borderColor: 'rgba(255, 255, 255, 0.4)'
 													}} />
 													
-													{/* Glass reflection overlay */}
-													<LinearGradient
-														colors={[
-															'rgba(255,255,255,0.4)',
-															'rgba(255,255,255,0.2)',
-															'rgba(255,255,255,0.0)'
-														]}
-														start={{ x: 0, y: 0 }}
-														end={{ x: 1, y: 1 }}
-														style={{
-															position: 'absolute',
-															top: 0,
-															left: 0,
-															right: 0,
-															height: '60%',
-															borderTopLeftRadius: 20,
-															borderTopRightRadius: 20
-														}}
-													/>
-													
-													{/* Inner glass highlight */}
+													{/* Inner Glass Ring */}
 													<View style={{
 														position: 'absolute',
 														top: 2,
@@ -770,14 +704,15 @@ export default function DashboardScreen() {
 														right: 2,
 														bottom: 2,
 														borderRadius: 18,
-														borderWidth: 1,
-														borderColor: 'rgba(255,255,255,0.2)'
+														borderWidth: 0.5,
+														borderColor: 'rgba(255, 255, 255, 0.2)'
 													}} />
+													
 													
 													<Ionicons 
 														name={action.icon as any} 
 														size={32} 
-														color={action.color} 
+														color='white' 
 														style={{ zIndex: 1 }}
 													/>
 													
@@ -814,7 +749,7 @@ export default function DashboardScreen() {
 												</View>
 												<Text style={{
 													fontSize: tokens.font.size.xs,
-													color: '#5B21B6',
+													color: 'white',
 													textAlign: 'center',
 													fontWeight: '500',
 													lineHeight: tokens.font.size.xs * 1.2
@@ -830,22 +765,21 @@ export default function DashboardScreen() {
 						</View>
 					))}
 				</View>
-				
-			</View>
+			</GlassView>
 			</ScrollView>
 
 			{/* Center Microphone Button - Popping out of bottom nav */}
 			<TouchableOpacity style={{ 
 				position: 'absolute',
-				bottom: 35, // Position above the bottom nav
+				bottom: 42, // Position above the bottom nav
 				left: '50%',
-				marginLeft: -28, // Half of button width to center
+				marginLeft: -32, // Half of button width to center
 				zIndex: 1000
 			}}>
 				<View style={{
-					width: 56,
-					height: 56,
-					borderRadius: 28,
+					width: 64,
+					height: 64,
+					borderRadius: 32,
 					overflow: 'hidden',
 					shadowColor: tokens.color.brand.gradient.start,
 					shadowOffset: { width: 0, height: 8 },
@@ -854,7 +788,7 @@ export default function DashboardScreen() {
 					elevation: 12
 				}}>
 					<LinearGradient
-						colors={[tokens.color.brand.gradient.start, tokens.color.brand.gradient.mid]}
+						colors={['#4C1D95', '#5B21B6', '#6D28D9', '#7C3AED']}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
 						style={{
@@ -875,7 +809,7 @@ export default function DashboardScreen() {
 							borderRadius: 28
 						}} />
 						
-						<Ionicons name="mic" size={24} color="white" style={{ zIndex: 1 }} />
+						<Ionicons name="mic" size={28} color="white" style={{ zIndex: 1 }} />
 					</LinearGradient>
 				</View>
 			</TouchableOpacity>
@@ -906,7 +840,7 @@ export default function DashboardScreen() {
 				paddingTop: tokens.spacing.gap.sm,
 				paddingHorizontal: tokens.spacing.gap.md,
 				paddingBottom: tokens.spacing.gap.sm + 10, // Extra for safe area
-				height: 75,
+				height: 85,
 				// Dramatic upward shadow
 				shadowColor: '#000000',
 				shadowOffset: { width: 0, height: -12 },
@@ -952,10 +886,10 @@ export default function DashboardScreen() {
 					paddingHorizontal: tokens.spacing.gap.xs
 				}}>
 					{/* Menu Button */}
-					<TouchableOpacity onPress={openDrawer} style={{ alignItems: 'center', width: 60 }}>
-						<Ionicons name="menu-outline" size={22} color={tokens.color.text.secondary} />
+					<TouchableOpacity onPress={openDrawer} style={{ alignItems: 'center', width: 65 }}>
+						<Ionicons name="menu-outline" size={26} color={tokens.color.text.secondary} />
 						<Text style={{ 
-							fontSize: 10, 
+							fontSize: 11, 
 							color: tokens.color.text.secondary, 
 							marginTop: 3,
 							fontWeight: '500'
@@ -965,10 +899,10 @@ export default function DashboardScreen() {
 					</TouchableOpacity>
 					
 					{/* Add Memory Button */}
-					<TouchableOpacity onPress={toggleAddMenu} style={{ alignItems: 'center', width: 60 }}>
-						<Ionicons name="add-outline" size={22} color={tokens.color.text.secondary} />
+					<TouchableOpacity onPress={toggleAddMenu} style={{ alignItems: 'center', width: 65 }}>
+						<Ionicons name="add-outline" size={26} color={tokens.color.text.secondary} />
 						<Text style={{ 
-							fontSize: 10, 
+							fontSize: 11, 
 							color: tokens.color.text.secondary, 
 							marginTop: 3,
 							fontWeight: '500'
@@ -978,13 +912,13 @@ export default function DashboardScreen() {
 					</TouchableOpacity>
 					
 					{/* Spacer for center button */}
-					<View style={{ width: 56 }} />
+					<View style={{ width: 64 }} />
 					
 					{/* View Memories Button */}
-					<TouchableOpacity style={{ alignItems: 'center', width: 60 }}>
-						<Ionicons name="albums-outline" size={22} color={tokens.color.text.secondary} />
+					<TouchableOpacity style={{ alignItems: 'center', width: 65 }}>
+						<Ionicons name="albums-outline" size={26} color={tokens.color.text.secondary} />
 						<Text style={{ 
-							fontSize: 10, 
+							fontSize: 11, 
 							color: tokens.color.text.secondary, 
 							marginTop: 3,
 							fontWeight: '500'
@@ -994,10 +928,10 @@ export default function DashboardScreen() {
 					</TouchableOpacity>
 					
 					{/* Profile Button */}
-					<TouchableOpacity onPress={toggleProfileMenu} style={{ alignItems: 'center', width: 60 }}>
-						<Ionicons name="person-outline" size={22} color={tokens.color.text.secondary} />
+					<TouchableOpacity onPress={toggleProfileMenu} style={{ alignItems: 'center', width: 65 }}>
+						<Ionicons name="person-outline" size={26} color={tokens.color.text.secondary} />
 						<Text style={{ 
-							fontSize: 10, 
+							fontSize: 11, 
 							color: tokens.color.text.secondary, 
 							marginTop: 3,
 							fontWeight: '500'
@@ -1055,7 +989,7 @@ export default function DashboardScreen() {
 				<Animated.View
 					style={{
 						position: 'absolute',
-						bottom: 85, // Just above the bottom nav
+						bottom: 95, // Just above the bottom nav
 						right: tokens.spacing.containerX,
 						backgroundColor: 'white',
 						borderRadius: tokens.radius.xl,
@@ -1131,8 +1065,8 @@ export default function DashboardScreen() {
 				<Animated.View
 					style={{
 						position: 'absolute',
-						bottom: 85, // Just above the bottom nav
-						left: tokens.spacing.containerX + 60, // Position above Add button
+						bottom: 95, // Just above the bottom nav
+						left: tokens.spacing.containerX + 65, // Position above Add button
 						backgroundColor: 'white',
 						borderRadius: tokens.radius.xl,
 						shadowColor: '#000',

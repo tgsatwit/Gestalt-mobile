@@ -6,7 +6,6 @@ import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { MainStackParamList } from './MainNavigator';
-import type { NavigationProp } from '@react-navigation/native';
 
 interface DrawerContextType {
   isOpen: boolean;
@@ -117,10 +116,12 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
     }
   ];
 
-  const navigation = useNavigation<NavigationProp<MainStackParamList>>();
+  const navigation = useNavigation<any>();
 
   const handleNavigate = (screen: keyof MainStackParamList, params?: any) => {
     closeDrawer();
+    
+    // Navigate directly to the screen
     navigation.navigate(screen, params);
   };
 
