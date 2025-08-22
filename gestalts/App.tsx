@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme';
 import { tokens } from './src/theme/tokens';
 import RootNavigator from './src/navigation/RootNavigator';
+import { navigationRef } from './src/navigation/NavigationService';
 import {
   useFonts as usePlusJakarta,
   PlusJakartaSans_400Regular,
@@ -43,7 +44,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider fontLoaded={fontLoaded}>
-          <NavigationContainer theme={navTheme}>
+          <NavigationContainer ref={navigationRef} theme={navTheme}>
             <StatusBar style="dark" />
             <RootNavigator />
           </NavigationContainer>

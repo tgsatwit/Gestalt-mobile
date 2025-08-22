@@ -161,12 +161,21 @@ This guide captures the established design patterns from the Gestalts mobile app
 }
 ```
 
-**Toggle Controls**
+**Toggle Controls (Primary Style)**
 - Container: purple tinted background, pill shape
 - Active state: brand gradient background, white text
 - Inactive state: transparent background, secondary text
 - Padding: 8pt horizontal, 3pt vertical
 - Font size: 10pt, weight varies by state
+
+**Secondary Button Style (Subtle Selection)**
+- Active background: `tokens.color.brand.gradient.start + '15'` (light purple tint)
+- Active border: `1pt solid tokens.color.brand.gradient.start + '30'` (subtle purple border)
+- Active text: `tokens.color.brand.gradient.start` (purple text)
+- Inactive background: transparent
+- Inactive text: `tokens.color.text.secondary`
+- Font weight: 600 (active), 400 (inactive)
+- Used for: tab navigation, mode selectors, secondary toggles
 
 #### Interactive Elements
 

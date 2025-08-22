@@ -6,6 +6,7 @@ import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { MainStackParamList } from './MainNavigator';
+import type { NavigationProp } from '@react-navigation/native';
 
 interface DrawerContextType {
   isOpen: boolean;
@@ -116,13 +117,15 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
     }
   ];
 
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NavigationProp<MainStackParamList>>();
 
   const handleNavigate = (screen: keyof MainStackParamList, params?: any) => {
     closeDrawer();
     
-    // Navigate directly to the screen
-    navigation.navigate(screen, params);
+    // Use navigation hook which should work now that drawer is inside navigator
+    setTimeout(() => {
+      navigation.navigate(screen, params);
+    }, 100); // Small delay to ensure drawer closes smoothly
   };
 
   return (
