@@ -3,7 +3,6 @@ import { View, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useDrawer } from '../navigation/SimpleDrawer';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
 import { useNavigation } from '@react-navigation/native';
@@ -11,7 +10,6 @@ import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function AddMilestoneScreen() {
 	const { tokens } = useTheme();
-	const { openDrawer } = useDrawer();
 	const navigation = useNavigation();
 	const addMilestone = useMemoriesStore((s) => s.addMilestone);
 	
@@ -20,12 +18,12 @@ export default function AddMilestoneScreen() {
 	const [category, setCategory] = useState<string>('');
 
 	const milestoneCategories = [
-		{ name: 'First Words', icon: 'chatbubble', color: '#10B981' },
-		{ name: 'Communication', icon: 'people', color: '#3B82F6' },
-		{ name: 'Social Skills', icon: 'heart', color: '#EC4899' },
-		{ name: 'Stage Progress', icon: 'trophy', color: '#F59E0B' },
-		{ name: 'Independence', icon: 'person', color: '#8B5CF6' },
-		{ name: 'Learning', icon: 'school', color: '#EF4444' }
+		{ name: 'First Words', icon: 'chatbubble', color: '#7C3AED' },
+		{ name: 'Communication', icon: 'people', color: '#7C3AED' },
+		{ name: 'Social Skills', icon: 'heart', color: '#7C3AED' },
+		{ name: 'Stage Progress', icon: 'trophy', color: '#7C3AED' },
+		{ name: 'Independence', icon: 'person', color: '#7C3AED' },
+		{ name: 'Learning', icon: 'school', color: '#7C3AED' }
 	];
 
 	const milestoneExamples = [
@@ -57,38 +55,14 @@ export default function AddMilestoneScreen() {
 				paddingBottom: tokens.spacing.gap.lg
 			}}>
 				<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-					{/* Left Side: Menu + Title */}
+					{/* Left Side: Back Arrow + Title */}
 					<View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.gap.md, flex: 1 }}>
-						<TouchableOpacity onPress={openDrawer}>
-							<Ionicons name="menu" size={24} color="white" />
+						<TouchableOpacity onPress={() => navigation.goBack()}>
+							<Ionicons name="arrow-back" size={24} color="white" />
 						</TouchableOpacity>
 						<Text style={{ color: 'white', fontSize: tokens.font.size.h3, fontWeight: '600' }}>
 							Add Milestone
 						</Text>
-					</View>
-					
-					{/* Right Side Controls */}
-					<View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.gap.sm }}>
-						{/* Settings Button */}
-						<TouchableOpacity
-							activeOpacity={0.7}
-							style={{
-								padding: 6
-							}}
-						>
-							<Ionicons name="ellipsis-horizontal" size={18} color="white" />
-						</TouchableOpacity>
-
-						{/* Close Button */}
-						<TouchableOpacity
-							onPress={() => navigation.navigate('Dashboard')}
-							activeOpacity={0.7}
-							style={{
-								padding: 6
-							}}
-						>
-							<Ionicons name="close" size={18} color="white" />
-						</TouchableOpacity>
 					</View>
 				</View>
 			</View>
@@ -103,23 +77,19 @@ export default function AddMilestoneScreen() {
 				<ScrollView contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 120 }}>
 				{/* Celebration Header */}
 				<View style={{
-					backgroundColor: 'rgba(16, 185, 129, 0.1)',
-					borderRadius: tokens.radius.xl,
-					padding: tokens.spacing.gap.lg,
+					backgroundColor: 'rgba(124, 58, 237, 0.1)',
+					borderRadius: tokens.radius.lg,
+					padding: tokens.spacing.gap.md,
 					marginBottom: tokens.spacing.gap.lg,
 					alignItems: 'center'
 				}}>
-					<Ionicons name="trophy" size={48} color="#10B981" />
+					<Ionicons name="trophy" size={32} color="#7C3AED" />
 					<Text style={{ 
-						fontSize: tokens.font.size.xl,
-						fontWeight: '700',
-						marginTop: tokens.spacing.gap.sm,
-						marginBottom: tokens.spacing.gap.xs
+						fontSize: tokens.font.size.lg,
+						fontWeight: '600',
+						marginTop: tokens.spacing.gap.xs
 					}}>
 						Celebrate Progress!
-					</Text>
-					<Text color="secondary" style={{ textAlign: 'center' }}>
-						Every step forward is worth celebrating
 					</Text>
 				</View>
 
@@ -214,7 +184,7 @@ export default function AddMilestoneScreen() {
 								onPress={() => setTitle(example)}
 								style={{
 									backgroundColor: tokens.color.surface,
-									borderRadius: tokens.radius.full,
+									borderRadius: tokens.radius.pill,
 									paddingHorizontal: tokens.spacing.gap.md,
 									paddingVertical: tokens.spacing.gap.sm,
 									marginRight: tokens.spacing.gap.sm
@@ -287,69 +257,28 @@ export default function AddMilestoneScreen() {
 
 				{/* Photo Attachment */}
 				<TouchableOpacity style={{
-					backgroundColor: 'rgba(16, 185, 129, 0.05)',
-					borderColor: '#10B981',
-					borderWidth: 1,
-					borderStyle: 'dashed',
+					backgroundColor: tokens.color.surface,
 					borderRadius: tokens.radius.lg,
 					padding: tokens.spacing.gap.lg,
 					alignItems: 'center',
-					marginBottom: tokens.spacing.gap.lg
+					marginBottom: tokens.spacing.gap.lg,
+					borderWidth: 1,
+					borderColor: tokens.color.border.default,
+					borderStyle: 'dashed'
 				}}>
-					<Ionicons name="camera" size={32} color="#10B981" />
-					<Text style={{ 
-						marginTop: tokens.spacing.gap.sm,
-						color: '#10B981',
-						fontWeight: '500'
-					}}>
-						Capture this moment
-					</Text>
+					<Ionicons name="camera-outline" size={32} color={tokens.color.text.secondary} />
 					<Text color="secondary" style={{ 
-						fontSize: tokens.font.size.sm,
-						textAlign: 'center',
-						marginTop: 2
+						marginTop: tokens.spacing.gap.sm,
+						fontSize: tokens.font.size.sm 
 					}}>
-						Add a photo to remember this milestone
+						Add photos or videos
 					</Text>
 				</TouchableOpacity>
-
-				{/* Share Options */}
-				<View style={{
-					backgroundColor: tokens.color.surface,
-					borderRadius: tokens.radius.lg,
-					padding: tokens.spacing.gap.md,
-					marginBottom: tokens.spacing.gap.lg
-				}}>
-					<Text weight="medium" style={{ marginBottom: tokens.spacing.gap.sm }}>
-						Share this milestone
-					</Text>
-					<TouchableOpacity style={{ 
-						flexDirection: 'row',
-						alignItems: 'center',
-						paddingVertical: tokens.spacing.gap.xs
-					}}>
-						<Ionicons name="checkbox" size={20} color="#10B981" />
-						<Text style={{ marginLeft: tokens.spacing.gap.sm }}>
-							Add to progress report
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity style={{ 
-						flexDirection: 'row',
-						alignItems: 'center',
-						paddingVertical: tokens.spacing.gap.xs
-					}}>
-						<Ionicons name="square-outline" size={20} color={tokens.color.text.secondary} />
-						<Text style={{ marginLeft: tokens.spacing.gap.sm }}>
-							Share with specialist
-						</Text>
-					</TouchableOpacity>
-				</View>
 
 				{/* Save Button */}
 				<GradientButton 
 					title="Save Milestone" 
 					onPress={handleSave}
-					colors={['#10B981', '#059669']}
 				/>
 				</ScrollView>
 			</View>
