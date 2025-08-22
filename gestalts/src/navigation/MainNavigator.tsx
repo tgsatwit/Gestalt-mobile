@@ -6,6 +6,12 @@ import CoachScreen from '../screens/CoachScreen';
 import MemoriesScreen from '../screens/MemoriesScreen';
 import PlayScreen from '../screens/PlayScreen';
 import ReportScreen from '../screens/ReportScreen';
+import StorybookScreen from '../screens/StorybookScreen';
+import KnowledgeScreen from '../screens/KnowledgeScreen';
+import AddJournalScreen from '../screens/AddJournalScreen';
+import AddMilestoneScreen from '../screens/AddMilestoneScreen';
+import GestaltListsScreen from '../screens/GestaltListsScreen';
+import ChildProfileScreen from '../screens/ChildProfileScreen';
 
 export type MainStackParamList = {
   Dashboard: undefined;
@@ -13,26 +19,119 @@ export type MainStackParamList = {
   Memories: undefined;
   Play: undefined;
   Report: undefined;
+  PlayAnalyzer: undefined;
+  Storybook: undefined;
+  Knowledge: undefined;
+  AddJournal: undefined;
+  AddMilestone: undefined;
+  GestaltLists: undefined;
+  ChildProfile: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
+// Wrap screens with DrawerProvider (for bottom nav screens)
+const DashboardWithDrawer = () => (
+  <DrawerProvider>
+    <DashboardScreen />
+  </DrawerProvider>
+);
+
+const CoachWithDrawer = () => (
+  <DrawerProvider>
+    <CoachScreen />
+  </DrawerProvider>
+);
+
+const MemoriesWithDrawer = () => (
+  <DrawerProvider>
+    <MemoriesScreen />
+  </DrawerProvider>
+);
+
+const PlayWithDrawer = () => (
+  <DrawerProvider>
+    <PlayScreen />
+  </DrawerProvider>
+);
+
+const ReportWithDrawer = () => (
+  <DrawerProvider>
+    <ReportScreen />
+  </DrawerProvider>
+);
+
+const KnowledgeWithDrawer = () => (
+  <DrawerProvider>
+    <KnowledgeScreen />
+  </DrawerProvider>
+);
+
+const AddJournalWithDrawer = () => (
+  <DrawerProvider>
+    <AddJournalScreen />
+  </DrawerProvider>
+);
+
+const AddMilestoneWithDrawer = () => (
+  <DrawerProvider>
+    <AddMilestoneScreen />
+  </DrawerProvider>
+);
+
+const GestaltListsWithDrawer = () => (
+  <DrawerProvider>
+    <GestaltListsScreen />
+  </DrawerProvider>
+);
+
+const ChildProfileWithDrawer = () => (
+  <DrawerProvider>
+    <ChildProfileScreen />
+  </DrawerProvider>
+);
+
+// Screens without bottom nav (colored header style)
+const PlayAnalyzerWithDrawer = () => (
+  <DrawerProvider>
+    <PlayScreen />
+  </DrawerProvider>
+);
+
+const StorybookWithDrawer = () => (
+  <DrawerProvider>
+    <StorybookScreen />
+  </DrawerProvider>
+);
+
 export default function MainNavigator() {
   return (
-    <DrawerProvider>
-      <Stack.Navigator 
-        initialRouteName="Dashboard"
-        screenOptions={{ 
-          headerShown: false,
-          gestureEnabled: true
-        }}
-      >
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="Coach" component={CoachScreen} />
-        <Stack.Screen name="Memories" component={MemoriesScreen} />
-        <Stack.Screen name="Play" component={PlayScreen} />
-        <Stack.Screen name="Report" component={ReportScreen} />
-      </Stack.Navigator>
-    </DrawerProvider>
+    <Stack.Navigator 
+      initialRouteName="Dashboard"
+      screenOptions={{ 
+        headerShown: false,
+        gestureEnabled: true
+      }}
+    >
+      {/* Main Navigation Screens */}
+      <Stack.Screen name="Dashboard" component={DashboardWithDrawer} />
+      <Stack.Screen name="Coach" component={CoachWithDrawer} />
+      <Stack.Screen name="Memories" component={MemoriesWithDrawer} />
+      <Stack.Screen name="Play" component={PlayWithDrawer} />
+      <Stack.Screen name="Report" component={ReportWithDrawer} />
+      
+      {/* Learn & Grow Screens */}
+      <Stack.Screen name="PlayAnalyzer" component={PlayAnalyzerWithDrawer} />
+      <Stack.Screen name="Storybook" component={StorybookWithDrawer} />
+      <Stack.Screen name="Knowledge" component={KnowledgeWithDrawer} />
+      
+      {/* Record & Track Screens */}
+      <Stack.Screen name="AddJournal" component={AddJournalWithDrawer} />
+      <Stack.Screen name="AddMilestone" component={AddMilestoneWithDrawer} />
+      <Stack.Screen name="GestaltLists" component={GestaltListsWithDrawer} />
+      
+      {/* Profile Screens */}
+      <Stack.Screen name="ChildProfile" component={ChildProfileWithDrawer} />
+    </Stack.Navigator>
   );
 }

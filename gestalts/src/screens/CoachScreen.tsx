@@ -5,7 +5,7 @@ import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import Constants from 'expo-constants';
 // Temporarily comment out ElevenLabs SDK to test basic functionality
@@ -29,6 +29,7 @@ type CoachScreenRouteProp = RouteProp<MainStackParamList, 'Coach'>;
 export default function CoachScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
+	const navigation = useNavigation();
 	const route = useRoute<CoachScreenRouteProp>();
 	const addJournal = useMemoriesStore((s) => s.addJournal);
 	const addAppointmentNote = useMemoriesStore((s) => s.addAppointmentNote);
@@ -577,9 +578,7 @@ export default function CoachScreen() {
 								onPress={() => setShowSettingsDropdown(!showSettingsDropdown)}
 								activeOpacity={0.7}
 								style={{
-									padding: 6,
-									borderRadius: tokens.radius.lg,
-									backgroundColor: 'rgba(255,255,255,0.2)'
+									padding: 6
 								}}
 							>
 								<Ionicons name="ellipsis-horizontal" size={18} color="white" />
@@ -589,25 +588,32 @@ export default function CoachScreen() {
 							<TouchableOpacity
 								activeOpacity={0.7}
 								style={{
-									padding: 6,
-									borderRadius: tokens.radius.lg,
-									backgroundColor: 'rgba(255,255,255,0.2)'
+									padding: 6
 								}}
 							>
 								<Ionicons name="sparkles" size={18} color="white" />
 							</TouchableOpacity>
 
-							{/* Conversation History Button - Far Right */}
+							{/* Conversation History Button */}
 							<TouchableOpacity
 								onPress={openConversationHistory}
 								activeOpacity={0.7}
 								style={{
-									padding: 6,
-									borderRadius: tokens.radius.lg,
-									backgroundColor: 'rgba(255,255,255,0.2)'
+									padding: 6
 								}}
 							>
 								<Ionicons name="chatbubbles" size={18} color="white" />
+							</TouchableOpacity>
+
+							{/* Close Button - Far Right */}
+							<TouchableOpacity
+								onPress={() => navigation.navigate('Dashboard')}
+								activeOpacity={0.7}
+								style={{
+									padding: 6
+								}}
+							>
+								<Ionicons name="close" size={18} color="white" />
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -814,15 +820,18 @@ export default function CoachScreen() {
 									}}
 									activeOpacity={0.7}
 									style={{
-										paddingHorizontal: 8,
-										paddingVertical: 3,
+										width: 50,
+										paddingVertical: tokens.spacing.gap.xs,
 										borderRadius: tokens.radius.pill,
-										backgroundColor: isVoiceMode ? tokens.color.brand.gradient.start : 'transparent'
+										backgroundColor: isVoiceMode ? tokens.color.brand.gradient.start + '15' : 'transparent',
+										borderWidth: isVoiceMode ? 1 : 0,
+										borderColor: isVoiceMode ? tokens.color.brand.gradient.start + '30' : 'transparent',
+										alignItems: 'center'
 									}}
 								>
 									<Text style={{
-										color: isVoiceMode ? 'white' : tokens.color.text.secondary,
-										fontSize: 10,
+										color: isVoiceMode ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+										fontSize: tokens.font.size.xs,
 										fontWeight: isVoiceMode ? '600' : '400'
 									}}>
 										Talk
@@ -838,15 +847,18 @@ export default function CoachScreen() {
 									}}
 									activeOpacity={0.7}
 									style={{
-										paddingHorizontal: 8,
-										paddingVertical: 3,
+										width: 50,
+										paddingVertical: tokens.spacing.gap.xs,
 										borderRadius: tokens.radius.pill,
-										backgroundColor: !isVoiceMode ? tokens.color.brand.gradient.start : 'transparent'
+										backgroundColor: !isVoiceMode ? tokens.color.brand.gradient.start + '15' : 'transparent',
+										borderWidth: !isVoiceMode ? 1 : 0,
+										borderColor: !isVoiceMode ? tokens.color.brand.gradient.start + '30' : 'transparent',
+										alignItems: 'center'
 									}}
 								>
 									<Text style={{
-										color: !isVoiceMode ? 'white' : tokens.color.text.secondary,
-										fontSize: 10,
+										color: !isVoiceMode ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+										fontSize: tokens.font.size.xs,
 										fontWeight: !isVoiceMode ? '600' : '400'
 									}}>
 										Chat

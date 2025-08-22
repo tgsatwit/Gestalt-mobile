@@ -7,6 +7,7 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { GlassView } from '../components/GlassView';
+import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function DashboardScreen() {
 	const { tokens } = useTheme();
@@ -48,13 +49,17 @@ export default function DashboardScreen() {
 		(navigation as any).navigate('Coach', { initialMode: mode });
 	};
 
+	const handleTilePress = (navigateTo: string) => {
+		(navigation as any).navigate(navigateTo);
+	};
+
 	const sections = [
 		{
 			title: 'Learn & Grow',
 			icon: 'arrow-forward',
 			quickActions: [
-				{ title: 'Play Analyzer', icon: 'sync', color: '#7C3AED', navigateTo: 'Play' },
-				{ title: 'Storybook', icon: 'book-outline', color: '#7C3AED', navigateTo: 'Stories' },
+				{ title: 'Play Analyzer', icon: 'sync', color: '#7C3AED', navigateTo: 'PlayAnalyzer' },
+				{ title: 'Storybook', icon: 'book-outline', color: '#7C3AED', navigateTo: 'Storybook' },
 				{ title: 'Knowledge', icon: 'bulb-outline', color: '#7C3AED', navigateTo: 'Knowledge' }
 			]
 		},
@@ -62,12 +67,12 @@ export default function DashboardScreen() {
 			title: 'Record & Track',
 			icon: 'arrow-forward',
 			quickActions: [
-				{ title: 'Add Memory', icon: 'add-circle-outline', color: '#7C3AED', navigateTo: 'AddMemory' },
-				{ title: 'Appointment Notes', icon: 'calendar-outline', color: '#7C3AED', navigateTo: 'Appointments', count: appointmentNotes.length },
-				{ title: 'Journal', icon: 'create-outline', color: '#7C3AED', navigateTo: 'Journal', count: journal.length },
-				{ title: 'Milestones', icon: 'flag-outline', color: '#7C3AED', navigateTo: 'Milestones', count: milestones.length },
+				{ title: 'Add Journal', icon: 'create-outline', color: '#7C3AED', navigateTo: 'AddJournal' },
+				{ title: 'Add Milestone', icon: 'flag-outline', color: '#7C3AED', navigateTo: 'AddMilestone' },
+				{ title: 'Journal', icon: 'albums-outline', color: '#7C3AED', navigateTo: 'Memories', count: journal.length },
+				{ title: 'Milestones', icon: 'trophy-outline', color: '#7C3AED', navigateTo: 'Memories', count: milestones.length },
 				{ title: 'Gestalt Lists', icon: 'list-outline', color: '#7C3AED', navigateTo: 'GestaltLists' },
-				{ title: 'Reports', icon: 'document-text-outline', color: '#7C3AED', navigateTo: 'Reports' }
+				{ title: 'Reports', icon: 'document-text-outline', color: '#7C3AED', navigateTo: 'Report' }
 			]
 		}
 	];
@@ -469,6 +474,7 @@ export default function DashboardScreen() {
 										<TouchableOpacity
 											key={index}
 											activeOpacity={0.8}
+											onPress={() => handleTilePress(action.navigateTo)}
 											style={{
 												alignItems: 'center',
 												width: sectionIndex === 0 ? 120 : 85
@@ -621,6 +627,7 @@ export default function DashboardScreen() {
 											<TouchableOpacity
 												key={index}
 												activeOpacity={0.8}
+												onPress={() => handleTilePress(action.navigateTo)}
 												style={{
 													alignItems: 'center',
 													width: 85
@@ -814,327 +821,17 @@ export default function DashboardScreen() {
 				</View>
 			</TouchableOpacity>
 
-			{/* Shadow Base Layer for Dramatic Effect */}
-			<View style={{
-				position: 'absolute',
-				bottom: 0,
-				left: 0,
-				right: 0,
-				height: 100,
-				backgroundColor: 'transparent',
-				shadowColor: '#000000',
-				shadowOffset: { width: 0, height: -15 },
-				shadowOpacity: 0.25,
-				shadowRadius: 30,
-				elevation: 25
-			}} />
+			<BottomNavigation
+				onAddPress={toggleAddMenu}
+				onProfilePress={toggleProfileMenu}
+				showAddMenu={showAddMenu}
+				showProfileMenu={showProfileMenu}
+				addMenuAnim={addMenuAnim}
+				profileMenuAnim={profileMenuAnim}
+				addMenuOptions={addMenuOptions}
+				profileMenuOptions={profileMenuOptions}
+			/>
 
-			{/* Compact Sticky Bottom Navigation */}
-			<View style={{
-				position: 'absolute',
-				bottom: 0,
-				left: 0,
-				right: 0,
-				backgroundColor: 'white',
-				borderTopWidth: 0,
-				paddingTop: tokens.spacing.gap.sm,
-				paddingHorizontal: tokens.spacing.gap.md,
-				paddingBottom: tokens.spacing.gap.sm + 10, // Extra for safe area
-				height: 85,
-				// Dramatic upward shadow
-				shadowColor: '#000000',
-				shadowOffset: { width: 0, height: -12 },
-				shadowOpacity: 0.2,
-				shadowRadius: 25,
-				elevation: 30,
-				overflow: 'visible'
-			}}>
-				{/* Bright white glow at top edge */}
-				<View style={{
-					position: 'absolute',
-					top: -6,
-					left: 0,
-					right: 0,
-					height: 6,
-					backgroundColor: 'white',
-					shadowColor: 'white',
-					shadowOffset: { width: 0, height: 0 },
-					shadowOpacity: 1,
-					shadowRadius: 8,
-					elevation: 5
-				}} />
-				
-				{/* White glow gradient overlay */}
-				<LinearGradient
-					colors={['rgba(255,255,255,1)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.4)']}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 0, y: 1 }}
-					style={{
-						position: 'absolute',
-						top: -3,
-						left: 0,
-						right: 0,
-						height: 20
-					}}
-				/>
-				
-				<View style={{ 
-					flexDirection: 'row', 
-					alignItems: 'center', 
-					justifyContent: 'space-between',
-					flex: 1,
-					paddingHorizontal: tokens.spacing.gap.xs
-				}}>
-					{/* Menu Button */}
-					<TouchableOpacity onPress={openDrawer} style={{ alignItems: 'center', width: 65 }}>
-						<Ionicons name="menu-outline" size={26} color={tokens.color.text.secondary} />
-						<Text style={{ 
-							fontSize: 11, 
-							color: tokens.color.text.secondary, 
-							marginTop: 3,
-							fontWeight: '500'
-						}}>
-							Menu
-						</Text>
-					</TouchableOpacity>
-					
-					{/* Add Memory Button */}
-					<TouchableOpacity onPress={toggleAddMenu} style={{ alignItems: 'center', width: 65 }}>
-						<Ionicons name="add-outline" size={26} color={tokens.color.text.secondary} />
-						<Text style={{ 
-							fontSize: 11, 
-							color: tokens.color.text.secondary, 
-							marginTop: 3,
-							fontWeight: '500'
-						}}>
-							Add
-						</Text>
-					</TouchableOpacity>
-					
-					{/* Spacer for center button */}
-					<View style={{ width: 64 }} />
-					
-					{/* View Memories Button */}
-					<TouchableOpacity style={{ alignItems: 'center', width: 65 }}>
-						<Ionicons name="albums-outline" size={26} color={tokens.color.text.secondary} />
-						<Text style={{ 
-							fontSize: 11, 
-							color: tokens.color.text.secondary, 
-							marginTop: 3,
-							fontWeight: '500'
-						}}>
-							Memories
-						</Text>
-					</TouchableOpacity>
-					
-					{/* Profile Button */}
-					<TouchableOpacity onPress={toggleProfileMenu} style={{ alignItems: 'center', width: 65 }}>
-						<Ionicons name="person-outline" size={26} color={tokens.color.text.secondary} />
-						<Text style={{ 
-							fontSize: 11, 
-							color: tokens.color.text.secondary, 
-							marginTop: 3,
-							fontWeight: '500'
-						}}>
-							Profile
-						</Text>
-					</TouchableOpacity>
-				</View>
-			</View>
-
-			{/* Profile Menu Overlay */}
-			{showProfileMenu && (
-				<Animated.View
-					style={{
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						bottom: 0,
-						backgroundColor: 'rgba(0,0,0,0.1)',
-						opacity: profileMenuAnim
-					}}
-				>
-					<TouchableOpacity 
-						style={{ flex: 1 }}
-						onPress={toggleProfileMenu}
-						activeOpacity={1}
-					/>
-				</Animated.View>
-			)}
-
-			{/* Add Menu Overlay */}
-			{showAddMenu && (
-				<Animated.View
-					style={{
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						bottom: 0,
-						backgroundColor: 'rgba(0,0,0,0.1)',
-						opacity: addMenuAnim
-					}}
-				>
-					<TouchableOpacity 
-						style={{ flex: 1 }}
-						onPress={toggleAddMenu}
-						activeOpacity={1}
-					/>
-				</Animated.View>
-			)}
-
-			{/* Animated Profile Dropdown Menu */}
-			{showProfileMenu && (
-				<Animated.View
-					style={{
-						position: 'absolute',
-						bottom: 95, // Just above the bottom nav
-						right: tokens.spacing.containerX,
-						backgroundColor: 'white',
-						borderRadius: tokens.radius.xl,
-						shadowColor: '#000',
-						shadowOffset: { width: 0, height: 8 },
-						shadowOpacity: 0.15,
-						shadowRadius: 20,
-						elevation: 15,
-						overflow: 'hidden',
-						minWidth: 180,
-						transform: [
-							{
-								translateY: profileMenuAnim.interpolate({
-									inputRange: [0, 1],
-									outputRange: [20, 0],
-								})
-							},
-							{
-								scale: profileMenuAnim.interpolate({
-									inputRange: [0, 1],
-									outputRange: [0.95, 1],
-								})
-							}
-						],
-						opacity: profileMenuAnim
-					}}
-				>
-					{/* Glass effect background */}
-					<LinearGradient
-						colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.9)']}
-						style={{
-							position: 'absolute',
-							top: 0,
-							left: 0,
-							right: 0,
-							bottom: 0,
-						}}
-					/>
-					
-					{profileMenuOptions.map((option, index) => (
-						<TouchableOpacity
-							key={option.title}
-							onPress={() => {
-								console.log('Navigate to:', option.navigateTo);
-								toggleProfileMenu();
-							}}
-							activeOpacity={0.7}
-							style={{
-								alignItems: 'center',
-								justifyContent: 'center',
-								paddingHorizontal: tokens.spacing.gap.lg,
-								paddingVertical: tokens.spacing.gap.lg,
-								borderBottomWidth: index !== profileMenuOptions.length - 1 ? 0.5 : 0,
-								borderBottomColor: 'rgba(124,58,237,0.1)',
-								backgroundColor: 'transparent'
-							}}
-						>
-							<Text style={{
-								fontSize: tokens.font.size.sm,
-								color: tokens.color.text.primary,
-								fontWeight: '600',
-								textAlign: 'center'
-							}}>
-								{option.title}
-							</Text>
-						</TouchableOpacity>
-					))}
-				</Animated.View>
-			)}
-
-			{/* Animated Add Dropdown Menu */}
-			{showAddMenu && (
-				<Animated.View
-					style={{
-						position: 'absolute',
-						bottom: 95, // Just above the bottom nav
-						left: tokens.spacing.containerX + 65, // Position above Add button
-						backgroundColor: 'white',
-						borderRadius: tokens.radius.xl,
-						shadowColor: '#000',
-						shadowOffset: { width: 0, height: 8 },
-						shadowOpacity: 0.15,
-						shadowRadius: 20,
-						elevation: 15,
-						overflow: 'hidden',
-						minWidth: 180,
-						transform: [
-							{
-								translateY: addMenuAnim.interpolate({
-									inputRange: [0, 1],
-									outputRange: [20, 0],
-								})
-							},
-							{
-								scale: addMenuAnim.interpolate({
-									inputRange: [0, 1],
-									outputRange: [0.95, 1],
-								})
-							}
-						],
-						opacity: addMenuAnim
-					}}
-				>
-					{/* Glass effect background */}
-					<LinearGradient
-						colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.9)']}
-						style={{
-							position: 'absolute',
-							top: 0,
-							left: 0,
-							right: 0,
-							bottom: 0,
-						}}
-					/>
-					
-					{addMenuOptions.map((option, index) => (
-						<TouchableOpacity
-							key={option.title}
-							onPress={() => {
-								console.log('Navigate to:', option.navigateTo);
-								toggleAddMenu();
-							}}
-							activeOpacity={0.7}
-							style={{
-								alignItems: 'center',
-								justifyContent: 'center',
-								paddingHorizontal: tokens.spacing.gap.lg,
-								paddingVertical: tokens.spacing.gap.lg,
-								borderBottomWidth: index !== addMenuOptions.length - 1 ? 0.5 : 0,
-								borderBottomColor: 'rgba(124,58,237,0.1)',
-								backgroundColor: 'transparent'
-							}}
-						>
-							<Text style={{
-								fontSize: tokens.font.size.sm,
-								color: tokens.color.text.primary,
-								fontWeight: '600',
-								textAlign: 'center'
-							}}>
-								{option.title}
-							</Text>
-						</TouchableOpacity>
-					))}
-				</Animated.View>
-			)}
 		</LinearGradient>
 	);
 }
