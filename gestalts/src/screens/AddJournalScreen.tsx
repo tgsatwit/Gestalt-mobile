@@ -3,7 +3,6 @@ import { View, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useDrawer } from '../navigation/SimpleDrawer';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
 import { useNavigation } from '@react-navigation/native';
@@ -11,7 +10,6 @@ import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function AddJournalScreen() {
 	const { tokens } = useTheme();
-	const { openDrawer } = useDrawer();
 	const navigation = useNavigation();
 	const addJournal = useMemoriesStore((s) => s.addJournal);
 	
@@ -61,38 +59,14 @@ export default function AddJournalScreen() {
 				paddingBottom: tokens.spacing.gap.lg
 			}}>
 				<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-					{/* Left Side: Menu + Title */}
+					{/* Left Side: Back Arrow + Title */}
 					<View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.gap.md, flex: 1 }}>
-						<TouchableOpacity onPress={openDrawer}>
-							<Ionicons name="menu" size={24} color="white" />
+						<TouchableOpacity onPress={() => navigation.goBack()}>
+							<Ionicons name="arrow-back" size={24} color="white" />
 						</TouchableOpacity>
 						<Text style={{ color: 'white', fontSize: tokens.font.size.h3, fontWeight: '600' }}>
 							Add Journal Entry
 						</Text>
-					</View>
-					
-					{/* Right Side Controls */}
-					<View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.gap.sm }}>
-						{/* Settings Button */}
-						<TouchableOpacity
-							activeOpacity={0.7}
-							style={{
-								padding: 6
-							}}
-						>
-							<Ionicons name="ellipsis-horizontal" size={18} color="white" />
-						</TouchableOpacity>
-
-						{/* Close Button */}
-						<TouchableOpacity
-							onPress={() => navigation.navigate('Dashboard')}
-							activeOpacity={0.7}
-							style={{
-								padding: 6
-							}}
-						>
-							<Ionicons name="close" size={18} color="white" />
-						</TouchableOpacity>
 					</View>
 				</View>
 			</View>

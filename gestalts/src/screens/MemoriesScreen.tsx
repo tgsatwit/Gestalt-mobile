@@ -37,6 +37,17 @@ export default function MemoriesScreen() {
 	const [showChildrenFilter, setShowChildrenFilter] = useState(false);
 	const [selectedSpecialists, setSelectedSpecialists] = useState<string[]>([]);
 	const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
+
+	// Journal filter states
+	const [isJournalFiltersExpanded, setIsJournalFiltersExpanded] = useState(false);
+	const [journalTypeFilter, setJournalTypeFilter] = useState<'all' | 'personal' | 'child'>('all');
+	const [showJournalChildrenFilter, setShowJournalChildrenFilter] = useState(false);
+	const [selectedJournalChildren, setSelectedJournalChildren] = useState<string[]>([]);
+	
+	// Milestone filter states
+	const [isMilestoneFiltersExpanded, setIsMilestoneFiltersExpanded] = useState(false);
+	const [showMilestoneTypesFilter, setShowMilestoneTypesFilter] = useState(false);
+	const [selectedMilestoneTypes, setSelectedMilestoneTypes] = useState<string[]>([]);
 	
 	// Collapsible search/filter state
 	const [isSearchFiltersExpanded, setIsSearchFiltersExpanded] = useState(false);
@@ -95,6 +106,10 @@ export default function MemoriesScreen() {
 	// Simulate multiple children for testing (uncomment this line to test multi-child layout)
 	// const availableChildren = profile ? [profile.childName, 'Emma', 'Alex'] : [];
 	
+	// Milestone types for filtering
+	const milestoneTypes = ['First Words', 'Communication', 'Social Skills', 'Stage Progress', 'Independence', 'Learning'];
+	const availableMilestoneTypes = milestoneTypes;
+	
 	// Initialize filters when specialists/children change
 	React.useEffect(() => {
 		if (availableSpecialists.length === 1 && selectedSpecialists.length === 0) {
@@ -102,8 +117,19 @@ export default function MemoriesScreen() {
 		}
 		if (availableChildren.length === 1 && selectedChildren.length === 0) {
 			setSelectedChildren(availableChildren);
+			setSelectedJournalChildren(availableChildren);
 		}
-	}, [availableSpecialists.length, availableChildren.length]);
+		if (availableMilestoneTypes.length > 0 && selectedMilestoneTypes.length === 0) {
+			setSelectedMilestoneTypes(availableMilestoneTypes);
+		}
+	}, [availableSpecialists.length, availableChildren.length, availableMilestoneTypes.length]);
+
+	// Initialize journal children filter
+	React.useEffect(() => {
+		if (availableChildren.length === 1 && selectedJournalChildren.length === 0) {
+			setSelectedJournalChildren(availableChildren);
+		}
+	}, [availableChildren.length]);
 
 	const filteredAppointments = appointments.filter(apt => {
 		// Filter by completion status
@@ -121,6 +147,22 @@ export default function MemoriesScreen() {
 			// For now, all appointments belong to the current child
 		}
 		
+		return true;
+	});
+
+	// Filter milestones by type and search
+	const filteredMilestones = milestones.filter(milestone => {
+		// Text search
+		if (searchQuery.trim() && !milestone.title?.toLowerCase().includes(searchQuery.toLowerCase())) {
+			return false;
+		}
+
+		// Filter by milestone type (if any selected)
+		if (selectedMilestoneTypes.length > 0 && selectedMilestoneTypes.length < availableMilestoneTypes.length) {
+			// For now, we don't have milestone.type in the data structure, so we'll show all
+			// In the future, you would check: if (!milestone.type || !selectedMilestoneTypes.includes(milestone.type)) return false;
+		}
+
 		return true;
 	});
 
@@ -144,6 +186,32 @@ export default function MemoriesScreen() {
 			entry[searchField]?.toLowerCase().includes(searchQuery.toLowerCase())
 		);
 	};
+
+	// Filter journal entries by type and children
+	const filteredJournalEntries = journal.filter(entry => {
+		// Text search
+		if (searchQuery.trim() && !entry.content?.toLowerCase().includes(searchQuery.toLowerCase())) {
+			return false;
+		}
+
+		// Filter by journal type (personal vs child)
+		// If entry.type is undefined, treat as personal for backward compatibility
+		const entryType = entry.type || 'personal';
+		if (journalTypeFilter === 'personal' && entryType !== 'personal') return false;
+		if (journalTypeFilter === 'child' && entryType === 'personal') return false;
+
+		// Filter by selected children (when journal type is child or all)
+		if (journalTypeFilter !== 'personal' && entryType !== 'personal') {
+			if (selectedJournalChildren.length > 0 && selectedJournalChildren.length < availableChildren.length) {
+				// Filter by child name if entry has childName, otherwise show all
+				if (entry.childName && !selectedJournalChildren.includes(entry.childName)) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	});
 
 	const toggleAppointmentComplete = (id: string) => {
 		setAppointments(prev => prev.map(apt => 
@@ -214,11 +282,15 @@ export default function MemoriesScreen() {
 	React.useEffect(() => {
 		setShowSpecialistFilter(false);
 		setShowChildrenFilter(false);
+		setShowJournalChildrenFilter(false);
+		setShowMilestoneTypesFilter(false);
 	}, [activeTab]);
 
 	const closeAllDropdowns = () => {
 		setShowSpecialistFilter(false);
 		setShowChildrenFilter(false);
+		setShowJournalChildrenFilter(false);
+		setShowMilestoneTypesFilter(false);
 	};
 
 	const toggleSearchFilters = () => {
@@ -227,6 +299,64 @@ export default function MemoriesScreen() {
 			// Close dropdowns when collapsing
 			closeAllDropdowns();
 		}
+	};
+
+	const toggleJournalFilters = () => {
+		setIsJournalFiltersExpanded(!isJournalFiltersExpanded);
+		if (isJournalFiltersExpanded) {
+			// Close dropdowns when collapsing
+			setShowJournalChildrenFilter(false);
+		}
+	};
+
+	const toggleMilestoneFilters = () => {
+		setIsMilestoneFiltersExpanded(!isMilestoneFiltersExpanded);
+		if (isMilestoneFiltersExpanded) {
+			// Close dropdowns when collapsing
+			setShowMilestoneTypesFilter(false);
+		}
+	};
+
+	// Journal filter helper functions
+	const toggleJournalChildSelection = (child: string) => {
+		setSelectedJournalChildren(prev => {
+			if (prev.includes(child)) {
+				return prev.filter(c => c !== child);
+			} else {
+				return [...prev, child];
+			}
+		});
+	};
+
+	const getSelectedJournalChildrenText = () => {
+		if (selectedJournalChildren.length === 0 || selectedJournalChildren.length === availableChildren.length) {
+			return 'All Children';
+		}
+		if (selectedJournalChildren.length === 1) {
+			return selectedJournalChildren[0];
+		}
+		return `${selectedJournalChildren.length} Selected`;
+	};
+
+	// Milestone filter helper functions
+	const toggleMilestoneTypeSelection = (type: string) => {
+		setSelectedMilestoneTypes(prev => {
+			if (prev.includes(type)) {
+				return prev.filter(t => t !== type);
+			} else {
+				return [...prev, type];
+			}
+		});
+	};
+
+	const getSelectedMilestoneTypesText = () => {
+		if (selectedMilestoneTypes.length === 0 || selectedMilestoneTypes.length === availableMilestoneTypes.length) {
+			return 'All Types';
+		}
+		if (selectedMilestoneTypes.length === 1) {
+			return selectedMilestoneTypes[0];
+		}
+		return `${selectedMilestoneTypes.length} Selected`;
 	};
 
 
@@ -470,37 +600,199 @@ export default function MemoriesScreen() {
 					{/* Content based on active tab */}
 					{activeTab === 'journal' && (
 						<View>
-							{/* Search Bar */}
-							<View style={{
-								flexDirection: 'row',
-								alignItems: 'center',
-								backgroundColor: tokens.color.bg.muted,
-								borderRadius: tokens.radius.lg,
-								paddingHorizontal: tokens.spacing.gap.sm,
-								paddingVertical: tokens.spacing.gap.sm,
-								borderWidth: 1,
-								borderColor: tokens.color.border.default,
-								marginBottom: tokens.spacing.gap.lg
-							}}>
-								<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
-								<TextInput
-									placeholder="Search journal..."
-									value={searchQuery}
-									onChangeText={setSearchQuery}
-									style={{
-										flex: 1,
-										fontSize: tokens.font.size.xs,
-										color: tokens.color.text.primary,
+							{/* Search & Filter Toggle */}
+							<TouchableOpacity
+								onPress={toggleJournalFilters}
+								activeOpacity={0.7}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									justifyContent: 'space-between',
+									backgroundColor: tokens.color.bg.muted,
+									borderRadius: tokens.radius.lg,
+									borderWidth: 1,
+									borderColor: tokens.color.border.default,
+									paddingHorizontal: tokens.spacing.gap.sm,
+									paddingVertical: tokens.spacing.gap.sm,
+									marginBottom: tokens.spacing.gap.sm
+								}}
+							>
+								<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+									<Ionicons name="funnel-outline" size={14} color={tokens.color.text.secondary} />
+									<Text style={{
+										fontSize: tokens.font.size.sm,
+										color: tokens.color.text.secondary,
 										fontWeight: '400'
-									}}
-									placeholderTextColor={tokens.color.text.secondary}
+									}}>
+										Search & Filters
+									</Text>
+								</View>
+								<Ionicons 
+									name={isJournalFiltersExpanded ? "chevron-up" : "chevron-down"} 
+									size={14} 
+									color={tokens.color.text.secondary} 
 								/>
-								{searchQuery ? (
-									<TouchableOpacity onPress={() => setSearchQuery('')}>
-										<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
-									</TouchableOpacity>
-								) : null}
-							</View>
+							</TouchableOpacity>
+
+							{/* Collapsible Search & Filter Section */}
+							{isJournalFiltersExpanded && (
+								<View style={{ marginBottom: tokens.spacing.gap.md }}>
+									{/* Search Bar */}
+									<View style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										backgroundColor: tokens.color.bg.muted,
+										borderRadius: tokens.radius.lg,
+										paddingHorizontal: tokens.spacing.gap.sm,
+										paddingVertical: tokens.spacing.gap.sm,
+										borderWidth: 1,
+										borderColor: tokens.color.border.default,
+										marginBottom: tokens.spacing.gap.sm
+									}}>
+										<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
+										<TextInput
+											placeholder="Search journal..."
+											value={searchQuery}
+											onChangeText={setSearchQuery}
+											onFocus={() => setShowJournalChildrenFilter(false)}
+											style={{
+												flex: 1,
+												fontSize: tokens.font.size.sm,
+												color: tokens.color.text.primary,
+												fontWeight: '400'
+											}}
+											placeholderTextColor={tokens.color.text.secondary}
+										/>
+										{searchQuery ? (
+											<TouchableOpacity onPress={() => setSearchQuery('')}>
+												<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
+											</TouchableOpacity>
+										) : null}
+									</View>
+
+									{/* Journal Type Filter Tabs */}
+									<View style={{ 
+										flexDirection: 'row', 
+										marginBottom: tokens.spacing.gap.sm,
+										backgroundColor: tokens.color.bg.muted,
+										borderRadius: tokens.radius.lg,
+										borderWidth: 1,
+										borderColor: tokens.color.border.default,
+										padding: 4
+									}}>
+										{(['all', 'personal', 'child'] as const).map((filter) => (
+											<TouchableOpacity
+												key={filter}
+												onPress={() => setJournalTypeFilter(filter)}
+												style={{
+													flex: 1,
+													paddingVertical: tokens.spacing.gap.sm,
+													paddingHorizontal: tokens.spacing.gap.sm,
+													borderRadius: tokens.radius.lg - 4,
+													backgroundColor: journalTypeFilter === filter ? 'white' : 'transparent',
+													alignItems: 'center'
+												}}
+											>
+												<Text style={{
+													fontSize: tokens.font.size.sm,
+													fontWeight: '400',
+													color: journalTypeFilter === filter ? tokens.color.text.primary : tokens.color.text.secondary
+												}}>
+													{filter === 'all' ? 'All' : filter === 'personal' ? 'Personal' : 'Child'}
+												</Text>
+											</TouchableOpacity>
+										))}
+									</View>
+
+									{/* Children Filter Dropdown */}
+									{availableChildren.length > 1 && journalTypeFilter !== 'personal' && (
+										<View style={{ position: 'relative' }}>
+											<TouchableOpacity
+												onPress={() => {
+													setShowJournalChildrenFilter(!showJournalChildrenFilter);
+												}}
+												activeOpacity={0.7}
+												style={{
+													flexDirection: 'row',
+													alignItems: 'center',
+													backgroundColor: tokens.color.bg.muted,
+													paddingHorizontal: tokens.spacing.gap.sm,
+													paddingVertical: tokens.spacing.gap.sm,
+													borderRadius: tokens.radius.lg,
+													borderWidth: 1,
+													borderColor: tokens.color.border.default
+												}}
+											>
+												<Text style={{
+													fontSize: tokens.font.size.sm,
+													color: tokens.color.text.secondary,
+													marginRight: 4,
+													fontWeight: '400',
+													flex: 1
+												}}>
+													{getSelectedJournalChildrenText()}
+												</Text>
+												<Ionicons 
+													name={showJournalChildrenFilter ? "chevron-up" : "chevron-down"} 
+													size={12} 
+													color={tokens.color.text.secondary} 
+												/>
+											</TouchableOpacity>
+
+											{/* Children Dropdown */}
+											{showJournalChildrenFilter && (
+												<View style={{
+													position: 'absolute',
+													top: '100%',
+													left: 0,
+													right: 0,
+													marginTop: 4,
+													backgroundColor: 'white',
+													borderRadius: tokens.radius.lg,
+													shadowColor: '#000',
+													shadowOffset: { width: 0, height: 2 },
+													shadowOpacity: 0.08,
+													shadowRadius: 12,
+													elevation: 6,
+													zIndex: 1000,
+													maxHeight: 150
+												}}>
+													<ScrollView style={{ maxHeight: 150 }}>
+														{availableChildren.map((child, index) => (
+															<TouchableOpacity
+																key={child}
+																onPress={() => toggleJournalChildSelection(child)}
+																activeOpacity={0.7}
+																style={{
+																	paddingVertical: tokens.spacing.gap.xs,
+																	paddingHorizontal: tokens.spacing.gap.sm,
+																	borderBottomWidth: index !== availableChildren.length - 1 ? 0.5 : 0,
+																	borderBottomColor: 'rgba(0,0,0,0.08)',
+																	backgroundColor: selectedJournalChildren.includes(child) ? tokens.color.bg.muted : 'transparent',
+																	flexDirection: 'row',
+																	alignItems: 'center',
+																	justifyContent: 'space-between'
+																}}
+															>
+																<Text style={{
+																	fontSize: tokens.font.size.sm,
+																	color: selectedJournalChildren.includes(child) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+																	fontWeight: '400'
+																}}>
+																	{child}
+																</Text>
+																{selectedJournalChildren.includes(child) && (
+																	<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+																)}
+															</TouchableOpacity>
+														))}
+													</ScrollView>
+												</View>
+											)}
+										</View>
+									)}
+								</View>
+							)}
 
 							{/* Quick Add Button */}
 							<TouchableOpacity 
@@ -514,7 +806,8 @@ export default function MemoriesScreen() {
 									flexDirection: 'row',
 									alignItems: 'center',
 									justifyContent: 'center',
-									marginBottom: tokens.spacing.gap.lg
+									marginBottom: tokens.spacing.gap.lg,
+									marginTop: isJournalFiltersExpanded ? 0 : tokens.spacing.gap.md
 								}}
 							>
 								<Ionicons name="add-circle" size={20} color={tokens.color.brand.gradient.start} />
@@ -526,57 +819,103 @@ export default function MemoriesScreen() {
 								}}>Add New Journal Entry</Text>
 							</TouchableOpacity>
 
-
 							{/* Journal Entries */}
-							{filterEntries(journal, 'content').map((entry) => (
-								<View key={entry.id} style={{
-									backgroundColor: 'white',
-									borderRadius: tokens.radius['2xl'],
-									padding: tokens.spacing.gap.lg,
-									marginBottom: tokens.spacing.gap.md,
-									borderWidth: 1,
-									borderColor: tokens.color.border.default,
-									shadowColor: '#000',
-									shadowOffset: { width: 0, height: 1 },
-									shadowOpacity: 0.05,
-									shadowRadius: 4,
-									elevation: 1
-								}}>
-									<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: tokens.spacing.gap.sm }}>
-										<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-											<Ionicons name="journal-outline" size={16} color={tokens.color.brand.gradient.start} />
-											<Text style={{
-												fontSize: tokens.font.size.small,
-												color: tokens.color.text.secondary,
-												fontWeight: '500'
-											}}>{dayjs(entry.createdAtISO).format('MMM DD, YYYY • HH:mm')}</Text>
-										</View>
-										{entry.mood && (
-											<View style={{
-												flexDirection: 'row',
-												alignItems: 'center',
-												gap: 4,
-												paddingHorizontal: 8,
-												paddingVertical: 4,
-												borderRadius: 12,
-												backgroundColor: (moods.find(m => m.key === entry.mood)?.color || '#6B7280') + '15'
-											}}>
-												<Text style={{ fontSize: 12 }}>{moods.find(m => m.key === entry.mood)?.icon}</Text>
+							{filteredJournalEntries.length > 0 ? (
+								filteredJournalEntries.map((entry) => (
+									<View key={entry.id} style={{
+										backgroundColor: 'white',
+										borderRadius: tokens.radius['2xl'],
+										padding: tokens.spacing.gap.lg,
+										marginBottom: tokens.spacing.gap.md,
+										borderWidth: 1,
+										borderColor: tokens.color.border.default,
+										shadowColor: '#000',
+										shadowOffset: { width: 0, height: 1 },
+										shadowOpacity: 0.05,
+										shadowRadius: 4,
+										elevation: 1
+									}}>
+										<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: tokens.spacing.gap.sm }}>
+											<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+												<Ionicons name="journal-outline" size={16} color={tokens.color.brand.gradient.start} />
 												<Text style={{
-													fontSize: 10,
-													fontWeight: '600',
-													color: moods.find(m => m.key === entry.mood)?.color || '#6B7280'
-												}}>{moods.find(m => m.key === entry.mood)?.label}</Text>
+													fontSize: tokens.font.size.small,
+													color: tokens.color.text.secondary,
+													fontWeight: '500',
+													flex: 1
+												}}>{dayjs(entry.createdAtISO).format('MMM DD, YYYY • HH:mm')}</Text>
+												
+												{/* Journal Type Badge */}
+												{(entry.type || 'personal') !== 'personal' && (
+													<View style={{
+														paddingHorizontal: 6,
+														paddingVertical: 2,
+														borderRadius: 8,
+														backgroundColor: tokens.color.brand.gradient.start + '15'
+													}}>
+														<Text style={{
+															fontSize: 9,
+															fontWeight: '600',
+															color: tokens.color.brand.gradient.start
+														}}>
+															{entry.childName || 'Child'}
+														</Text>
+													</View>
+												)}
 											</View>
-										)}
+											{entry.mood && (
+												<View style={{
+													flexDirection: 'row',
+													alignItems: 'center',
+													gap: 4,
+													paddingHorizontal: 8,
+													paddingVertical: 4,
+													borderRadius: 12,
+													backgroundColor: (moods.find(m => m.key === entry.mood)?.color || '#6B7280') + '15'
+												}}>
+													<Text style={{ fontSize: 12 }}>{moods.find(m => m.key === entry.mood)?.icon}</Text>
+													<Text style={{
+														fontSize: 10,
+														fontWeight: '600',
+														color: moods.find(m => m.key === entry.mood)?.color || '#6B7280'
+													}}>{moods.find(m => m.key === entry.mood)?.label}</Text>
+												</View>
+											)}
+										</View>
+										<Text style={{
+											fontSize: tokens.font.size.body,
+											color: tokens.color.text.primary,
+											lineHeight: tokens.font.size.body * 1.5
+										}}>{entry.content}</Text>
 									</View>
+								))
+							) : (
+								/* Empty State */
+								<View style={{
+									padding: tokens.spacing.gap.lg * 1.5,
+									alignItems: 'center'
+								}}>
+									<Ionicons name="journal-outline" size={48} color={tokens.color.text.secondary} />
 									<Text style={{
 										fontSize: tokens.font.size.body,
-										color: tokens.color.text.primary,
-										lineHeight: tokens.font.size.body * 1.5
-									}}>{entry.content}</Text>
+										color: tokens.color.text.secondary,
+										textAlign: 'center',
+										marginTop: tokens.spacing.gap.sm
+									}}>
+										{searchQuery ? 'No journal entries found' : 
+										 journalTypeFilter === 'personal' ? 'No personal journal entries yet' :
+										 journalTypeFilter === 'child' ? 'No child journal entries yet' : 'No journal entries yet'}
+									</Text>
+									<Text style={{
+										fontSize: tokens.font.size.sm,
+										color: tokens.color.text.secondary,
+										textAlign: 'center',
+										marginTop: 4
+									}}>
+										{!searchQuery ? 'Tap "Add New Journal Entry" to get started' : ''}
+									</Text>
 								</View>
-							))}
+							)}
 						</View>
 					)}
 
@@ -640,7 +979,7 @@ export default function MemoriesScreen() {
 
 
 							{/* Milestones */}
-							{filterEntries(milestones, 'title').map((milestone) => (
+							{filteredMilestones.map((milestone) => (
 								<View key={milestone.id} style={{
 									backgroundColor: 'white',
 									borderRadius: tokens.radius['2xl'],
@@ -1021,7 +1360,6 @@ export default function MemoriesScreen() {
 										style={{ flex: 1, fontSize: tokens.font.size.body }}
 										autoFocus
 										onSubmitEditing={addQuickAppointment}
-										blurOnSubmit={false}
 									/>
 									<TouchableOpacity onPress={addQuickAppointment}>
 										<Ionicons name="checkmark" size={20} color={tokens.color.brand.gradient.start} />
@@ -1052,7 +1390,7 @@ export default function MemoriesScreen() {
 										fontSize: tokens.font.size.body,
 										fontWeight: '600',
 										color: tokens.color.brand.gradient.start
-									}}>New Reminder</Text>
+									}}>New Appointment Note</Text>
 								</TouchableOpacity>
 							)}
 
@@ -1160,8 +1498,8 @@ export default function MemoriesScreen() {
 										textAlign: 'center',
 										marginTop: tokens.spacing.gap.sm
 									}}>
-										{appointmentFilter === 'completed' ? 'No completed reminders' :
-										 appointmentFilter === 'open' ? 'No open reminders' : 'No reminders yet'}
+										{appointmentFilter === 'completed' ? 'No completed appointment notes' :
+										 appointmentFilter === 'open' ? 'No open appointment notes' : 'No appointment notes yet'}
 									</Text>
 									<Text style={{
 										fontSize: tokens.font.size.sm,
@@ -1169,7 +1507,7 @@ export default function MemoriesScreen() {
 										textAlign: 'center',
 										marginTop: 4
 									}}>
-										{appointmentFilter === 'all' ? 'Tap "New Reminder" to get started' : ''}
+										{appointmentFilter === 'all' ? 'Tap "New Appointment Note" to get started' : ''}
 									</Text>
 								</View>
 							)}

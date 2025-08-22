@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
 
-export type JournalEntry = { id: string; content: string; createdAtISO: string; mood?: 'good' | 'tough' | 'neutral' };
+export type JournalEntry = { id: string; content: string; createdAtISO: string; mood?: 'good' | 'tough' | 'neutral'; type?: 'personal' | 'child'; childName?: string };
 export type Milestone = { id: string; title: string; dateISO: string; notes?: string };
 export type AppointmentNote = { id: string; specialist?: string; question: string; createdAtISO: string };
 export type PlaySession = { id: string; activity: string; notes?: string; createdAtISO: string };
@@ -15,7 +15,7 @@ export type MemoriesState = {
 	appointmentNotes: AppointmentNote[];
 	playSessions: PlaySession[];
 	profile: ChildProfile | null;
-	addJournal: (content: string, mood?: JournalEntry['mood']) => void;
+	addJournal: (content: string, mood?: JournalEntry['mood'], type?: JournalEntry['type'], childName?: string) => void;
 	addMilestone: (title: string, dateISO?: string, notes?: string) => void;
 	addAppointmentNote: (question: string, specialist?: string) => void;
 	addPlaySession: (activity: string, notes?: string) => void;
@@ -32,8 +32,8 @@ export const useMemoriesStore = create<MemoriesState>()(
 			appointmentNotes: [],
 			playSessions: [],
 			profile: null,
-			addJournal: (content, mood) =>
-				set((state) => ({ journal: [{ id: generateId(), content, mood, createdAtISO: dayjs().toISOString() }, ...state.journal] })),
+			addJournal: (content, mood, type, childName) =>
+				set((state) => ({ journal: [{ id: generateId(), content, mood, type, childName, createdAtISO: dayjs().toISOString() }, ...state.journal] })),
 			addMilestone: (title, dateISO, notes) =>
 				set((state) => ({ milestones: [{ id: generateId(), title, notes, dateISO: dateISO ?? dayjs().toISOString() }, ...state.milestones] })),
 			addAppointmentNote: (question, specialist) =>
