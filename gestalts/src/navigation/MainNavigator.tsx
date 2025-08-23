@@ -10,6 +10,7 @@ import StorybookScreen from '../screens/StorybookScreen';
 import KnowledgeScreen from '../screens/KnowledgeScreen';
 import AddJournalScreen from '../screens/AddJournalScreen';
 import AddMilestoneScreen from '../screens/AddMilestoneScreen';
+import AppointmentNoteScreen from '../screens/AppointmentNoteScreen';
 import GestaltListsScreen from '../screens/GestaltListsScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
 
@@ -24,6 +25,7 @@ export type MainStackParamList = {
   Knowledge: undefined;
   AddJournal: undefined;
   AddMilestone: undefined;
+  AppointmentNote: { id?: string } | undefined;
   GestaltLists: undefined;
   ChildProfile: undefined;
 };
@@ -79,6 +81,12 @@ const AddMilestoneWithDrawer = () => (
   </DrawerProvider>
 );
 
+const AppointmentNoteWithDrawer = () => (
+  <DrawerProvider>
+    <AppointmentNoteScreen />
+  </DrawerProvider>
+);
+
 const GestaltListsWithDrawer = () => (
   <DrawerProvider>
     <GestaltListsScreen />
@@ -128,6 +136,7 @@ export default function MainNavigator() {
       {/* Record & Track Screens */}
       <Stack.Screen name="AddJournal" component={AddJournalWithDrawer} />
       <Stack.Screen name="AddMilestone" component={AddMilestoneWithDrawer} />
+      <Stack.Screen name="AppointmentNote" component={AppointmentNoteWithDrawer} />
       <Stack.Screen name="GestaltLists" component={GestaltListsWithDrawer} />
       
       {/* Profile Screens */}

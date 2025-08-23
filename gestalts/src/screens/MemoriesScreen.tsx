@@ -20,6 +20,7 @@ export default function MemoriesScreen() {
 	const { openDrawer } = useDrawer();
 	const navigation = useNavigation<NavigationProp>();
 	const { journal, milestones, appointmentNotes, profile } = useMemoriesStore();
+	const addAppointmentNoteFull = useMemoriesStore((s) => s.addAppointmentNoteFull);
 	const [activeTab, setActiveTab] = useState<MemoryTab>('journal');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -51,6 +52,7 @@ export default function MemoriesScreen() {
 	
 	// Collapsible search/filter state
 	const [isSearchFiltersExpanded, setIsSearchFiltersExpanded] = useState(false);
+	const [isGestaltsFiltersExpanded, setIsGestaltsFiltersExpanded] = useState(false);
 
 	// Mock gestalts data - this would come from store in real implementation
 	const gestalts = [
@@ -284,6 +286,7 @@ export default function MemoriesScreen() {
 		setShowChildrenFilter(false);
 		setShowJournalChildrenFilter(false);
 		setShowMilestoneTypesFilter(false);
+		setIsGestaltsFiltersExpanded(false);
 	}, [activeTab]);
 
 	const closeAllDropdowns = () => {
@@ -309,13 +312,6 @@ export default function MemoriesScreen() {
 		}
 	};
 
-	const toggleMilestoneFilters = () => {
-		setIsMilestoneFiltersExpanded(!isMilestoneFiltersExpanded);
-		if (isMilestoneFiltersExpanded) {
-			// Close dropdowns when collapsing
-			setShowMilestoneTypesFilter(false);
-		}
-	};
 
 	// Journal filter helper functions
 	const toggleJournalChildSelection = (child: string) => {
@@ -357,6 +353,28 @@ export default function MemoriesScreen() {
 			return selectedMilestoneTypes[0];
 		}
 		return `${selectedMilestoneTypes.length} Selected`;
+	};
+
+	// Open or create a corresponding store-backed appointment note for editing
+	const openAppointmentNote = (apt: { id: string; question: string; specialist?: string; completed?: boolean; createdAt?: string; details?: string; completionNotes?: string }) => {
+		const existing = appointmentNotes.find((n) => n.id === apt.id) 
+			|| appointmentNotes.find((n) => n.question === apt.question && (n.specialist || '') === (apt.specialist || ''));
+		if (existing) {
+			(navigation as any).navigate('AppointmentNote', { id: existing.id });
+			return;
+		}
+		addAppointmentNoteFull({
+			question: apt.question,
+			specialist: apt.specialist,
+			details: apt.details,
+			isClosed: !!apt.completed,
+			closureResponse: apt.completionNotes,
+			appointmentDateISO: apt.createdAt,
+		});
+		const latest = useMemoriesStore.getState().appointmentNotes[0];
+		if (latest) {
+			(navigation as any).navigate('AppointmentNote', { id: latest.id });
+		}
 	};
 
 
@@ -600,199 +618,243 @@ export default function MemoriesScreen() {
 					{/* Content based on active tab */}
 					{activeTab === 'journal' && (
 						<View>
-							{/* Search & Filter Toggle */}
-							<TouchableOpacity
-								onPress={toggleJournalFilters}
-								activeOpacity={0.7}
-								style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									justifyContent: 'space-between',
-									backgroundColor: tokens.color.bg.muted,
-									borderRadius: tokens.radius.lg,
-									borderWidth: 1,
-									borderColor: tokens.color.border.default,
-									paddingHorizontal: tokens.spacing.gap.sm,
-									paddingVertical: tokens.spacing.gap.sm,
-									marginBottom: tokens.spacing.gap.sm
-								}}
-							>
-								<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-									<Ionicons name="funnel-outline" size={14} color={tokens.color.text.secondary} />
-									<Text style={{
-										fontSize: tokens.font.size.sm,
-										color: tokens.color.text.secondary,
-										fontWeight: '400'
-									}}>
-										Search & Filters
-									</Text>
-								</View>
-								<Ionicons 
-									name={isJournalFiltersExpanded ? "chevron-up" : "chevron-down"} 
-									size={14} 
-									color={tokens.color.text.secondary} 
-								/>
-							</TouchableOpacity>
-
-							{/* Collapsible Search & Filter Section */}
-							{isJournalFiltersExpanded && (
-								<View style={{ marginBottom: tokens.spacing.gap.md }}>
-									{/* Search Bar */}
-									<View style={{
+							{/* Search & Filters */}
+							<View style={{
+								backgroundColor: tokens.color.surface,
+								borderWidth: 1,
+								borderColor: tokens.color.border.default,
+								borderRadius: tokens.radius.lg,
+								marginBottom: tokens.spacing.gap.lg
+							}}>
+								{/* Header */}
+								<TouchableOpacity
+									onPress={toggleJournalFilters}
+									style={{
 										flexDirection: 'row',
 										alignItems: 'center',
-										backgroundColor: tokens.color.bg.muted,
-										borderRadius: tokens.radius.lg,
-										paddingHorizontal: tokens.spacing.gap.sm,
-										paddingVertical: tokens.spacing.gap.sm,
-										borderWidth: 1,
-										borderColor: tokens.color.border.default,
-										marginBottom: tokens.spacing.gap.sm
-									}}>
-										<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
-										<TextInput
-											placeholder="Search journal..."
-											value={searchQuery}
-											onChangeText={setSearchQuery}
-											onFocus={() => setShowJournalChildrenFilter(false)}
-											style={{
-												flex: 1,
-												fontSize: tokens.font.size.sm,
-												color: tokens.color.text.primary,
-												fontWeight: '400'
-											}}
-											placeholderTextColor={tokens.color.text.secondary}
-										/>
-										{searchQuery ? (
-											<TouchableOpacity onPress={() => setSearchQuery('')}>
-												<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
-											</TouchableOpacity>
-										) : null}
+										justifyContent: 'space-between',
+										paddingHorizontal: tokens.spacing.gap.md,
+										paddingVertical: tokens.spacing.gap.md
+									}}
+								>
+									<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+										<Ionicons name="filter" size={16} color={tokens.color.text.secondary} />
+										<Text style={{ 
+											marginLeft: tokens.spacing.gap.xs,
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.primary,
+											fontWeight: '500'
+										}}>
+											Search & Filter
+										</Text>
 									</View>
+									<Ionicons 
+										name={isJournalFiltersExpanded ? "chevron-up" : "chevron-down"} 
+										size={16} 
+										color={tokens.color.text.secondary} 
+									/>
+								</TouchableOpacity>
 
-									{/* Journal Type Filter Tabs */}
-									<View style={{ 
-										flexDirection: 'row', 
-										marginBottom: tokens.spacing.gap.sm,
-										backgroundColor: tokens.color.bg.muted,
-										borderRadius: tokens.radius.lg,
-										borderWidth: 1,
-										borderColor: tokens.color.border.default,
-										padding: 4
-									}}>
-										{(['all', 'personal', 'child'] as const).map((filter) => (
+								{/* Expanded Content */}
+								{isJournalFiltersExpanded && (
+									<View style={{ paddingHorizontal: tokens.spacing.gap.md, paddingBottom: tokens.spacing.gap.md }}>
+										{/* Search Bar */}
+										<View style={{
+											flexDirection: 'row',
+											alignItems: 'center',
+											backgroundColor: tokens.color.bg.muted,
+											borderRadius: tokens.radius.lg,
+											paddingHorizontal: tokens.spacing.gap.sm,
+											paddingVertical: tokens.spacing.gap.sm,
+											borderWidth: 1,
+											borderColor: tokens.color.border.default,
+											marginBottom: tokens.spacing.gap.md
+										}}>
+											<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
+											<TextInput
+												placeholder="Search Journal..."
+												value={searchQuery}
+												onChangeText={setSearchQuery}
+												onFocus={() => setShowJournalChildrenFilter(false)}
+												style={{
+													flex: 1,
+													fontSize: tokens.font.size.sm,
+													color: tokens.color.text.primary,
+													fontWeight: '400'
+												}}
+												placeholderTextColor={tokens.color.text.secondary}
+											/>
+											{searchQuery ? (
+												<TouchableOpacity onPress={() => setSearchQuery('')}>
+													<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
+												</TouchableOpacity>
+											) : null}
+										</View>
+
+										{/* Journal Type Filter Tabs */}
+										<View style={{ 
+											flexDirection: 'row', 
+											marginBottom: tokens.spacing.gap.sm,
+											backgroundColor: tokens.color.bg.muted,
+											borderRadius: tokens.radius.lg,
+											borderWidth: 1,
+											borderColor: tokens.color.border.default,
+											padding: 4
+										}}>
+											{/* All Tab */}
 											<TouchableOpacity
-												key={filter}
-												onPress={() => setJournalTypeFilter(filter)}
+												onPress={() => setJournalTypeFilter('all')}
 												style={{
 													flex: 1,
 													paddingVertical: tokens.spacing.gap.sm,
 													paddingHorizontal: tokens.spacing.gap.sm,
 													borderRadius: tokens.radius.lg - 4,
-													backgroundColor: journalTypeFilter === filter ? 'white' : 'transparent',
+													backgroundColor: journalTypeFilter === 'all' ? 'white' : 'transparent',
 													alignItems: 'center'
 												}}
 											>
 												<Text style={{
 													fontSize: tokens.font.size.sm,
 													fontWeight: '400',
-													color: journalTypeFilter === filter ? tokens.color.text.primary : tokens.color.text.secondary
+													color: journalTypeFilter === 'all' ? tokens.color.text.primary : tokens.color.text.secondary
 												}}>
-													{filter === 'all' ? 'All' : filter === 'personal' ? 'Personal' : 'Child'}
+													All
 												</Text>
 											</TouchableOpacity>
-										))}
-									</View>
 
-									{/* Children Filter Dropdown */}
-									{availableChildren.length > 1 && journalTypeFilter !== 'personal' && (
-										<View style={{ position: 'relative' }}>
+											{/* Personal Tab */}
 											<TouchableOpacity
-												onPress={() => {
-													setShowJournalChildrenFilter(!showJournalChildrenFilter);
-												}}
-												activeOpacity={0.7}
+												onPress={() => setJournalTypeFilter('personal')}
 												style={{
-													flexDirection: 'row',
-													alignItems: 'center',
-													backgroundColor: tokens.color.bg.muted,
-													paddingHorizontal: tokens.spacing.gap.sm,
+													flex: 1,
 													paddingVertical: tokens.spacing.gap.sm,
-													borderRadius: tokens.radius.lg,
-													borderWidth: 1,
-													borderColor: tokens.color.border.default
+													paddingHorizontal: tokens.spacing.gap.sm,
+													borderRadius: tokens.radius.lg - 4,
+													backgroundColor: journalTypeFilter === 'personal' ? 'white' : 'transparent',
+													alignItems: 'center'
 												}}
 											>
 												<Text style={{
 													fontSize: tokens.font.size.sm,
-													color: tokens.color.text.secondary,
-													marginRight: 4,
 													fontWeight: '400',
-													flex: 1
+													color: journalTypeFilter === 'personal' ? tokens.color.text.primary : tokens.color.text.secondary
 												}}>
-													{getSelectedJournalChildrenText()}
+													Personal
 												</Text>
-												<Ionicons 
-													name={showJournalChildrenFilter ? "chevron-up" : "chevron-down"} 
-													size={12} 
-													color={tokens.color.text.secondary} 
-												/>
 											</TouchableOpacity>
 
-											{/* Children Dropdown */}
-											{showJournalChildrenFilter && (
-												<View style={{
-													position: 'absolute',
-													top: '100%',
-													left: 0,
-													right: 0,
-													marginTop: 4,
-													backgroundColor: 'white',
-													borderRadius: tokens.radius.lg,
-													shadowColor: '#000',
-													shadowOffset: { width: 0, height: 2 },
-													shadowOpacity: 0.08,
-													shadowRadius: 12,
-													elevation: 6,
-													zIndex: 1000,
-													maxHeight: 150
+											{/* Child Tab - Dynamic Label */}
+											<TouchableOpacity
+												onPress={() => setJournalTypeFilter('child')}
+												style={{
+													flex: 1,
+													paddingVertical: tokens.spacing.gap.sm,
+													paddingHorizontal: tokens.spacing.gap.sm,
+													borderRadius: tokens.radius.lg - 4,
+													backgroundColor: journalTypeFilter === 'child' ? 'white' : 'transparent',
+													alignItems: 'center'
+												}}
+											>
+												<Text style={{
+													fontSize: tokens.font.size.sm,
+													fontWeight: '400',
+													color: journalTypeFilter === 'child' ? tokens.color.text.primary : tokens.color.text.secondary
 												}}>
-													<ScrollView style={{ maxHeight: 150 }}>
-														{availableChildren.map((child, index) => (
-															<TouchableOpacity
-																key={child}
-																onPress={() => toggleJournalChildSelection(child)}
-																activeOpacity={0.7}
-																style={{
-																	paddingVertical: tokens.spacing.gap.xs,
-																	paddingHorizontal: tokens.spacing.gap.sm,
-																	borderBottomWidth: index !== availableChildren.length - 1 ? 0.5 : 0,
-																	borderBottomColor: 'rgba(0,0,0,0.08)',
-																	backgroundColor: selectedJournalChildren.includes(child) ? tokens.color.bg.muted : 'transparent',
-																	flexDirection: 'row',
-																	alignItems: 'center',
-																	justifyContent: 'space-between'
-																}}
-															>
-																<Text style={{
-																	fontSize: tokens.font.size.sm,
-																	color: selectedJournalChildren.includes(child) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
-																	fontWeight: '400'
-																}}>
-																	{child}
-																</Text>
-																{selectedJournalChildren.includes(child) && (
-																	<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
-																)}
-															</TouchableOpacity>
-														))}
-													</ScrollView>
-												</View>
-											)}
+													{availableChildren.length === 1 ? availableChildren[0] : 'Child'}
+												</Text>
+											</TouchableOpacity>
 										</View>
-									)}
-								</View>
-							)}
+
+										{/* Children Filter Dropdown - Only show when multiple children and 'child' filter is selected */}
+										{availableChildren.length > 1 && journalTypeFilter === 'child' && (
+											<View style={{ position: 'relative' }}>
+												<TouchableOpacity
+													onPress={() => {
+														setShowJournalChildrenFilter(!showJournalChildrenFilter);
+													}}
+													activeOpacity={0.7}
+													style={{
+														flexDirection: 'row',
+														alignItems: 'center',
+														backgroundColor: tokens.color.bg.muted,
+														paddingHorizontal: tokens.spacing.gap.sm,
+														paddingVertical: tokens.spacing.gap.sm,
+														borderRadius: tokens.radius.lg,
+														borderWidth: 1,
+														borderColor: tokens.color.border.default
+													}}
+												>
+													<Text style={{
+														fontSize: tokens.font.size.sm,
+														color: tokens.color.text.secondary,
+														marginRight: 4,
+														fontWeight: '400',
+														flex: 1
+													}}>
+														{getSelectedJournalChildrenText()}
+													</Text>
+													<Ionicons 
+														name={showJournalChildrenFilter ? "chevron-up" : "chevron-down"} 
+														size={12} 
+														color={tokens.color.text.secondary} 
+													/>
+												</TouchableOpacity>
+
+												{/* Children Dropdown */}
+												{showJournalChildrenFilter && (
+													<View style={{
+														position: 'absolute',
+														top: '100%',
+														left: 0,
+														right: 0,
+														marginTop: 4,
+														backgroundColor: 'white',
+														borderRadius: tokens.radius.lg,
+														shadowColor: '#000',
+														shadowOffset: { width: 0, height: 2 },
+														shadowOpacity: 0.08,
+														shadowRadius: 12,
+														elevation: 6,
+														zIndex: 1000,
+														maxHeight: 150
+													}}>
+														<ScrollView style={{ maxHeight: 150 }}>
+															{availableChildren.map((child, index) => (
+																<TouchableOpacity
+																	key={child}
+																	onPress={() => toggleJournalChildSelection(child)}
+																	activeOpacity={0.7}
+																	style={{
+																		paddingVertical: tokens.spacing.gap.xs,
+																		paddingHorizontal: tokens.spacing.gap.sm,
+																		borderBottomWidth: index !== availableChildren.length - 1 ? 0.5 : 0,
+																		borderBottomColor: 'rgba(0,0,0,0.08)',
+																		backgroundColor: selectedJournalChildren.includes(child) ? tokens.color.bg.muted : 'transparent',
+																		flexDirection: 'row',
+																		alignItems: 'center',
+																		justifyContent: 'space-between'
+																	}}
+																>
+																	<Text style={{
+																		fontSize: tokens.font.size.sm,
+																		color: selectedJournalChildren.includes(child) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+																		fontWeight: '400'
+																	}}>
+																		{child}
+																	</Text>
+																	{selectedJournalChildren.includes(child) && (
+																		<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+																	)}
+																</TouchableOpacity>
+															))}
+														</ScrollView>
+													</View>
+												)}
+											</View>
+										)}
+									</View>
+								)}
+							</View>
 
 							{/* Quick Add Button */}
 							<TouchableOpacity 
@@ -806,8 +868,7 @@ export default function MemoriesScreen() {
 									flexDirection: 'row',
 									alignItems: 'center',
 									justifyContent: 'center',
-									marginBottom: tokens.spacing.gap.lg,
-									marginTop: isJournalFiltersExpanded ? 0 : tokens.spacing.gap.md
+									marginBottom: tokens.spacing.gap.lg
 								}}
 							>
 								<Ionicons name="add-circle" size={20} color={tokens.color.brand.gradient.start} />
@@ -921,36 +982,163 @@ export default function MemoriesScreen() {
 
 					{activeTab === 'milestones' && (
 						<View>
-							{/* Search Bar */}
+							{/* Search & Filters */}
 							<View style={{
-								flexDirection: 'row',
-								alignItems: 'center',
-								backgroundColor: tokens.color.bg.muted,
-								borderRadius: tokens.radius.lg,
-								paddingHorizontal: tokens.spacing.gap.sm,
-								paddingVertical: tokens.spacing.gap.sm,
+								backgroundColor: tokens.color.surface,
 								borderWidth: 1,
 								borderColor: tokens.color.border.default,
+								borderRadius: tokens.radius.lg,
 								marginBottom: tokens.spacing.gap.lg
 							}}>
-								<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
-								<TextInput
-									placeholder="Search milestones..."
-									value={searchQuery}
-									onChangeText={setSearchQuery}
+								{/* Header */}
+								<TouchableOpacity
+									onPress={() => setIsMilestoneFiltersExpanded(!isMilestoneFiltersExpanded)}
 									style={{
-										flex: 1,
-										fontSize: tokens.font.size.xs,
-										color: tokens.color.text.primary,
-										fontWeight: '400'
+										flexDirection: 'row',
+										alignItems: 'center',
+										justifyContent: 'space-between',
+										paddingHorizontal: tokens.spacing.gap.md,
+										paddingVertical: tokens.spacing.gap.md
 									}}
-									placeholderTextColor={tokens.color.text.secondary}
-								/>
-								{searchQuery ? (
-									<TouchableOpacity onPress={() => setSearchQuery('')}>
-										<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
-									</TouchableOpacity>
-								) : null}
+								>
+									<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+										<Ionicons name="filter" size={16} color={tokens.color.text.secondary} />
+										<Text style={{ 
+											marginLeft: tokens.spacing.gap.xs,
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.primary,
+											fontWeight: '500'
+										}}>
+											Search & Filter
+										</Text>
+									</View>
+									<Ionicons 
+										name={isMilestoneFiltersExpanded ? "chevron-up" : "chevron-down"} 
+										size={16} 
+										color={tokens.color.text.secondary} 
+									/>
+								</TouchableOpacity>
+
+								{/* Expanded Content */}
+								{isMilestoneFiltersExpanded && (
+									<View style={{ paddingHorizontal: tokens.spacing.gap.md, paddingBottom: tokens.spacing.gap.md }}>
+										{/* Search Bar */}
+										<View style={{
+											flexDirection: 'row',
+											alignItems: 'center',
+											backgroundColor: tokens.color.bg.muted,
+											borderRadius: tokens.radius.lg,
+											paddingHorizontal: tokens.spacing.gap.sm,
+											paddingVertical: tokens.spacing.gap.sm,
+											borderWidth: 1,
+											borderColor: tokens.color.border.default,
+											marginBottom: tokens.spacing.gap.md
+										}}>
+											<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
+											<TextInput
+												placeholder="Search Milestones..."
+												value={searchQuery}
+												onChangeText={setSearchQuery}
+												style={{
+													flex: 1,
+													fontSize: tokens.font.size.sm,
+													color: tokens.color.text.primary,
+													fontWeight: '400'
+												}}
+												placeholderTextColor={tokens.color.text.secondary}
+											/>
+											{searchQuery ? (
+												<TouchableOpacity onPress={() => setSearchQuery('')}>
+													<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
+												</TouchableOpacity>
+											) : null}
+										</View>
+
+										{/* Milestone Type Filter */}
+										<View style={{ position: 'relative' }}>
+											<TouchableOpacity
+												onPress={() => setShowMilestoneTypesFilter(!showMilestoneTypesFilter)}
+												activeOpacity={0.7}
+												style={{
+													flexDirection: 'row',
+													alignItems: 'center',
+													backgroundColor: tokens.color.bg.muted,
+													paddingHorizontal: tokens.spacing.gap.sm,
+													paddingVertical: tokens.spacing.gap.sm,
+													borderRadius: tokens.radius.lg,
+													borderWidth: 1,
+													borderColor: tokens.color.border.default
+												}}
+											>
+												<Text style={{
+													fontSize: tokens.font.size.sm,
+													color: tokens.color.text.secondary,
+													marginRight: 4,
+													fontWeight: '400',
+													flex: 1
+												}}>
+													{getSelectedMilestoneTypesText()}
+												</Text>
+												<Ionicons 
+													name={showMilestoneTypesFilter ? "chevron-up" : "chevron-down"} 
+													size={12} 
+													color={tokens.color.text.secondary} 
+												/>
+											</TouchableOpacity>
+
+											{/* Milestone Types Dropdown */}
+											{showMilestoneTypesFilter && (
+												<View style={{
+													position: 'absolute',
+													top: '100%',
+													left: 0,
+													right: 0,
+													marginTop: 4,
+													backgroundColor: 'white',
+													borderRadius: tokens.radius.lg,
+													shadowColor: '#000',
+													shadowOffset: { width: 0, height: 2 },
+													shadowOpacity: 0.08,
+													shadowRadius: 12,
+													elevation: 6,
+													zIndex: 1000,
+													maxHeight: 150
+												}}>
+													<ScrollView style={{ maxHeight: 150 }}>
+														{milestoneTypes.map((type, index) => (
+															<TouchableOpacity
+																key={type}
+																onPress={() => toggleMilestoneTypeSelection(type)}
+																activeOpacity={0.7}
+																style={{
+																	paddingVertical: tokens.spacing.gap.xs,
+																	paddingHorizontal: tokens.spacing.gap.sm,
+																	borderBottomWidth: index !== milestoneTypes.length - 1 ? 0.5 : 0,
+																	borderBottomColor: 'rgba(0,0,0,0.08)',
+																	backgroundColor: selectedMilestoneTypes.includes(type) ? tokens.color.bg.muted : 'transparent',
+																	flexDirection: 'row',
+																	alignItems: 'center',
+																	justifyContent: 'space-between'
+																}}
+															>
+																<Text style={{
+																	fontSize: tokens.font.size.sm,
+																	color: selectedMilestoneTypes.includes(type) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+																	fontWeight: '400'
+																}}>
+																	{type}
+																</Text>
+																{selectedMilestoneTypes.includes(type) && (
+																	<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+																)}
+															</TouchableOpacity>
+														))}
+													</ScrollView>
+												</View>
+											)}
+										</View>
+									</View>
+								)}
 							</View>
 
 							{/* Quick Add Button */}
@@ -1031,123 +1219,126 @@ export default function MemoriesScreen() {
 
 					{activeTab === 'appointments' && (
 						<View>
-							{/* Search & Filter Toggle */}
-							<TouchableOpacity
-								onPress={toggleSearchFilters}
-								activeOpacity={0.7}
-								style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									justifyContent: 'space-between',
-									backgroundColor: tokens.color.bg.muted,
-									borderRadius: tokens.radius.lg,
-									borderWidth: 1,
-									borderColor: tokens.color.border.default,
-									paddingHorizontal: tokens.spacing.gap.sm,
-									paddingVertical: tokens.spacing.gap.sm,
-									marginBottom: tokens.spacing.gap.sm
-								}}
-							>
-								<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-									<Ionicons name="funnel-outline" size={14} color={tokens.color.text.secondary} />
-									<Text style={{
-										fontSize: tokens.font.size.sm,
-										color: tokens.color.text.secondary,
-										fontWeight: '400'
-									}}>
-										Search & Filters
-									</Text>
-								</View>
-								<Ionicons 
-									name={isSearchFiltersExpanded ? "chevron-up" : "chevron-down"} 
-									size={14} 
-									color={tokens.color.text.secondary} 
-								/>
-							</TouchableOpacity>
-
-							{/* Collapsible Search & Filter Section */}
-							{isSearchFiltersExpanded && (
-								<View style={{ marginBottom: tokens.spacing.gap.md }}>
-								{/* Search Bar */}
-								<View style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									backgroundColor: tokens.color.bg.muted,
-									borderRadius: tokens.radius.lg,
-									paddingHorizontal: tokens.spacing.gap.sm,
-									paddingVertical: tokens.spacing.gap.sm,
-									borderWidth: 1,
-									borderColor: tokens.color.border.default,
-									marginBottom: tokens.spacing.gap.sm
-								}}>
-									<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
-									<TextInput
-										placeholder="Search appointments..."
-										value={searchQuery}
-										onChangeText={setSearchQuery}
-										onFocus={closeAllDropdowns}
-										style={{
-											flex: 1,
+							{/* Search & Filters */}
+							<View style={{
+								backgroundColor: tokens.color.surface,
+								borderWidth: 1,
+								borderColor: tokens.color.border.default,
+								borderRadius: tokens.radius.lg,
+								marginBottom: tokens.spacing.gap.lg
+							}}>
+								{/* Header */}
+								<TouchableOpacity
+									onPress={toggleSearchFilters}
+									style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										justifyContent: 'space-between',
+										paddingHorizontal: tokens.spacing.gap.md,
+										paddingVertical: tokens.spacing.gap.md
+									}}
+								>
+									<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+										<Ionicons name="filter" size={16} color={tokens.color.text.secondary} />
+										<Text style={{ 
+											marginLeft: tokens.spacing.gap.xs,
 											fontSize: tokens.font.size.sm,
 											color: tokens.color.text.primary,
-											fontWeight: '400'
-										}}
-										placeholderTextColor={tokens.color.text.secondary}
+											fontWeight: '500'
+										}}>
+											Search & Filter
+										</Text>
+									</View>
+									<Ionicons 
+										name={isSearchFiltersExpanded ? "chevron-up" : "chevron-down"} 
+										size={16} 
+										color={tokens.color.text.secondary} 
 									/>
-									{searchQuery ? (
-										<TouchableOpacity onPress={() => setSearchQuery('')}>
-											<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
-										</TouchableOpacity>
-									) : null}
-								</View>
+								</TouchableOpacity>
 
-								{/* Status Filter Tabs */}
-								<View style={{ 
-									flexDirection: 'row', 
-									marginBottom: tokens.spacing.gap.sm,
-									backgroundColor: tokens.color.bg.muted,
-									borderRadius: tokens.radius.lg,
-									borderWidth: 1,
-									borderColor: tokens.color.border.default,
-									padding: 4
-								}}>
-									{(['all', 'open', 'completed'] as const).map((filter) => (
-										<TouchableOpacity
-											key={filter}
-											onPress={() => setAppointmentFilter(filter)}
+								{/* Expanded Content */}
+								{isSearchFiltersExpanded && (
+									<View style={{ paddingHorizontal: tokens.spacing.gap.md, paddingBottom: tokens.spacing.gap.md }}>
+									{/* Search Bar */}
+									<View style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										backgroundColor: tokens.color.bg.muted,
+										borderRadius: tokens.radius.lg,
+										paddingHorizontal: tokens.spacing.gap.sm,
+										paddingVertical: tokens.spacing.gap.sm,
+										borderWidth: 1,
+										borderColor: tokens.color.border.default,
+										marginBottom: tokens.spacing.gap.md
+									}}>
+										<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
+										<TextInput
+											placeholder="Search Appointments..."
+											value={searchQuery}
+											onChangeText={setSearchQuery}
+											onFocus={closeAllDropdowns}
 											style={{
 												flex: 1,
-												paddingVertical: tokens.spacing.gap.sm,
-												paddingHorizontal: tokens.spacing.gap.sm,
-												borderRadius: tokens.radius.lg - 4,
-												backgroundColor: appointmentFilter === filter ? 'white' : 'transparent',
-												alignItems: 'center'
-											}}
-										>
-											<Text style={{
 												fontSize: tokens.font.size.sm,
-												fontWeight: '400',
-												color: appointmentFilter === filter ? tokens.color.text.primary : tokens.color.text.secondary
-											}}>
-												{filter.charAt(0).toUpperCase() + filter.slice(1)}
-											</Text>
-										</TouchableOpacity>
-									))}
-								</View>
+												color: tokens.color.text.primary,
+												fontWeight: '400'
+											}}
+											placeholderTextColor={tokens.color.text.secondary}
+										/>
+										{searchQuery ? (
+											<TouchableOpacity onPress={() => setSearchQuery('')}>
+												<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
+											</TouchableOpacity>
+										) : null}
+									</View>
 
-								{/* Dropdown Filters Row */}
-								{(availableChildren.length > 1 || availableSpecialists.length > 1) && (
+									{/* Status Filter Tabs */}
 									<View style={{ 
 										flexDirection: 'row', 
-										gap: tokens.spacing.gap.sm,
-										position: 'relative'
+										marginBottom: tokens.spacing.gap.sm,
+										backgroundColor: tokens.color.bg.muted,
+										borderRadius: tokens.radius.lg,
+										borderWidth: 1,
+										borderColor: tokens.color.border.default,
+										padding: 4
 									}}>
-									{/* Children Filter Dropdown - Left Side */}
-									{availableChildren.length > 1 && (
+										{(['all', 'open', 'completed'] as const).map((filter) => (
+											<TouchableOpacity
+												key={filter}
+												onPress={() => setAppointmentFilter(filter)}
+												style={{
+													flex: 1,
+													paddingVertical: tokens.spacing.gap.sm,
+													paddingHorizontal: tokens.spacing.gap.sm,
+													borderRadius: tokens.radius.lg - 4,
+													backgroundColor: appointmentFilter === filter ? 'white' : 'transparent',
+													alignItems: 'center'
+												}}
+											>
+												<Text style={{
+													fontSize: tokens.font.size.sm,
+													fontWeight: '400',
+													color: appointmentFilter === filter ? tokens.color.text.primary : tokens.color.text.secondary
+												}}>
+													{filter.charAt(0).toUpperCase() + filter.slice(1)}
+												</Text>
+											</TouchableOpacity>
+										))}
+									</View>
+
+									{/* Dropdown Filters Row */}
+									{(availableChildren.length > 1 || availableSpecialists.length > 1) && (
 										<View style={{ 
-											flex: availableSpecialists.length > 1 ? 1 : 2,
-											position: 'relative' 
+											flexDirection: 'row', 
+											gap: tokens.spacing.gap.sm,
+											position: 'relative'
 										}}>
+										{/* Children Filter Dropdown - Left Side */}
+										{availableChildren.length > 1 && (
+											<View style={{ 
+												flex: availableSpecialists.length > 1 ? 1 : 2,
+												position: 'relative' 
+											}}>
 											<TouchableOpacity
 												onPress={() => {
 													setShowChildrenFilter(!showChildrenFilter);
@@ -1325,10 +1516,11 @@ export default function MemoriesScreen() {
 											)}
 										</View>
 									)}
+										</View>
+									)}
 									</View>
 								)}
-								</View>
-							)}
+							</View>
 
 							{/* Quick Add Input */}
 							{showQuickAdd ? (
@@ -1377,11 +1569,10 @@ export default function MemoriesScreen() {
 										borderWidth: 1,
 										borderRadius: tokens.radius.lg,
 										padding: tokens.spacing.gap.md,
-										marginTop: tokens.spacing.gap.md,
-										marginBottom: tokens.spacing.gap.lg,
 										flexDirection: 'row',
 										alignItems: 'center',
-										justifyContent: 'center'
+										justifyContent: 'center',
+										marginBottom: tokens.spacing.gap.lg
 									}}
 								>
 									<Ionicons name="add-circle" size={20} color={tokens.color.brand.gradient.start} />
@@ -1459,7 +1650,7 @@ export default function MemoriesScreen() {
 
 										{/* Options Menu */}
 										<TouchableOpacity 
-											onPress={() => setEditingAppointment(appointment.id)}
+											onPress={() => openAppointmentNote(appointment)}
 											style={{ padding: 4 }}
 										>
 											<Ionicons name="ellipsis-horizontal" size={16} color={tokens.color.text.secondary} />
@@ -1514,39 +1705,168 @@ export default function MemoriesScreen() {
 						</View>
 					)}
 
-
 					{activeTab === 'gestalts' && (
 						<View>
-							{/* Search Bar */}
+							{/* Search & Filters */}
 							<View style={{
-								flexDirection: 'row',
-								alignItems: 'center',
-								backgroundColor: tokens.color.bg.muted,
-								borderRadius: tokens.radius.lg,
-								paddingHorizontal: tokens.spacing.gap.sm,
-								paddingVertical: tokens.spacing.gap.sm,
+								backgroundColor: tokens.color.surface,
 								borderWidth: 1,
 								borderColor: tokens.color.border.default,
+								borderRadius: tokens.radius.lg,
 								marginBottom: tokens.spacing.gap.lg
 							}}>
-								<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
-								<TextInput
-									placeholder="Search gestalts..."
-									value={searchQuery}
-									onChangeText={setSearchQuery}
+								{/* Header */}
+								<TouchableOpacity
+									onPress={() => setIsGestaltsFiltersExpanded(!isGestaltsFiltersExpanded)}
 									style={{
-										flex: 1,
-										fontSize: tokens.font.size.xs,
-										color: tokens.color.text.primary,
-										fontWeight: '400'
+										flexDirection: 'row',
+										alignItems: 'center',
+										justifyContent: 'space-between',
+										paddingHorizontal: tokens.spacing.gap.md,
+										paddingVertical: tokens.spacing.gap.md
 									}}
-									placeholderTextColor={tokens.color.text.secondary}
-								/>
-								{searchQuery ? (
-									<TouchableOpacity onPress={() => setSearchQuery('')}>
-										<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
-									</TouchableOpacity>
-								) : null}
+								>
+									<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+										<Ionicons name="filter" size={16} color={tokens.color.text.secondary} />
+										<Text style={{ 
+											marginLeft: tokens.spacing.gap.xs,
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.primary,
+											fontWeight: '500'
+										}}>
+											Search{availableChildren.length > 1 ? ' & Filter' : ''}
+										</Text>
+									</View>
+									<Ionicons 
+										name={isGestaltsFiltersExpanded ? "chevron-up" : "chevron-down"} 
+										size={16} 
+										color={tokens.color.text.secondary} 
+									/>
+								</TouchableOpacity>
+
+								{/* Expanded Content */}
+								{isGestaltsFiltersExpanded && (
+									<View style={{ paddingHorizontal: tokens.spacing.gap.md, paddingBottom: tokens.spacing.gap.md }}>
+										{/* Search Bar */}
+										<View style={{
+											flexDirection: 'row',
+											alignItems: 'center',
+											backgroundColor: tokens.color.bg.muted,
+											borderRadius: tokens.radius.lg,
+											paddingHorizontal: tokens.spacing.gap.sm,
+											paddingVertical: tokens.spacing.gap.sm,
+											borderWidth: 1,
+											borderColor: tokens.color.border.default,
+											marginBottom: availableChildren.length > 1 ? tokens.spacing.gap.md : 0
+										}}>
+											<Ionicons name="search" size={14} color={tokens.color.text.secondary} style={{ marginRight: 8 }} />
+											<TextInput
+												placeholder="Search gestalts..."
+												value={searchQuery}
+												onChangeText={setSearchQuery}
+												onFocus={() => setShowChildrenFilter(false)}
+												style={{
+													flex: 1,
+													fontSize: tokens.font.size.sm,
+													color: tokens.color.text.primary,
+													fontWeight: '400'
+												}}
+												placeholderTextColor={tokens.color.text.secondary}
+											/>
+											{searchQuery ? (
+												<TouchableOpacity onPress={() => setSearchQuery('')}>
+													<Ionicons name="close-circle" size={14} color={tokens.color.text.secondary} />
+												</TouchableOpacity>
+											) : null}
+										</View>
+
+										{/* Children Filter Dropdown - Only show if multiple children */}
+										{availableChildren.length > 1 && (
+											<View style={{ position: 'relative' }}>
+												<TouchableOpacity
+													onPress={() => setShowChildrenFilter(!showChildrenFilter)}
+													activeOpacity={0.7}
+													style={{
+														flexDirection: 'row',
+														alignItems: 'center',
+														backgroundColor: tokens.color.bg.muted,
+														paddingHorizontal: tokens.spacing.gap.sm,
+														paddingVertical: tokens.spacing.gap.sm,
+														borderRadius: tokens.radius.lg,
+														borderWidth: 1,
+														borderColor: tokens.color.border.default
+													}}
+												>
+													<Text style={{
+														fontSize: tokens.font.size.sm,
+														color: tokens.color.text.secondary,
+														marginRight: 4,
+														fontWeight: '400',
+														flex: 1
+													}}>
+														{getSelectedChildrenText()}
+													</Text>
+													<Ionicons 
+														name={showChildrenFilter ? "chevron-up" : "chevron-down"} 
+														size={12} 
+														color={tokens.color.text.secondary} 
+													/>
+												</TouchableOpacity>
+
+												{/* Children Dropdown */}
+												{showChildrenFilter && (
+													<View style={{
+														position: 'absolute',
+														top: '100%',
+														left: 0,
+														right: 0,
+														marginTop: 4,
+														backgroundColor: 'white',
+														borderRadius: tokens.radius.lg,
+														shadowColor: '#000',
+														shadowOffset: { width: 0, height: 2 },
+														shadowOpacity: 0.08,
+														shadowRadius: 12,
+														elevation: 6,
+														zIndex: 1000,
+														maxHeight: 150
+													}}>
+														<ScrollView style={{ maxHeight: 150 }}>
+															{availableChildren.map((child, index) => (
+																<TouchableOpacity
+																	key={child}
+																	onPress={() => toggleChildSelection(child)}
+																	activeOpacity={0.7}
+																	style={{
+																		paddingVertical: tokens.spacing.gap.xs,
+																		paddingHorizontal: tokens.spacing.gap.sm,
+																		borderBottomWidth: index !== availableChildren.length - 1 ? 0.5 : 0,
+																		borderBottomColor: 'rgba(0,0,0,0.08)',
+																		backgroundColor: selectedChildren.includes(child) ? tokens.color.bg.muted : 'transparent',
+																		flexDirection: 'row',
+																		alignItems: 'center',
+																		justifyContent: 'space-between'
+																	}}
+																>
+																	<Text style={{
+																		fontSize: tokens.font.size.sm,
+																		color: selectedChildren.includes(child) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+																		fontWeight: '400'
+																	}}>
+																		{child}
+																	</Text>
+																	{selectedChildren.includes(child) && (
+																		<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+																	)}
+																</TouchableOpacity>
+															))}
+														</ScrollView>
+													</View>
+												)}
+											</View>
+										)}
+									</View>
+								)}
 							</View>
 
 							{/* Quick Add Button */}
