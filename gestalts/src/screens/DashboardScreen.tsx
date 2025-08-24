@@ -1,12 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Animated, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Animated, Image, StyleSheet } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { GlassView } from '../components/GlassView';
+import { BlurView } from 'expo-blur';
 import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function DashboardScreen() {
@@ -19,33 +19,49 @@ export default function DashboardScreen() {
 	const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
 	const screenWidth = Dimensions.get('window').width;
 	const scrollX = useRef(new Animated.Value(0)).current;
+	const pulseAnim = useRef(new Animated.Value(1)).current;
 
+	// Pulse animation for mic button
+	useEffect(() => {
+		Animated.loop(
+			Animated.sequence([
+				Animated.timing(pulseAnim, {
+					toValue: 1.05,
+					duration: 1500,
+					useNativeDriver: true,
+				}),
+				Animated.timing(pulseAnim, {
+					toValue: 1,
+					duration: 1500,
+					useNativeDriver: true,
+				}),
+			])
+		).start();
+	}, []);
+
+	// AI Coach modes - with subtle accent colors
 	const coachModes = [
 		{
-			title: 'Language Coach',
-			subtitle: 'GLP strategies & daily activities',
-			icon: 'mic',
-			gradient: [tokens.color.brand.gradient.start, tokens.color.brand.gradient.mid],
+			title: 'Language',
+			icon: 'chatbubbles',
+			accentColor: 'rgba(139, 92, 246, 0.3)',
 			mode: 'Language Coach'
 		},
 		{
-			title: 'Parent Support',
-			subtitle: 'Emotional guidance & encouragement',
+			title: 'Support',
 			icon: 'heart',
-			gradient: ['#F472B6', '#EC4899'],
+			accentColor: 'rgba(236, 72, 153, 0.3)',
 			mode: 'Parent Support'
 		},
 		{
-			title: 'Child Mode',
-			subtitle: 'Interactive play & learning',
-			icon: 'happy',
-			gradient: ['#34D399', '#10B981'],
+			title: 'Play',
+			icon: 'game-controller',
+			accentColor: 'rgba(34, 197, 94, 0.3)',
 			mode: 'Child Mode'
 		}
 	];
 
 	const handleModeSelect = (mode: string) => {
-		// Navigate to Coach screen with the selected mode
 		(navigation as any).navigate('Coach', { initialMode: mode });
 	};
 
@@ -53,31 +69,42 @@ export default function DashboardScreen() {
 		(navigation as any).navigate(navigateTo);
 	};
 
-	const sections = [
-		{
-			title: 'Learn & Grow',
-			icon: 'arrow-forward',
-			quickActions: [
-				{ title: 'Play Analyzer', icon: 'sync', color: '#7C3AED', navigateTo: 'PlayAnalyzer' },
-				{ title: 'Storybook', icon: 'book-outline', color: '#7C3AED', navigateTo: 'Storybook' },
-				{ title: 'Knowledge', icon: 'bulb-outline', color: '#7C3AED', navigateTo: 'Knowledge' }
-			]
+	// Feature tiles with glass design
+	const mainFeatures = [
+		{ 
+			icon: 'book', 
+			title: 'Journal',
+			navigateTo: 'Memories',
+			count: journal.length,
+			size: 'large'
 		},
-		{
-			title: 'Record & Track',
-			icon: 'arrow-forward',
-			quickActions: [
-				{ title: 'Add Journal', icon: 'create-outline', color: '#7C3AED', navigateTo: 'AddJournal' },
-				{ title: 'Add Milestone', icon: 'flag-outline', color: '#7C3AED', navigateTo: 'AddMilestone' },
-				{ title: 'Journal', icon: 'albums-outline', color: '#7C3AED', navigateTo: 'Memories', count: journal.length },
-				{ title: 'Milestones', icon: 'trophy-outline', color: '#7C3AED', navigateTo: 'Memories', count: milestones.length },
-				{ title: 'Gestalt Lists', icon: 'list-outline', color: '#7C3AED', navigateTo: 'GestaltLists' },
-				{ title: 'Reports', icon: 'document-text-outline', color: '#7C3AED', navigateTo: 'Report' }
-			]
+		{ 
+			icon: 'trophy', 
+			title: 'Milestones',
+			navigateTo: 'Memories',
+			count: milestones.length,
+			size: 'small'
+		},
+		{ 
+			icon: 'game-controller', 
+			title: 'Play',
+			navigateTo: 'PlayAnalyzer',
+			size: 'small'
+		},
+		{ 
+			icon: 'bar-chart', 
+			title: 'Reports',
+			navigateTo: 'Report',
+			size: 'medium'
+		},
+		{ 
+			icon: 'list', 
+			title: 'Gestalts',
+			navigateTo: 'GestaltLists',
+			size: 'medium'
 		}
 	];
 
-	const [scrollY] = useState(new Animated.Value(0));
 	const [showProfileMenu, setShowProfileMenu] = useState(false);
 	const profileMenuAnim = useRef(new Animated.Value(0)).current;
 	const [showAddMenu, setShowAddMenu] = useState(false);
@@ -85,35 +112,28 @@ export default function DashboardScreen() {
 
 	const profileMenuOptions = [
 		{ title: 'Child Profile', icon: 'person-outline', navigateTo: 'ChildProfile' },
-		{ title: 'Specialist', icon: 'medical-outline', navigateTo: 'Specialist' },
-		{ title: 'My Profile', icon: 'settings-outline', navigateTo: 'MyProfile' }
+		{ title: 'Settings', icon: 'settings-outline', navigateTo: 'MyProfile' }
 	];
 
 	const addMenuOptions = [
-		{ title: 'Appointment Note', icon: 'calendar-outline', navigateTo: 'AddAppointmentNote' },
+		{ title: 'Journal', icon: 'create-outline', navigateTo: 'AddJournal' },
 		{ title: 'Milestone', icon: 'flag-outline', navigateTo: 'AddMilestone' },
-		{ title: 'Journal Entry', icon: 'create-outline', navigateTo: 'AddJournal' },
-		{ title: 'Add a Gestalt', icon: 'list-outline', navigateTo: 'AddGestalt' }
+		{ title: 'Note', icon: 'calendar-outline', navigateTo: 'AddAppointmentNote' }
 	];
 
 	const toggleProfileMenu = () => {
 		if (showProfileMenu) {
-			// Close menu
 			Animated.timing(profileMenuAnim, {
 				toValue: 0,
-				duration: 300,
+				duration: 200,
 				useNativeDriver: true,
 			}).start(() => setShowProfileMenu(false));
 		} else {
-			// Close add menu if open
-			if (showAddMenu) {
-				toggleAddMenu();
-			}
-			// Open menu
+			if (showAddMenu) toggleAddMenu();
 			setShowProfileMenu(true);
 			Animated.timing(profileMenuAnim, {
 				toValue: 1,
-				duration: 300,
+				duration: 200,
 				useNativeDriver: true,
 			}).start();
 		}
@@ -121,700 +141,536 @@ export default function DashboardScreen() {
 
 	const toggleAddMenu = () => {
 		if (showAddMenu) {
-			// Close menu
 			Animated.timing(addMenuAnim, {
 				toValue: 0,
-				duration: 300,
+				duration: 200,
 				useNativeDriver: true,
 			}).start(() => setShowAddMenu(false));
 		} else {
-			// Close profile menu if open
-			if (showProfileMenu) {
-				toggleProfileMenu();
-			}
-			// Open menu
+			if (showProfileMenu) toggleProfileMenu();
 			setShowAddMenu(true);
 			Animated.timing(addMenuAnim, {
 				toValue: 1,
-				duration: 300,
+				duration: 200,
 				useNativeDriver: true,
 			}).start();
 		}
 	};
 
-	const headerBackgroundOpacity = scrollY.interpolate({
-		inputRange: [0, 100],
-		outputRange: [0, 1],
-		extrapolate: 'clamp'
-	});
-
-	const iconOpacity = scrollY.interpolate({
-		inputRange: [0, 100],
-		outputRange: [1, 0],
-		extrapolate: 'clamp'
-	});
-
-	const darkIconOpacity = scrollY.interpolate({
-		inputRange: [0, 100],
-		outputRange: [0, 1],
-		extrapolate: 'clamp'
-	});
-
 	return (
-		<LinearGradient
-			colors={['#7C3AED', '#EC4899', '#FB923C']}
-			start={{ x: 0, y: 0 }}
-			end={{ x: 1, y: 1 }}
-			style={{ flex: 1 }}
-		>
+		<View style={{ flex: 1 }}>
+			{/* Gestalt Brand Gradient Background */}
+			<LinearGradient
+				colors={['#7C3AED', '#EC4899', '#FB923C']}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 1, y: 1 }}
+				style={StyleSheet.absoluteFillObject}
+			/>
+			
+			{/* Subtle overlay for depth */}
+			<LinearGradient
+				colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.1)']}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 0, y: 1 }}
+				style={StyleSheet.absoluteFillObject}
+			/>
 
-			<ScrollView 
-				style={{ flex: 1, backgroundColor: 'transparent' }}
-				contentContainerStyle={{ paddingBottom: 60 }}
-				showsVerticalScrollIndicator={false}
-				onScroll={Animated.event(
-					[{ nativeEvent: { contentOffset: { y: scrollY } } }],
-					{ useNativeDriver: false }
-				)}
-				scrollEventThrottle={16}
-			>
-				{/* Upper Section - transparent over background gradient */}
-				<View style={{ paddingBottom: 40, paddingTop: 60 }}>
+			<SafeAreaView style={{ flex: 1 }}>
+				<ScrollView 
+					style={{ flex: 1 }}
+					contentContainerStyle={{ paddingBottom: 100 }}
+					showsVerticalScrollIndicator={false}
+				>
+					{/* Minimal Header with Glass Effect */}
+					<View style={{ 
+						flexDirection: 'row',
+						alignItems: 'center',
+						justifyContent: 'space-between',
+						paddingHorizontal: 20,
+						paddingTop: 10,
+						paddingBottom: 10
+					}}>
+						<TouchableOpacity onPress={openDrawer}>
+							<View style={{
+								width: 44,
+								height: 44,
+								borderRadius: 22,
+								backgroundColor: 'rgba(255,255,255,0.15)',
+								borderWidth: 1,
+								borderColor: 'rgba(255,255,255,0.3)',
+								alignItems: 'center',
+								justifyContent: 'center'
+							}}>
+								<Ionicons name="menu" size={24} color="white" />
+							</View>
+						</TouchableOpacity>
 
-				{/* Header with Hamburger Menu and Logo */}
-				<View style={{ 
-					flexDirection: 'row',
-					alignItems: 'center',
-					justifyContent: 'space-between',
-					paddingHorizontal: tokens.spacing.containerX,
-					paddingTop: tokens.spacing.gap.sm,
-					paddingBottom: tokens.spacing.gap.lg
-				}}>
-					{/* Hamburger Menu Button */}
-					<TouchableOpacity 
-						onPress={openDrawer}
-						style={{
-							padding: 8,
-							marginLeft: -8
-						}}
-					>
-						<Ionicons name="menu-outline" size={28} color="white" />
-					</TouchableOpacity>
-
-					{/* Logo and Gestalts Text - centered */}
-					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-						{/* Inverted Logo - white on transparent */}
-						<Image 
-							source={require('../../assets/Gestalts-logo.png')} 
-							style={{ 
-								width: 32, 
-								height: 32,
-								tintColor: 'white'
-							}}
-							resizeMode="contain"
-						/>
-						
-						{/* Gestalts Text */}
-						<Text weight="semibold" style={{
-							fontSize: tokens.font.size.lg,
-							fontFamily: 'PlusJakartaSans-SemiBold',
-							color: 'white',
-							letterSpacing: 0.3,
-							textShadowColor: 'rgba(0,0,0,0.3)',
-							textShadowOffset: { width: 0, height: 1 },
-							textShadowRadius: 2
-						}}>
-							Gestalts
-						</Text>
+						<TouchableOpacity onPress={toggleProfileMenu}>
+							<View style={{
+								width: 44,
+								height: 44,
+								borderRadius: 22,
+								backgroundColor: 'rgba(255,255,255,0.15)',
+								borderWidth: 1,
+								borderColor: 'rgba(255,255,255,0.3)',
+								alignItems: 'center',
+								justifyContent: 'center',
+								overflow: 'hidden'
+							}}>
+								<Text style={{ 
+									color: 'white', 
+									fontWeight: '700',
+									fontSize: 18
+								}}>
+									{profile?.parentName?.charAt(0)?.toUpperCase() || 'P'}
+								</Text>
+							</View>
+						</TouchableOpacity>
 					</View>
 
-					{/* Spacer for balance */}
-					<View style={{ width: 28 }} />
-				</View>
-
-				{/* Welcome Message */}
+					{/* Bold Welcome */}
 				<View style={{ 
-					paddingHorizontal: tokens.spacing.containerX,
-					paddingTop: tokens.spacing.gap.lg,
-					paddingBottom: tokens.spacing.gap.lg
+					paddingHorizontal: 20,
+					paddingTop: 20,
+					paddingBottom: 30
 				}}>
 					<Text style={{ 
-						fontSize: tokens.font.size.h2,
-						fontWeight: '700',
+						fontSize: 38,
+						fontWeight: '800',
 						color: 'white',
-						marginBottom: tokens.spacing.gap.xs,
-						lineHeight: tokens.font.size.h2 * 1.2
+						letterSpacing: -1,
+						textShadowColor: 'rgba(0,0,0,0.2)',
+						textShadowOffset: { width: 0, height: 2 },
+						textShadowRadius: 4
 					}}>
-						{profile?.parentName ? `Hey, ${profile.parentName}!` : 'Hey!'}
+						Hey {profile?.parentName?.split(' ')[0] || 'there'}!
 					</Text>
 					<Text style={{
-						fontSize: tokens.font.size.body,
-						color: 'rgba(255,255,255,0.9)',
-						lineHeight: tokens.font.size.body * 1.4
+						fontSize: 18,
+						color: 'rgba(255,255,255,0.95)',
+						fontWeight: '500',
+						marginTop: 4
 					}}>
-						How can we support {profile?.childName || 'your child'} today?
+						{profile?.childName || 'Your child'}'s journey
 					</Text>
 				</View>
 
-				{/* Featured Coach Mode Cards - Shazam Style */}
-				<View style={{ 
-					marginBottom: tokens.spacing.sectionY.sm,
-					paddingVertical: tokens.spacing.gap.lg 
-				}}>
-					<Animated.ScrollView
+				{/* AI Coach Cards - Liquid Glass Design */}
+				<View style={{ paddingBottom: 30 }}>
+					<ScrollView
 						horizontal
 						showsHorizontalScrollIndicator={false}
-						snapToInterval={204} // cardWidth (180) + spacing (24)
-						snapToAlignment="start"
+						snapToInterval={screenWidth * 0.7}
 						decelerationRate="fast"
-						onScroll={Animated.event(
-							[{ nativeEvent: { contentOffset: { x: scrollX } } }],
-							{ useNativeDriver: false }
-						)}
-						onMomentumScrollEnd={() => {
-							// Handle scroll end if needed
-						}}
-						scrollEventThrottle={16}
 						contentContainerStyle={{
-							paddingLeft: (screenWidth - 180) / 2,
-							paddingRight: (screenWidth - 180) / 2
+							paddingHorizontal: 20
 						}}
 					>
-						{coachModes.map((mode, index) => {
-							const cardWidth = 180;
-							const spacing = 24;
-							
-							// Each card's center position in the scroll
-							const cardPosition = index * (cardWidth + spacing);
-							
-							const inputRange = [
-								(index - 1) * (cardWidth + spacing),
-								cardPosition,
-								(index + 1) * (cardWidth + spacing)
-							];
-
-							const scale = scrollX.interpolate({
-								inputRange,
-								outputRange: [0.7, 1, 0.7],
-								extrapolate: 'clamp'
-							});
-
-							const opacity = scrollX.interpolate({
-								inputRange,
-								outputRange: [0.4, 1, 0.4],
-								extrapolate: 'clamp'
-							});
-
-							// Add overlay for inactive cards
-							const overlayOpacity = scrollX.interpolate({
-								inputRange,
-								outputRange: [0.5, 0, 0.5],
-								extrapolate: 'clamp'
-							});
-
-							return (
-								<TouchableOpacity
-									key={index}
-									onPress={() => handleModeSelect(mode.mode)}
-									activeOpacity={0.95}
-									style={{
-										width: 180,
-										alignItems: 'center',
-										marginRight: index < coachModes.length - 1 ? 24 : 0
-									}}
-								>
-									{/* Animated Circle */}
-									<Animated.View
-										style={{
-											transform: [{ scale }],
-											opacity
-										}}
-									>
-										{/* Liquid Glass Background */}
-										<View
-											style={{
-												width: 180,
-												height: 180,
-												borderRadius: 90,
-												backgroundColor: 'rgba(255,255,255,0.1)',
-												borderWidth: 1.5,
-												borderColor: 'rgba(255,255,255,0.2)',
-												shadowColor: 'rgba(0,0,0,0.25)',
-												shadowOffset: { width: 0, height: 20 },
-												shadowOpacity: 0.8,
-												shadowRadius: 30,
-												elevation: 20,
-												justifyContent: 'center',
-												alignItems: 'center',
-												marginBottom: tokens.spacing.gap.md,
-												overflow: 'hidden'
-											}}
-										>
-											{/* Subtle Top Gradient Highlight */}
-											<View
-												style={{
-													position: 'absolute',
-													top: 0,
-													left: 0,
-													right: 0,
-													height: 90,
-													backgroundColor: 'rgba(255,255,255,0.2)',
-													borderRadius: 90
-												}}
-											/>
-											
-											{/* Inner Glass Reflection */}
-											<View
-												style={{
-													position: 'absolute',
-													top: 8,
-													left: 8,
-													right: 8,
-													bottom: 8,
-													borderRadius: 82,
-													borderWidth: 0.5,
-													borderColor: 'rgba(255,255,255,0.15)',
-													backgroundColor: 'transparent'
-												}}
-											/>
-											
-											{/* Main Icon */}
-											<Ionicons name={mode.icon as any} size={55} color="white" />
-											
-											{/* Overlay for inactive cards */}
-											<Animated.View
-												style={{
-													position: 'absolute',
-													top: 0,
-													left: 0,
-													right: 0,
-													bottom: 0,
-													backgroundColor: 'rgba(0,0,0,0.4)',
-													borderRadius: 90,
-													opacity: overlayOpacity
-												}}
-											/>
-										</View>
-									</Animated.View>
-
-								{/* Text Below Circle */}
-								<Animated.View 
-									style={{ 
-										alignItems: 'center',
-										opacity 
-									}}
-								>
-									<Text style={{
-										fontSize: tokens.font.size.lg,
-										fontWeight: '700',
-										color: 'white',
-										textAlign: 'center'
+						{coachModes.map((mode, index) => (
+							<TouchableOpacity
+								key={index}
+								onPress={() => handleModeSelect(mode.mode)}
+								activeOpacity={0.9}
+								style={{
+									marginRight: 15
+								}}
+							>
+								<View style={{
+									width: screenWidth * 0.7,
+									height: 160,
+									borderRadius: 24,
+									overflow: 'hidden',
+									backgroundColor: 'rgba(255,255,255,0.1)',
+									borderWidth: 1,
+									borderColor: 'rgba(255,255,255,0.2)'
+								}}>
+									{/* Glass effect overlay */}
+									<View style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										height: '50%',
+										backgroundColor: 'rgba(255,255,255,0.1)'
+									}} />
+									
+									<View style={{
+										flex: 1,
+										padding: 24,
+										justifyContent: 'space-between'
 									}}>
-										{mode.title}
-									</Text>
-								</Animated.View>
-							</TouchableOpacity>
-						);
-						})}
-					</Animated.ScrollView>
-				</View>
-			</View>
-
-			{/* Liquid Glass Background Section */}
-			<GlassView 
-				intensity={0.08}
-				style={{ 
-					borderTopLeftRadius: 32,
-					borderTopRightRadius: 32,
-					marginTop: -16,
-					paddingTop: 16,
-					backgroundColor: 'rgba(255, 255, 255, 0.05)',
-					borderTopWidth: 1,
-					borderLeftWidth: 1,
-					borderRightWidth: 1,
-					borderColor: 'rgba(255, 255, 255, 0.2)'
-				}}
-			>
-				{/* Learn & Grow Section */}
-				<View style={{ paddingTop: tokens.spacing.gap.sm }}>
-					{sections.map((section, sectionIndex) => (
-						<View key={sectionIndex} style={{ marginBottom: tokens.spacing.sectionY.md }}>
-							{/* Section Header */}
-							<View style={{
-								paddingHorizontal: tokens.spacing.containerX,
-								marginBottom: tokens.spacing.gap.sm
-							}}>
-								<View style={{ alignItems: 'center' }}>
-									<View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.gap.sm }}>
+										<Ionicons 
+											name={mode.icon as any} 
+											size={40} 
+											color="white"
+											style={{
+												shadowColor: '#000',
+												shadowOffset: { width: 0, height: 2 },
+												shadowOpacity: 0.2,
+												shadowRadius: 4
+											}}
+										/>
 										<Text style={{
-											fontSize: tokens.font.size.h3,
+											fontSize: 24,
 											fontWeight: '700',
 											color: 'white',
-											textAlign: 'center'
+											letterSpacing: -0.5,
+											textShadowColor: 'rgba(0,0,0,0.2)',
+											textShadowOffset: { width: 0, height: 1 },
+											textShadowRadius: 2
 										}}>
-											{section.title}
+											{mode.title}
 										</Text>
 									</View>
 								</View>
-							</View>
-
-							{/* Quick Action Tiles - For sections with colored tiles */}
-							{section.quickActions && (
-								sectionIndex === 0 ? (
-									<View style={{
-										flexDirection: 'row',
-										justifyContent: 'center',
-										alignItems: 'center',
-										paddingHorizontal: tokens.spacing.gap.md,
-										paddingVertical: tokens.spacing.gap.sm,
-										gap: tokens.spacing.gap.md
-									}}>
-										{section.quickActions.map((action, index) => (
-										<TouchableOpacity
-											key={index}
-											activeOpacity={0.8}
-											onPress={() => handleTilePress(action.navigateTo)}
-											style={{
-												alignItems: 'center',
-												width: sectionIndex === 0 ? 120 : 85
-											}}
-										>
-											{/* Backdrop shadow */}
-											<View style={{
-												position: 'absolute',
-												width: sectionIndex === 0 ? 96 : 68,
-												height: sectionIndex === 0 ? 96 : 68,
-												borderRadius: sectionIndex === 0 ? 28 : 20,
-												backgroundColor: 'rgba(0,0,0,0.08)',
-												top: 2,
-												left: sectionIndex === 0 ? 12 : 8,
-												zIndex: 0
-											}} />
-											<View style={{
-												width: sectionIndex === 0 ? 96 : 68,
-												height: sectionIndex === 0 ? 96 : 68,
-												borderRadius: sectionIndex === 0 ? 28 : 20,
-												shadowColor: '#7C3AED',
-												shadowOffset: { width: 0, height: 6 },
-												shadowOpacity: 0.2,
-												shadowRadius: 12,
-												elevation: 8,
-												marginBottom: tokens.spacing.gap.xs,
-												position: 'relative',
-												alignItems: 'center',
-												justifyContent: 'center',
-												overflow: 'visible'
-											}}>
-																													{/* Enhanced Liquid Glass Background */}
-																	<View
-																		style={{
-																			position: 'absolute',
-																			top: 0,
-																			left: 0,
-																			right: 0,
-																			bottom: 0,
-																			borderRadius: sectionIndex === 0 ? 28 : 20,
-																			backgroundColor: 'rgba(255, 255, 255, 0.15)',
-																			// Inner shadow for depth
-																			shadowColor: 'rgba(0,0,0,0.1)',
-																			shadowOffset: { width: 0, height: 2 },
-																			shadowOpacity: 1,
-																			shadowRadius: 4
-																		}}
-																	/>
-												
-												{/* Liquid Glass Highlight */}
-												<View style={{
-													position: 'absolute',
-													top: 0,
-													left: 0,
-													right: 0,
-													height: '45%',
-													borderRadius: sectionIndex === 0 ? 28 : 20,
-													backgroundColor: 'rgba(255, 255, 255, 0.3)',
-													opacity: 0.8
-												}} />
-												
-												{/* Enhanced Glass Border */}
-												<View style={{
-													position: 'absolute',
-													top: 0,
-													left: 0,
-													right: 0,
-													bottom: 0,
-													borderRadius: sectionIndex === 0 ? 28 : 20,
-													borderWidth: 1.5,
-													borderColor: 'rgba(255, 255, 255, 0.4)'
-												}} />
-												
-												{/* Inner Glass Ring */}
-												<View style={{
-													position: 'absolute',
-													top: 2,
-													left: 2,
-													right: 2,
-													bottom: 2,
-													borderRadius: sectionIndex === 0 ? 26 : 18,
-													borderWidth: 0.5,
-													borderColor: 'rgba(255, 255, 255, 0.2)'
-												}} />
-												
-												
-												<Ionicons 
-													name={action.icon as any} 
-													size={sectionIndex === 0 ? 42 : 32} 
-													color='white' 
-													style={{ zIndex: 1 }}
-												/>
-												
-												{/* Count badge */}
-												{action.count !== undefined && action.count > 0 && (
-													<View style={{
-														position: 'absolute',
-														top: -6,
-														right: -6,
-														backgroundColor: '#EF4444',
-														borderRadius: 12,
-														width: 24,
-														height: 24,
-														alignItems: 'center',
-														justifyContent: 'center',
-														borderWidth: 2,
-														borderColor: 'white',
-														shadowColor: '#000',
-														shadowOffset: { width: 0, height: 2 },
-														shadowOpacity: 0.2,
-														shadowRadius: 4,
-														elevation: 8,
-														zIndex: 10
-													}}>
-														<Text style={{
-															color: 'white',
-															fontSize: 10,
-															fontWeight: '700'
-														}}>
-															{action.count}
-														</Text>
-													</View>
-												)}
-											</View>
-											<Text style={{
-												fontSize: tokens.font.size.xs,
-												color: 'white',
-												textAlign: 'center',
-												fontWeight: '500',
-												lineHeight: tokens.font.size.xs * 1.2
-											}}>
-												{action.title}
-											</Text>
-										</TouchableOpacity>
-									))}
-									</View>
-								) : (
-									<ScrollView 
-										horizontal 
-										showsHorizontalScrollIndicator={false}
-										contentContainerStyle={{
-											paddingHorizontal: tokens.spacing.gap.md,
-											paddingVertical: tokens.spacing.gap.sm,
-											gap: tokens.spacing.gap.xs
-										}}
-									>
-										{section.quickActions.map((action, index) => (
-											<TouchableOpacity
-												key={index}
-												activeOpacity={0.8}
-												onPress={() => handleTilePress(action.navigateTo)}
-												style={{
-													alignItems: 'center',
-													width: 85
-												}}
-											>
-												{/* Backdrop shadow */}
-												<View style={{
-													position: 'absolute',
-													width: 68,
-													height: 68,
-													borderRadius: 20,
-													backgroundColor: 'rgba(0,0,0,0.08)',
-													top: 2,
-													left: 8,
-													zIndex: 0
-												}} />
-												<View style={{
-													width: 68,
-													height: 68,
-													borderRadius: 20,
-													shadowColor: '#7C3AED',
-													shadowOffset: { width: 0, height: 6 },
-													shadowOpacity: 0.2,
-													shadowRadius: 12,
-													elevation: 8,
-													marginBottom: tokens.spacing.gap.xs,
-													position: 'relative',
-													alignItems: 'center',
-													justifyContent: 'center',
-													overflow: 'visible'
-												}}>
-																																{/* Enhanced Liquid Glass Background */}
-																			<View
-																				style={{
-																					position: 'absolute',
-																					top: 0,
-																					left: 0,
-																					right: 0,
-																					bottom: 0,
-																					borderRadius: 20,
-																					backgroundColor: 'rgba(255, 255, 255, 0.15)',
-																					// Inner shadow for depth
-																					shadowColor: 'rgba(0,0,0,0.1)',
-																					shadowOffset: { width: 0, height: 2 },
-																					shadowOpacity: 1,
-																					shadowRadius: 4
-																				}}
-																			/>
-													
-													{/* Liquid Glass Highlight */}
-													<View style={{
-														position: 'absolute',
-														top: 0,
-														left: 0,
-														right: 0,
-														height: '45%',
-														borderRadius: 20,
-														backgroundColor: 'rgba(255, 255, 255, 0.3)',
-														opacity: 0.8
-													}} />
-													
-													{/* Enhanced Glass Border */}
-													<View style={{
-														position: 'absolute',
-														top: 0,
-														left: 0,
-														right: 0,
-														bottom: 0,
-														borderRadius: 20,
-														borderWidth: 1.5,
-														borderColor: 'rgba(255, 255, 255, 0.4)'
-													}} />
-													
-													{/* Inner Glass Ring */}
-													<View style={{
-														position: 'absolute',
-														top: 2,
-														left: 2,
-														right: 2,
-														bottom: 2,
-														borderRadius: 18,
-														borderWidth: 0.5,
-														borderColor: 'rgba(255, 255, 255, 0.2)'
-													}} />
-													
-													
-													<Ionicons 
-														name={action.icon as any} 
-														size={32} 
-														color='white' 
-														style={{ zIndex: 1 }}
-													/>
-													
-													{/* Count badge */}
-													{action.count !== undefined && action.count > 0 && (
-														<View style={{
-															position: 'absolute',
-															top: -6,
-															right: -6,
-															backgroundColor: '#EF4444',
-															borderRadius: 12,
-															width: 24,
-															height: 24,
-															alignItems: 'center',
-															justifyContent: 'center',
-															borderWidth: 2,
-															borderColor: 'white',
-															shadowColor: '#000',
-															shadowOffset: { width: 0, height: 2 },
-															shadowOpacity: 0.2,
-															shadowRadius: 4,
-															elevation: 8,
-															zIndex: 10
-														}}>
-															<Text style={{
-																color: 'white',
-																fontSize: 10,
-																fontWeight: '700'
-															}}>
-																{action.count}
-															</Text>
-														</View>
-													)}
-												</View>
-												<Text style={{
-													fontSize: tokens.font.size.xs,
-													color: 'white',
-													textAlign: 'center',
-													fontWeight: '500',
-													lineHeight: tokens.font.size.xs * 1.2
-												}}>
-													{action.title}
-												</Text>
-											</TouchableOpacity>
-										))}
-									</ScrollView>
-								)
-							)}
-
-						</View>
-					))}
+							</TouchableOpacity>
+						))}
+					</ScrollView>
 				</View>
-			</GlassView>
-			</ScrollView>
 
-			{/* Center Microphone Button - Popping out of bottom nav */}
-			<TouchableOpacity style={{ 
-				position: 'absolute',
-				bottom: 42, // Position above the bottom nav
-				left: '50%',
-				marginLeft: -32, // Half of button width to center
-				zIndex: 1000
-			}}>
+				{/* Feature Grid - Liquid Glass Tiles */}
 				<View style={{
-					width: 64,
-					height: 64,
-					borderRadius: 32,
-					overflow: 'hidden',
-					shadowColor: tokens.color.brand.gradient.start,
-					shadowOffset: { width: 0, height: 8 },
-					shadowOpacity: 0.5,
-					shadowRadius: 16,
-					elevation: 12
+					paddingHorizontal: 20
 				}}>
-					<LinearGradient
-						colors={['#4C1D95', '#5B21B6', '#6D28D9', '#7C3AED']}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-						style={{
-							width: '100%',
-							height: '100%',
-							alignItems: 'center',
-							justifyContent: 'center'
-						}}
+					{/* Large Feature Tile */}
+					<TouchableOpacity
+						onPress={() => handleTilePress(mainFeatures[0].navigateTo)}
+						activeOpacity={0.9}
+						style={{ marginBottom: 15 }}
 					>
-						{/* Glass overlay for mic button */}
+						<View style={{
+							height: 140,
+							borderRadius: 24,
+							overflow: 'hidden',
+							backgroundColor: 'rgba(255,255,255,0.1)',
+							borderWidth: 1,
+							borderColor: 'rgba(255,255,255,0.2)'
+						}}>
+							{/* Glass shine effect */}
+							<LinearGradient
+								colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 0.5, y: 1 }}
+								style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									right: 0,
+									bottom: 0
+								}}
+							/>
+							
+							<View style={{
+								flex: 1,
+								padding: 24,
+								justifyContent: 'space-between'
+							}}>
+								<View style={{
+									flexDirection: 'row',
+									justifyContent: 'space-between',
+									alignItems: 'flex-start'
+								}}>
+									<Ionicons 
+										name={mainFeatures[0].icon as any} 
+										size={48} 
+										color="white"
+										style={{
+											shadowColor: '#000',
+											shadowOffset: { width: 0, height: 2 },
+											shadowOpacity: 0.2,
+											shadowRadius: 4
+										}}
+									/>
+									{mainFeatures[0].count !== undefined && mainFeatures[0].count > 0 && (
+										<View style={{
+											backgroundColor: 'rgba(255,255,255,0.2)',
+											paddingHorizontal: 12,
+											paddingVertical: 4,
+											borderRadius: 12,
+											borderWidth: 1,
+											borderColor: 'rgba(255,255,255,0.3)'
+										}}>
+											<Text style={{
+												color: 'white',
+												fontWeight: '700',
+												fontSize: 16
+											}}>
+												{mainFeatures[0].count}
+											</Text>
+										</View>
+									)}
+								</View>
+								
+								<Text style={{
+									fontSize: 18,
+									fontWeight: '600',
+									color: 'white',
+									letterSpacing: -0.3
+								}}>
+									{mainFeatures[0].title}
+								</Text>
+							</View>
+						</View>
+					</TouchableOpacity>
+
+					{/* Two Column Grid */}
+					<View style={{
+						flexDirection: 'row',
+						gap: 15
+					}}>
+						{mainFeatures.slice(1, 3).map((feature, index) => (
+							<TouchableOpacity
+								key={index}
+								onPress={() => handleTilePress(feature.navigateTo)}
+								activeOpacity={0.9}
+								style={{ flex: 1 }}
+							>
+								<View style={{
+									height: 120,
+									borderRadius: 24,
+									overflow: 'hidden',
+									backgroundColor: 'rgba(255,255,255,0.1)',
+									borderWidth: 1,
+									borderColor: 'rgba(255,255,255,0.2)'
+								}}>
+									{/* Glass shine */}
+									<LinearGradient
+										colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0)']}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 0.5, y: 1 }}
+										style={{
+											position: 'absolute',
+											top: 0,
+											left: 0,
+											right: 0,
+											bottom: 0
+										}}
+									/>
+									
+									<View style={{
+										flex: 1,
+										padding: 20,
+										justifyContent: 'space-between'
+									}}>
+										<View style={{
+											flexDirection: 'row',
+											justifyContent: 'space-between',
+											alignItems: 'flex-start'
+										}}>
+											<Ionicons 
+												name={feature.icon as any} 
+												size={36} 
+												color="white"
+												style={{
+													shadowColor: '#000',
+													shadowOffset: { width: 0, height: 2 },
+													shadowOpacity: 0.2,
+													shadowRadius: 4
+												}}
+											/>
+											{'count' in feature && feature.count !== undefined && feature.count > 0 && (
+												<View style={{
+													backgroundColor: 'rgba(255,255,255,0.2)',
+													paddingHorizontal: 8,
+													paddingVertical: 2,
+													borderRadius: 8,
+													borderWidth: 1,
+													borderColor: 'rgba(255,255,255,0.3)'
+												}}>
+													<Text style={{
+														color: 'white',
+														fontWeight: '700',
+														fontSize: 12
+													}}>
+														{feature.count}
+													</Text>
+												</View>
+											)}
+										</View>
+										
+										<Text style={{
+											fontSize: 18,
+											fontWeight: '600',
+											color: 'white',
+											letterSpacing: -0.3
+										}}>
+											{feature.title}
+										</Text>
+									</View>
+								</View>
+							</TouchableOpacity>
+						))}
+					</View>
+
+					{/* Wide Feature Tiles */}
+					<View style={{ marginTop: 15, gap: 15 }}>
+						{mainFeatures.slice(3).map((feature, index) => (
+							<TouchableOpacity
+								key={index}
+								onPress={() => handleTilePress(feature.navigateTo)}
+								activeOpacity={0.9}
+							>
+								<View style={{
+									height: 100,
+									borderRadius: 24,
+									overflow: 'hidden',
+									backgroundColor: 'rgba(255,255,255,0.1)',
+									borderWidth: 1,
+									borderColor: 'rgba(255,255,255,0.2)'
+								}}>
+									{/* Glass shine */}
+									<LinearGradient
+										colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0)']}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 0.5 }}
+										style={{
+											position: 'absolute',
+											top: 0,
+											left: 0,
+											right: 0,
+											bottom: 0
+										}}
+									/>
+									
+									<View style={{
+										flex: 1,
+										flexDirection: 'row',
+										alignItems: 'center',
+										justifyContent: 'space-between',
+										padding: 20
+									}}>
+										<View style={{
+											flexDirection: 'row',
+											alignItems: 'center',
+											gap: 16
+										}}>
+											<Ionicons 
+												name={feature.icon as any} 
+												size={32} 
+												color="white"
+												style={{
+													shadowColor: '#000',
+													shadowOffset: { width: 0, height: 2 },
+													shadowOpacity: 0.2,
+													shadowRadius: 4
+												}}
+											/>
+											
+											<Text style={{
+												fontSize: 18,
+												fontWeight: '600',
+												color: 'white',
+												letterSpacing: -0.3
+											}}>
+												{feature.title}
+											</Text>
+										</View>
+									</View>
+								</View>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
+
+				{/* Quick Add Section - Glass Button */}
+				<View style={{
+					paddingHorizontal: 20,
+					paddingTop: 30,
+					paddingBottom: 20
+				}}>
+					<View style={{
+						flexDirection: 'row',
+						gap: 12
+					}}>
+						<TouchableOpacity
+							onPress={() => handleTilePress('AddJournal')}
+							style={{ flex: 1 }}
+						>
+							<View style={{
+								height: 56,
+								borderRadius: 28,
+								backgroundColor: 'rgba(255,255,255,0.15)',
+								borderWidth: 1,
+								borderColor: 'rgba(255,255,255,0.3)',
+								flexDirection: 'row',
+								alignItems: 'center',
+								justifyContent: 'center',
+								gap: 8
+							}}>
+								<Ionicons name="add-circle" size={24} color="white" />
+								<Text style={{
+									fontSize: 16,
+									fontWeight: '600',
+									color: 'white'
+								}}>
+									Quick Add
+								</Text>
+							</View>
+						</TouchableOpacity>
+					</View>
+				</View>
+				</ScrollView>
+			</SafeAreaView>
+
+			{/* Floating Mic Button - Light Gray Liquid Glass with Purple Icon */}
+			<Animated.View style={{ 
+				position: 'absolute',
+				bottom: 42,
+				left: '50%',
+				marginLeft: -36,
+				zIndex: 1000,
+				transform: [{ scale: pulseAnim }]
+			}}>
+				<TouchableOpacity 
+					onPress={() => handleModeSelect('Language Coach')}
+					activeOpacity={0.9}
+				>
+					<View style={{
+						width: 72,
+						height: 72,
+						borderRadius: 36,
+						backgroundColor: 'rgba(241, 245, 249, 0.95)',
+						borderWidth: 2,
+						borderColor: 'rgba(255, 255, 255, 0.8)',
+						shadowColor: '#000',
+						shadowOffset: { width: 0, height: 8 },
+						shadowOpacity: 0.25,
+						shadowRadius: 20,
+						elevation: 15,
+						overflow: 'hidden'
+					}}>
+						{/* Liquid glass shine effect */}
 						<View style={{
 							position: 'absolute',
 							top: 0,
 							left: 0,
 							right: 0,
-							height: '50%',
-							backgroundColor: 'rgba(255,255,255,0.2)',
-							borderRadius: 28
+							height: '45%',
+							backgroundColor: 'rgba(255, 255, 255, 0.6)'
 						}} />
 						
-						<Ionicons name="mic" size={28} color="white" style={{ zIndex: 1 }} />
-					</LinearGradient>
-				</View>
-			</TouchableOpacity>
+						{/* Inner shadow for depth */}
+						<View style={{
+							position: 'absolute',
+							top: 2,
+							left: 2,
+							right: 2,
+							bottom: 2,
+							borderRadius: 34,
+							borderWidth: 1,
+							borderColor: 'rgba(0, 0, 0, 0.05)'
+						}} />
+						
+						<View style={{
+							flex: 1,
+							alignItems: 'center',
+							justifyContent: 'center'
+						}}>
+							<Ionicons name="mic" size={32} color="#7C3AED" />
+						</View>
+					</View>
+				</TouchableOpacity>
+			</Animated.View>
 
 			<BottomNavigation
 				onAddPress={toggleAddMenu}
@@ -827,6 +683,171 @@ export default function DashboardScreen() {
 				profileMenuOptions={profileMenuOptions}
 			/>
 
-		</LinearGradient>
+			{/* Floating Add Menu - Glass Design */}
+			{showAddMenu && addMenuAnim && (
+				<>
+					<Animated.View
+						style={{
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0,
+							backgroundColor: 'rgba(0,0,0,0.4)',
+							opacity: addMenuAnim
+						}}
+					>
+						<TouchableOpacity 
+							style={{ flex: 1 }}
+							onPress={toggleAddMenu}
+							activeOpacity={1}
+						/>
+					</Animated.View>
+					
+					<Animated.View
+						style={{
+							position: 'absolute',
+							bottom: 100,
+							left: 20,
+							right: 20,
+							opacity: addMenuAnim,
+							transform: [{
+								translateY: addMenuAnim.interpolate({
+									inputRange: [0, 1],
+									outputRange: [50, 0],
+								})
+							}]
+						}}
+					>
+						<View style={{
+							backgroundColor: 'rgba(255,255,255,0.95)',
+							borderRadius: 24,
+							padding: 20,
+							shadowColor: '#000',
+							shadowOffset: { width: 0, height: 10 },
+							shadowOpacity: 0.2,
+							shadowRadius: 30,
+							elevation: 20
+						}}>
+							<View style={{
+								flexDirection: 'row',
+								justifyContent: 'space-around'
+							}}>
+								{addMenuOptions.map((option, index) => (
+									<TouchableOpacity
+										key={index}
+										onPress={() => {
+											(navigation as any).navigate(option.navigateTo);
+											toggleAddMenu();
+										}}
+										style={{ alignItems: 'center' }}
+									>
+										<View style={{
+											width: 60,
+											height: 60,
+											borderRadius: 20,
+											backgroundColor: 'rgba(124,58,237,0.1)',
+											alignItems: 'center',
+											justifyContent: 'center',
+											marginBottom: 8
+										}}>
+											<Ionicons 
+												name={option.icon as any} 
+												size={28} 
+												color="#7C3AED"
+											/>
+										</View>
+										<Text style={{
+											fontSize: 12,
+											color: '#6B7280',
+											fontWeight: '500'
+										}}>
+											{option.title}
+										</Text>
+									</TouchableOpacity>
+								))}
+							</View>
+						</View>
+					</Animated.View>
+				</>
+			)}
+
+			{/* Profile Menu - Glass Design */}
+			{showProfileMenu && profileMenuAnim && (
+				<>
+					<Animated.View
+						style={{
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0,
+							backgroundColor: 'rgba(0,0,0,0.4)',
+							opacity: profileMenuAnim
+						}}
+					>
+						<TouchableOpacity 
+							style={{ flex: 1 }}
+							onPress={toggleProfileMenu}
+							activeOpacity={1}
+						/>
+					</Animated.View>
+					
+					<Animated.View
+						style={{
+							position: 'absolute',
+							top: 100,
+							right: 20,
+							backgroundColor: 'rgba(255,255,255,0.95)',
+							borderRadius: 16,
+							shadowColor: '#000',
+							shadowOffset: { width: 0, height: 4 },
+							shadowOpacity: 0.15,
+							shadowRadius: 12,
+							elevation: 10,
+							minWidth: 160,
+							opacity: profileMenuAnim,
+							transform: [{
+								scale: profileMenuAnim.interpolate({
+									inputRange: [0, 1],
+									outputRange: [0.9, 1],
+								})
+							}]
+						}}
+					>
+						{profileMenuOptions.map((option, index) => (
+							<TouchableOpacity
+								key={index}
+								onPress={() => {
+									(navigation as any).navigate(option.navigateTo);
+									toggleProfileMenu();
+								}}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									padding: 16,
+									borderBottomWidth: index !== profileMenuOptions.length - 1 ? 1 : 0,
+									borderBottomColor: 'rgba(124,58,237,0.1)'
+								}}
+							>
+								<Ionicons 
+									name={option.icon as any} 
+									size={20} 
+									color="#7C3AED"
+									style={{ marginRight: 12 }}
+								/>
+								<Text style={{
+									fontSize: 14,
+									color: '#374151',
+									fontWeight: '500'
+								}}>
+									{option.title}
+								</Text>
+							</TouchableOpacity>
+						))}
+					</Animated.View>
+				</>
+			)}
+		</View>
 	);
 }
