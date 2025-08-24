@@ -3,7 +3,6 @@ import { View, TouchableOpacity, Animated } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
 
 interface BottomNavigationProps {
@@ -36,7 +35,6 @@ export function BottomNavigation({
   profileMenuOptions = []
 }: BottomNavigationProps) {
   const { tokens } = useTheme();
-  const { openDrawer } = useDrawer();
   const navigation = useNavigation();
 
   return (
@@ -160,16 +158,19 @@ export function BottomNavigation({
           flex: 1,
           paddingHorizontal: tokens.spacing.gap.xs
         }}>
-          {/* Menu Button */}
-          <TouchableOpacity onPress={openDrawer} style={{ alignItems: 'center', width: 65 }}>
-            <Ionicons name="menu-outline" size={26} color={tokens.color.text.secondary} />
+          {/* Home Button */}
+          <TouchableOpacity 
+            onPress={() => (navigation as any).navigate('Dashboard')}
+            style={{ alignItems: 'center', width: 65 }}
+          >
+            <Ionicons name="home-outline" size={26} color={tokens.color.text.secondary} />
             <Text style={{ 
               fontSize: 11, 
               color: tokens.color.text.secondary, 
               marginTop: 3,
               fontWeight: '500'
             }}>
-              Menu
+              Home
             </Text>
           </TouchableOpacity>
           
@@ -270,7 +271,7 @@ export function BottomNavigation({
             bottom: 95,
             left: tokens.spacing.containerX + 65,
             backgroundColor: 'white',
-            borderRadius: tokens.radius.xl,
+            borderRadius: tokens.radius['2xl'],
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.15,
@@ -345,7 +346,7 @@ export function BottomNavigation({
             bottom: 95,
             right: tokens.spacing.containerX,
             backgroundColor: 'white',
-            borderRadius: tokens.radius.xl,
+            borderRadius: tokens.radius['2xl'],
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.15,

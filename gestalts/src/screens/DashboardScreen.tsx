@@ -181,13 +181,27 @@ export default function DashboardScreen() {
 				{/* Upper Section - transparent over background gradient */}
 				<View style={{ paddingBottom: 40, paddingTop: 60 }}>
 
-				{/* Logo and Gestalts Text */}
+				{/* Header with Hamburger Menu and Logo */}
 				<View style={{ 
+					flexDirection: 'row',
 					alignItems: 'center',
+					justifyContent: 'space-between',
 					paddingHorizontal: tokens.spacing.containerX,
 					paddingTop: tokens.spacing.gap.sm,
 					paddingBottom: tokens.spacing.gap.lg
 				}}>
+					{/* Hamburger Menu Button */}
+					<TouchableOpacity 
+						onPress={openDrawer}
+						style={{
+							padding: 8,
+							marginLeft: -8
+						}}
+					>
+						<Ionicons name="menu-outline" size={28} color="white" />
+					</TouchableOpacity>
+
+					{/* Logo and Gestalts Text - centered */}
 					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
 						{/* Inverted Logo - white on transparent */}
 						<Image 
@@ -200,7 +214,7 @@ export default function DashboardScreen() {
 							resizeMode="contain"
 						/>
 						
-						{/* Gestalts Text - left aligned */}
+						{/* Gestalts Text */}
 						<Text weight="semibold" style={{
 							fontSize: tokens.font.size.lg,
 							fontFamily: 'PlusJakartaSans-SemiBold',
@@ -213,12 +227,15 @@ export default function DashboardScreen() {
 							Gestalts
 						</Text>
 					</View>
+
+					{/* Spacer for balance */}
+					<View style={{ width: 28 }} />
 				</View>
 
 				{/* Welcome Message */}
 				<View style={{ 
 					paddingHorizontal: tokens.spacing.containerX,
-					paddingTop: tokens.spacing.gap.xl,
+					paddingTop: tokens.spacing.gap.lg,
 					paddingBottom: tokens.spacing.gap.lg
 				}}>
 					<Text style={{ 
@@ -437,24 +454,6 @@ export default function DashboardScreen() {
 										}}>
 											{section.title}
 										</Text>
-										{section.count !== undefined && section.count > 0 && (
-											<View style={{
-												backgroundColor: '#EC4899',
-												borderRadius: 12,
-												paddingHorizontal: 10,
-												paddingVertical: 4,
-												minWidth: 24,
-												alignItems: 'center'
-											}}>
-												<Text style={{
-													color: 'white',
-													fontSize: tokens.font.size.xs,
-													fontWeight: '700'
-												}}>
-													{section.count}
-												</Text>
-											</View>
-										)}
 									</View>
 								</View>
 							</View>
@@ -506,25 +505,23 @@ export default function DashboardScreen() {
 												justifyContent: 'center',
 												overflow: 'visible'
 											}}>
-												{/* Enhanced Liquid Glass Background */}
-												<View
-													style={{
-														position: 'absolute',
-														top: 0,
-														left: 0,
-														right: 0,
-														bottom: 0,
-														borderRadius: sectionIndex === 0 ? 28 : 20,
-														backgroundColor: 'rgba(255, 255, 255, 0.15)',
-														// Add backdrop blur effect
-														backdropFilter: 'blur(10px)',
-														// Inner shadow for depth
-														shadowColor: 'rgba(0,0,0,0.1)',
-														shadowOffset: { width: 0, height: 2 },
-														shadowOpacity: 1,
-														shadowRadius: 4
-													}}
-												/>
+																													{/* Enhanced Liquid Glass Background */}
+																	<View
+																		style={{
+																			position: 'absolute',
+																			top: 0,
+																			left: 0,
+																			right: 0,
+																			bottom: 0,
+																			borderRadius: sectionIndex === 0 ? 28 : 20,
+																			backgroundColor: 'rgba(255, 255, 255, 0.15)',
+																			// Inner shadow for depth
+																			shadowColor: 'rgba(0,0,0,0.1)',
+																			shadowOffset: { width: 0, height: 2 },
+																			shadowOpacity: 1,
+																			shadowRadius: 4
+																		}}
+																	/>
 												
 												{/* Liquid Glass Highlight */}
 												<View style={{
@@ -659,25 +656,23 @@ export default function DashboardScreen() {
 													justifyContent: 'center',
 													overflow: 'visible'
 												}}>
-													{/* Enhanced Liquid Glass Background */}
-													<View
-														style={{
-															position: 'absolute',
-															top: 0,
-															left: 0,
-															right: 0,
-															bottom: 0,
-															borderRadius: 20,
-															backgroundColor: 'rgba(255, 255, 255, 0.15)',
-															// Add backdrop blur effect
-															backdropFilter: 'blur(10px)',
-															// Inner shadow for depth
-															shadowColor: 'rgba(0,0,0,0.1)',
-															shadowOffset: { width: 0, height: 2 },
-															shadowOpacity: 1,
-															shadowRadius: 4
-														}}
-													/>
+																																{/* Enhanced Liquid Glass Background */}
+																			<View
+																				style={{
+																					position: 'absolute',
+																					top: 0,
+																					left: 0,
+																					right: 0,
+																					bottom: 0,
+																					borderRadius: 20,
+																					backgroundColor: 'rgba(255, 255, 255, 0.15)',
+																					// Inner shadow for depth
+																					shadowColor: 'rgba(0,0,0,0.1)',
+																					shadowOffset: { width: 0, height: 2 },
+																					shadowOpacity: 1,
+																					shadowRadius: 4
+																				}}
+																			/>
 													
 													{/* Liquid Glass Highlight */}
 													<View style={{
