@@ -16,6 +16,7 @@ import {
 import { useFonts as useInter, Inter_400Regular } from '@expo-google-fonts/inter';
 import { useFonts as useOoohBaby, OoohBaby_400Regular } from '@expo-google-fonts/oooh-baby';
 import { View, ActivityIndicator } from 'react-native';
+import { ElevenLabsProvider } from '@elevenlabs/react-native';
 
 export default function App() {
   const [pjLoaded] = usePlusJakarta({
@@ -44,10 +45,12 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider fontLoaded={fontLoaded}>
-          <NavigationContainer ref={navigationRef} theme={navTheme}>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </NavigationContainer>
+          <ElevenLabsProvider>
+            <NavigationContainer ref={navigationRef} theme={navTheme}>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </NavigationContainer>
+          </ElevenLabsProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

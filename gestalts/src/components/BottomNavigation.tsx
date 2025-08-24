@@ -190,7 +190,10 @@ export function BottomNavigation({
           <View style={{ width: 64 }} />
           
           {/* View Memories Button */}
-          <TouchableOpacity style={{ alignItems: 'center', width: 65 }}>
+          <TouchableOpacity 
+            onPress={() => (navigation as any).navigate('Memories')}
+            style={{ alignItems: 'center', width: 65 }}
+          >
             <Ionicons name="albums-outline" size={26} color={tokens.color.text.secondary} />
             <Text style={{ 
               fontSize: 11, 
