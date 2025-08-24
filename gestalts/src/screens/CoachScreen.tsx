@@ -7,10 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import type { MainStackParamList } from '../navigation/MainNavigator';
-import Constants from 'expo-constants';
-// Temporarily comment out ElevenLabs SDK to test basic functionality
-// import { useConversation } from '@elevenlabs/react-native';
-import { AGENT_CONFIGS, ElevenLabsConversationalAI } from '../services/elevenLabsHTTPService';
+import { useConversation } from '@elevenlabs/react-native';
+import { AGENT_CONFIGS } from '../services/elevenLabsHTTPService';
 
 interface ConversationMessage {
   id: string;
@@ -81,85 +79,124 @@ export default function CoachScreen() {
 		}
 	}, [route.params]);
 
-	// ElevenLabs HTTP service
-	const [elevenLabsService, setElevenLabsService] = useState<ElevenLabsConversationalAI | null>(null);
+	// ElevenLabs RN SDK conversation
+	const conversationSdk = useConversation({
+		onStatusChange: ({ status }) => {
+			setIsConnecting(status === 'connecting');
+		},
+		onConnect: () => {
+			setIsConnecting(false);
+		},
+		onDisconnect: () => {
+			setIsConnecting(false);
+		},
+		onError: (message) => {
+			console.error('ElevenLabs SDK error:', message);
+			Alert.alert('Connection Error', 'Unable to connect to AI coach. Please check your connection and try again.');
+		},
+		onMessage: ({ message }) => {
+			try {
+				switch (message.type) {
+					case 'user_transcript': {
+						const content = (message as any).user_transcription_event?.user_transcript || '';
+						if (content) {
+							const userMsg: ConversationMessage = {
+								id: Date.now().toString(),
+								role: 'user',
+								content,
+								timestamp: new Date().toISOString(),
+							};
+							setConversation(prev => [...prev, userMsg]);
+						}
+						break;
+					}
+					case 'internal_tentative_agent_response': {
+						const content = (message as any).tentative_agent_response_internal_event?.tentative_agent_response || '';
+						if (content) {
+							setIsStreamingActive(true);
+							setStreamingContent(content);
+						}
+						break;
+					}
+					case 'agent_response': {
+						const content = (message as any).agent_response_event?.agent_response || '';
+						if (content) {
+							setIsStreamingActive(false);
+							setStreamingContent('');
+							const agentMsg: ConversationMessage = {
+								id: Date.now().toString(),
+								role: 'agent',
+								content,
+								timestamp: new Date().toISOString(),
+							};
+							setConversation(prev => [...prev, agentMsg]);
+						}
+						break;
+					}
+					default:
+						break;
+				}
+			} catch (e) {
+				console.error('Error handling SDK message', e);
+			}
+		},
+	});
 
 	// Initialize conversation when mode changes
 	useEffect(() => {
-		startConversation();
-	}, [mode]);
+		// Only auto-start for Chat mode; in Talk mode, user starts via mic tap
+		if (!isVoiceMode) {
+			startConversation(true);
+		}
+	}, [mode, isVoiceMode]);
 
 	// Auto-scroll to bottom when new messages arrive
 	useEffect(() => {
 		scrollViewRef.current?.scrollToEnd({ animated: true });
 	}, [conversation, streamingContent]);
 
-	// Cleanup service on unmount
+	// Cleanup on unmount (do not depend on conversationSdk to avoid early disconnects)
 	useEffect(() => {
 		return () => {
-			if (elevenLabsService) {
-				elevenLabsService.cleanup();
-			}
+			try { conversationSdk.endSession(); } catch {}
 		};
-	}, [elevenLabsService]);
+	}, []);
 
-	const startConversation = async () => {
+	const startConversation = async (withGreeting: boolean = true) => {
 		setIsConnecting(true);
-		
 		try {
 			const agentConfig = AGENT_CONFIGS[mode];
-			console.log('Starting conversation with agent:', agentConfig.agentId);
-			
-			// Get API key from environment
-			const apiKey = Constants.expoConfig?.extra?.elevenLabsApiKey || 'sk_85547fd02516d6dd30b819b6fed5708ae70521dfc774769b';
-			
-			// Initialize HTTP service
-			const service = new ElevenLabsConversationalAI({
-				apiKey,
-				agentId: agentConfig.agentId
+			console.log('Starting SDK session with agent:', agentConfig.agentId);
+			await conversationSdk.startSession({
+				agentId: agentConfig.agentId,
+				overrides: {
+					conversation: { textOnly: !isVoiceMode },
+					client: { source: 'gestalts-mobile', version: '1.0.0' },
+				},
 			});
-			
-			// Set up callbacks
-			service.setOnMessageCallback((message: ConversationMessage) => {
-				console.log('ElevenLabs message:', message);
-				setConversation(prev => [...prev, message]);
-			});
-			
-			service.setOnStreamingCallback((content: string, isComplete: boolean) => {
-				if (isComplete) {
-					setIsStreamingActive(false);
-					setStreamingContent('');
-				} else {
-					setIsStreamingActive(true);
-					setStreamingContent(content);
-				}
-			});
-			
-			// Connect to service
-			await service.initializeConnection();
-			setElevenLabsService(service);
-			setIsConnecting(false);
+			// Ensure mic is muted on connect; user must tap to start recording
+			try { conversationSdk.setMicMuted(true); } catch {}
 			setCurrentConversationId(`conversation-${Date.now()}`);
-			
-			// Send initial greeting
-			const greeting = getModeConfig(mode).greeting;
-			const greetingMessage: ConversationMessage = {
-				id: Date.now().toString(),
-				role: 'agent',
-				content: greeting,
-				timestamp: new Date().toISOString()
-			};
-			setConversation([greetingMessage]);
-			
+			if (withGreeting) {
+				// Local greeting to match prior UX
+				const greeting = getModeConfig(mode).greeting;
+				const greetingMessage: ConversationMessage = {
+					id: Date.now().toString(),
+					role: 'agent',
+					content: greeting,
+					timestamp: new Date().toISOString()
+				};
+				setConversation([greetingMessage]);
+			}
 		} catch (error) {
-			console.error('Error starting conversation:', error);
+			console.error('Error starting SDK session:', error);
 			setIsConnecting(false);
 			Alert.alert('Connection Error', 'Unable to connect to AI coach. Please check your connection and try again.');
 		}
 	};
 
 	const handleSendMessage = async () => {
-		if (!input.trim() || !elevenLabsService) return;
+		if (!input.trim()) return;
 
 		setHasUserInteracted(true);
 
@@ -173,8 +210,13 @@ export default function CoachScreen() {
 		setConversation(prev => [...prev, userMessage]);
 
 		try {
-			// Send message to ElevenLabs using HTTP service
-			await elevenLabsService.sendTextMessage(input.trim());
+			if (conversationSdk.status !== 'connected') {
+				if (isConnecting || conversationSdk.status === 'connecting') {
+					return; // wait; user can tap send again after connected
+				}
+				await startConversation(false);
+			}
+			conversationSdk.sendUserMessage(input.trim());
 			setInput('');
 		} catch (error) {
 			console.error('Error sending message:', error);
@@ -235,24 +277,45 @@ export default function CoachScreen() {
 	};
 
 	const handleVoiceRecording = async () => {
+		// If not connected yet, open the session and begin capture
+		if (conversationSdk.status !== 'connected') {
+			try {
+				if (isConnecting || conversationSdk.status === 'connecting') {
+					return; // avoid double start
+				}
+				await startConversation(false);
+				// Begin capture immediately after connect
+				startWaveAnimation();
+				setIsRecording(true);
+				setHasUserInteracted(true);
+				try { conversationSdk.setMicMuted(false); } catch {}
+				console.log('Voice recording started (session opened)');
+				return;
+			} catch (error) {
+				console.error('Error starting session from mic tap:', error);
+				Alert.alert('Connection Error', 'Unable to connect to AI coach. Please try again.');
+				return;
+			}
+		}
 		if (isRecording) {
-			// Stop recording
+			// Stop recording and end session
 			try {
 				stopWaveAnimation();
 				setIsRecording(false);
-				// Mark as interacted when voice recording completes
 				setHasUserInteracted(true);
-				// Note: ElevenLabs SDK handles voice recording automatically
-				console.log('Voice recording stopped');
+				try { conversationSdk.setMicMuted(true); } catch {}
+				try { await conversationSdk.endSession(); } catch {}
+				console.log('Voice recording stopped (session ended)');
 			} catch (error) {
 				console.error('Error stopping recording:', error);
 				Alert.alert('Recording Error', 'Failed to stop recording. Please try again.');
 			}
 		} else {
+			// Already connected; start capture
 			try {
-				setIsRecording(true);
 				startWaveAnimation();
-				// Note: ElevenLabs SDK handles voice recording automatically
+				setIsRecording(true);
+				try { conversationSdk.setMicMuted(false); } catch {}
 				console.log('Voice recording started');
 			} catch (error) {
 				console.error('Error starting recording:', error);
@@ -272,11 +335,9 @@ export default function CoachScreen() {
 		// Reset interaction state when switching modes
 		setHasUserInteracted(false);
 		
-		// End current session and start new one with different agent
+		// End current session before switching agents
 		try {
-			if (elevenLabsConversation) {
-				await elevenLabsConversation.endSession();
-			}
+			await conversationSdk.endSession();
 		} catch (error) {
 			console.error('Error ending session:', error);
 		}
@@ -607,7 +668,7 @@ export default function CoachScreen() {
 
 							{/* Close Button - Far Right */}
 							<TouchableOpacity
-								onPress={() => navigation.navigate('Dashboard')}
+								onPress={() => (navigation as any).navigate('Dashboard')}
 								activeOpacity={0.7}
 								style={{
 									padding: 6
@@ -1122,7 +1183,7 @@ export default function CoachScreen() {
 													}}
 													style={{
 														padding: 4,
-														borderRadius: tokens.radius.sm,
+														borderRadius: tokens.radius.lg,
 														backgroundColor: tokens.color.bg.muted
 													}}
 												>
@@ -1143,7 +1204,7 @@ export default function CoachScreen() {
 													}}
 													style={{
 														padding: 4,
-														borderRadius: tokens.radius.sm,
+														borderRadius: tokens.radius.lg,
 														backgroundColor: tokens.color.bg.muted
 													}}
 												>
