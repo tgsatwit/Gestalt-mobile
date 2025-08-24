@@ -8,7 +8,7 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import { useConversation } from '@elevenlabs/react-native';
-import { AGENT_CONFIGS } from '../services/elevenLabsHTTPService';
+import { AGENT_CONFIGS, ElevenLabsConversationalAI } from '../services/elevenLabsHTTPService';
 
 interface ConversationMessage {
   id: string;
@@ -54,6 +54,24 @@ export default function CoachScreen() {
 		lastUpdated: string;
 	}>>([]);
 	const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+	const [awaitingAgentResponse, setAwaitingAgentResponse] = useState(false);
+
+	// Helper: wait for SDK to be fully connected
+	const waitForConnected = async (timeoutMs: number = 8000) => {
+		if (conversationSdk.status === 'connected') return;
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now();
+			const iv = setInterval(() => {
+				if (conversationSdk.status === 'connected') {
+					clearInterval(iv);
+					resolve();
+				} else if (Date.now() - start > timeoutMs) {
+					clearInterval(iv);
+					reject(new Error('Timeout waiting for connection'));
+				}
+			}, 50);
+		});
+	};
 	
 	// Refs
 	const scrollViewRef = useRef<ScrollView>(null);
@@ -98,19 +116,24 @@ export default function CoachScreen() {
 			try {
 				switch (message.type) {
 					case 'user_transcript': {
-						const content = (message as any).user_transcription_event?.user_transcript || '';
-						if (content) {
-							const userMsg: ConversationMessage = {
-								id: Date.now().toString(),
-								role: 'user',
-								content,
-								timestamp: new Date().toISOString(),
-							};
-							setConversation(prev => [...prev, userMsg]);
+						// Only reflect user transcripts when in voice mode
+						if (isVoiceMode) {
+							const content = (message as any).user_transcription_event?.user_transcript || '';
+							if (content) {
+								const userMsg: ConversationMessage = {
+									id: Date.now().toString(),
+									role: 'user',
+									content,
+									timestamp: new Date().toISOString(),
+								};
+								setConversation(prev => [...prev, userMsg]);
+							}
 						}
 						break;
 					}
 					case 'internal_tentative_agent_response': {
+						// In chat mode, suppress streaming unless we're expecting a reply
+						if (!isVoiceMode && !awaitingAgentResponse) break;
 						const content = (message as any).tentative_agent_response_internal_event?.tentative_agent_response || '';
 						if (content) {
 							setIsStreamingActive(true);
@@ -119,6 +142,8 @@ export default function CoachScreen() {
 						break;
 					}
 					case 'agent_response': {
+						// In chat mode, only accept agent responses when we sent a message
+						if (!isVoiceMode && !awaitingAgentResponse) break;
 						const content = (message as any).agent_response_event?.agent_response || '';
 						if (content) {
 							setIsStreamingActive(false);
@@ -130,6 +155,35 @@ export default function CoachScreen() {
 								timestamp: new Date().toISOString(),
 							};
 							setConversation(prev => [...prev, agentMsg]);
+							if (!isVoiceMode) {
+								setAwaitingAgentResponse(false);
+								try { conversationSdk.endSession(); } catch {}
+							}
+						}
+						break;
+					}
+					case 'agent_response_correction': {
+						// Some agents emit corrections instead of a new response
+						if (!isVoiceMode && !awaitingAgentResponse) break;
+						const content = (message as any).agent_response_correction_event?.corrected_agent_response || '';
+						if (content) {
+							setIsStreamingActive(false);
+							setStreamingContent('');
+							setConversation(prev => {
+								// Replace last agent message if present; else append
+								const lastIdx = [...prev].reverse().findIndex(m => m.role === 'agent');
+								if (lastIdx !== -1) {
+									const idx = prev.length - 1 - lastIdx;
+									const updated = [...prev];
+									updated[idx] = { ...updated[idx], content };
+									return updated;
+								}
+								return [...prev, { id: Date.now().toString(), role: 'agent', content, timestamp: new Date().toISOString() }];
+							});
+							if (!isVoiceMode) {
+								setAwaitingAgentResponse(false);
+								try { conversationSdk.endSession(); } catch {}
+							}
 						}
 						break;
 					}
@@ -142,12 +196,9 @@ export default function CoachScreen() {
 		},
 	});
 
-	// Initialize conversation when mode changes
+	// Do not auto-start sessions on mode changes; connect only on mic tap (talk) or send (chat)
 	useEffect(() => {
-		// Only auto-start for Chat mode; in Talk mode, user starts via mic tap
-		if (!isVoiceMode) {
-			startConversation(true);
-		}
+		// noop by design
 	}, [mode, isVoiceMode]);
 
 	// Auto-scroll to bottom when new messages arrive
@@ -163,6 +214,10 @@ export default function CoachScreen() {
 	}, []);
 
 	const startConversation = async (withGreeting: boolean = true) => {
+		// Guard against duplicate session starts
+		if (isConnecting || conversationSdk.status === 'connecting' || conversationSdk.status === 'connected') {
+			return;
+		}
 		setIsConnecting(true);
 		try {
 			const agentConfig = AGENT_CONFIGS[mode];
@@ -170,24 +225,18 @@ export default function CoachScreen() {
 			await conversationSdk.startSession({
 				agentId: agentConfig.agentId,
 				overrides: {
-					conversation: { textOnly: !isVoiceMode },
+					conversation: { textOnly: !isVoiceMode }, // enforce passive text in chat mode
+					agent: { firstMessage: '' },
 					client: { source: 'gestalts-mobile', version: '1.0.0' },
 				},
 			});
+			// Wait for connection to be established
+			await waitForConnected(10000); // Increase timeout to 10 seconds
 			// Ensure mic is muted on connect; user must tap to start recording
 			try { conversationSdk.setMicMuted(true); } catch {}
 			setCurrentConversationId(`conversation-${Date.now()}`);
-			if (withGreeting) {
-				// Local greeting to match prior UX
-				const greeting = getModeConfig(mode).greeting;
-				const greetingMessage: ConversationMessage = {
-					id: Date.now().toString(),
-					role: 'agent',
-					content: greeting,
-					timestamp: new Date().toISOString()
-				};
-				setConversation([greetingMessage]);
-			}
+			setIsConnecting(false); // Set to false after successful connection
+			// Do not inject a local greeting automatically; wait for user interaction
 		} catch (error) {
 			console.error('Error starting SDK session:', error);
 			setIsConnecting(false);
@@ -208,19 +257,34 @@ export default function CoachScreen() {
 			timestamp: new Date().toISOString()
 		};
 		setConversation(prev => [...prev, userMessage]);
+		const messageText = input.trim();
+		setInput(''); // Clear input immediately for better UX
 
 		try {
+			// Check if we need to start a new conversation
 			if (conversationSdk.status !== 'connected') {
-				if (isConnecting || conversationSdk.status === 'connecting') {
-					return; // wait; user can tap send again after connected
+				if (!(isConnecting || conversationSdk.status === 'connecting')) {
+					await startConversation(false);
+				} else {
+					// Wait for ongoing connection
+					await waitForConnected(15000); // Give more time for connection
 				}
-				await startConversation(false);
 			}
-			conversationSdk.sendUserMessage(input.trim());
-			setInput('');
+			
+			// Double-check we're connected before sending
+			if (conversationSdk.status !== 'connected') {
+				throw new Error('Failed to establish connection');
+			}
+			
+			if (!isVoiceMode) setAwaitingAgentResponse(true);
+			conversationSdk.sendUserMessage(messageText);
 		} catch (error) {
 			console.error('Error sending message:', error);
-			Alert.alert('Error', 'Failed to send message. Please try again.');
+			setAwaitingAgentResponse(false);
+			// Remove the user message if sending failed
+			setConversation(prev => prev.filter(msg => msg.id !== userMessage.id));
+			setInput(messageText); // Restore the input so user can try again
+			Alert.alert('Connection Error', 'Unable to send message. Please check your connection and try again.');
 		}
 	};
 
@@ -737,46 +801,7 @@ export default function CoachScreen() {
 					paddingTop: tokens.spacing.gap.md,
 					paddingBottom: 40
 				}}>
-					{/* Mode Selector Dropdown - Small and Subtle */}
-					{showModeSelector && (
-						<View style={{
-							position: 'absolute',
-							bottom: 110,
-							left: tokens.spacing.containerX + tokens.spacing.gap.md,
-							width: 140, // Fixed small width instead of full screen
-							backgroundColor: 'white',
-							borderRadius: tokens.radius.lg,
-							shadowColor: '#000',
-							shadowOffset: { width: 0, height: 2 },
-							shadowOpacity: 0.08,
-							shadowRadius: 12,
-							elevation: 6,
-							zIndex: 1000
-						}}>
-							{MODES.map((m, index) => (
-								<TouchableOpacity
-									key={m}
-									onPress={() => handleModeChange(m)}
-									activeOpacity={0.7}
-									style={{
-										paddingVertical: tokens.spacing.gap.xs,
-										paddingHorizontal: tokens.spacing.gap.sm,
-										borderBottomWidth: index !== MODES.length - 1 ? 0.5 : 0,
-										borderBottomColor: 'rgba(0,0,0,0.08)',
-										backgroundColor: mode === m ? 'rgba(124,58,237,0.05)' : 'transparent'
-									}}
-								>
-									<Text style={{
-										fontSize: tokens.font.size.xs,
-										color: mode === m ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
-										fontWeight: mode === m ? '500' : '400'
-									}}>
-										{m}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
-					)}
+					{/* Mode Selector Dropdown - Matches MemoriesScreen style */}
 
 					{/* Suggested Prompts - Only shown before first interaction */}
 					{!hasUserInteracted && (
@@ -836,41 +861,95 @@ export default function CoachScreen() {
 							justifyContent: 'space-between',
 							marginBottom: tokens.spacing.gap.sm
 						}}>
-							{/* Mode Selector Button - Subtle */}
-							<TouchableOpacity
-								onPress={() => setShowModeSelector(!showModeSelector)}
-								activeOpacity={0.7}
-								style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									backgroundColor: 'rgba(124,58,237,0.05)',
-									paddingHorizontal: tokens.spacing.gap.sm,
-									paddingVertical: tokens.spacing.gap.xs,
-									borderRadius: tokens.radius.lg
-								}}
-							>
-								<Text style={{
-									fontSize: tokens.font.size.xs,
-									color: tokens.color.text.secondary,
-									marginRight: 4,
-									fontWeight: '500'
-								}}>
-									{mode}
-								</Text>
-								<Ionicons 
-									name={showModeSelector ? "chevron-up" : "chevron-down"} 
-									size={12} 
-									color={tokens.color.text.secondary} 
-								/>
-							</TouchableOpacity>
+							{/* Mode Selector Button - Compact style */}
+							<View style={{ position: 'relative', marginRight: tokens.spacing.gap.sm }}>
+								<TouchableOpacity
+									onPress={() => setShowModeSelector(!showModeSelector)}
+									activeOpacity={0.7}
+									style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										backgroundColor: tokens.color.bg.muted,
+										paddingHorizontal: tokens.spacing.gap.sm,
+										paddingVertical: tokens.spacing.gap.xs,
+										borderRadius: tokens.radius.lg,
+										borderWidth: 1,
+										borderColor: tokens.color.border.default
+									}}
+								>
+									<Text style={{
+										fontSize: tokens.font.size.xs,
+										color: tokens.color.text.secondary,
+										marginRight: 4,
+										fontWeight: '400'
+									}}>
+										{mode}
+									</Text>
+									<Ionicons 
+										name={showModeSelector ? "chevron-up" : "chevron-down"} 
+										size={12} 
+										color={tokens.color.text.secondary} 
+									/>
+								</TouchableOpacity>
 
-							{/* Right Side: Talk/Chat Toggle */}
+								{/* Mode Dropdown */}
+								{showModeSelector && (
+									<View style={{
+										position: 'absolute',
+										top: '100%',
+										left: 0,
+										minWidth: 140,
+										marginTop: 4,
+										backgroundColor: 'white',
+										borderRadius: tokens.radius.lg,
+										shadowColor: '#000',
+										shadowOffset: { width: 0, height: 2 },
+										shadowOpacity: 0.08,
+										shadowRadius: 12,
+										elevation: 6,
+										zIndex: 1000
+									}}>
+										{MODES.map((m, index) => (
+											<TouchableOpacity
+												key={m}
+												onPress={() => handleModeChange(m)}
+												activeOpacity={0.7}
+												style={{
+													paddingVertical: tokens.spacing.gap.xs,
+													paddingHorizontal: tokens.spacing.gap.sm,
+													borderBottomWidth: index !== MODES.length - 1 ? 0.5 : 0,
+													borderBottomColor: 'rgba(0,0,0,0.08)',
+													backgroundColor: mode === m ? tokens.color.bg.muted : 'transparent',
+													flexDirection: 'row',
+													alignItems: 'center',
+													justifyContent: 'space-between'
+												}}
+											>
+												<Text style={{
+													fontSize: tokens.font.size.xs,
+													color: mode === m ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+													fontWeight: '400'
+												}}>
+													{m}
+												</Text>
+												{mode === m && (
+													<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+												)}
+											</TouchableOpacity>
+										))}
+									</View>
+								)}
+							</View>
+
+							{/* Right Side: Talk/Chat Toggle - Matches dropdown style */}
 							<View style={{
 								flexDirection: 'row',
 								alignItems: 'center',
-								backgroundColor: 'rgba(124,58,237,0.05)',
-								borderRadius: tokens.radius.pill,
-								padding: 2
+								backgroundColor: tokens.color.bg.muted,
+								borderRadius: tokens.radius.lg,
+								borderWidth: 1,
+								borderColor: tokens.color.border.default,
+								padding: 3
 							}}>
 								<TouchableOpacity
 									onPress={() => {
@@ -881,19 +960,17 @@ export default function CoachScreen() {
 									}}
 									activeOpacity={0.7}
 									style={{
-										width: 50,
-										paddingVertical: tokens.spacing.gap.xs,
-										borderRadius: tokens.radius.pill,
-										backgroundColor: isVoiceMode ? tokens.color.brand.gradient.start + '15' : 'transparent',
-										borderWidth: isVoiceMode ? 1 : 0,
-										borderColor: isVoiceMode ? tokens.color.brand.gradient.start + '30' : 'transparent',
+										width: 65,
+										paddingVertical: tokens.spacing.gap.xs - 1,
+										borderRadius: tokens.radius.lg - 3,
+										backgroundColor: isVoiceMode ? 'white' : 'transparent',
 										alignItems: 'center'
 									}}
 								>
 									<Text style={{
 										color: isVoiceMode ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
 										fontSize: tokens.font.size.xs,
-										fontWeight: isVoiceMode ? '600' : '400'
+										fontWeight: isVoiceMode ? '500' : '400'
 									}}>
 										Talk
 									</Text>
@@ -908,19 +985,17 @@ export default function CoachScreen() {
 									}}
 									activeOpacity={0.7}
 									style={{
-										width: 50,
-										paddingVertical: tokens.spacing.gap.xs,
-										borderRadius: tokens.radius.pill,
-										backgroundColor: !isVoiceMode ? tokens.color.brand.gradient.start + '15' : 'transparent',
-										borderWidth: !isVoiceMode ? 1 : 0,
-										borderColor: !isVoiceMode ? tokens.color.brand.gradient.start + '30' : 'transparent',
+										width: 65,
+										paddingVertical: tokens.spacing.gap.xs - 1,
+										borderRadius: tokens.radius.lg - 3,
+										backgroundColor: !isVoiceMode ? 'white' : 'transparent',
 										alignItems: 'center'
 									}}
 								>
 									<Text style={{
 										color: !isVoiceMode ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
 										fontSize: tokens.font.size.xs,
-										fontWeight: !isVoiceMode ? '600' : '400'
+										fontWeight: !isVoiceMode ? '500' : '400'
 									}}>
 										Chat
 									</Text>
@@ -1007,14 +1082,16 @@ export default function CoachScreen() {
 											placeholder={currentConfig.placeholder}
 											value={input}
 											onChangeText={setInput}
-											multiline
+											multiline={false}
+											returnKeyType="send"
+											blurOnSubmit={true}
+											onSubmitEditing={() => { if (input.trim()) { handleSendMessage(); } }}
 											style={{
 												fontSize: tokens.font.size.sm,
 												color: tokens.color.text.secondary,
-												maxHeight: 80,
-												minHeight: 44,
+												height: 44,
 												paddingHorizontal: tokens.spacing.gap.md,
-												paddingVertical: tokens.spacing.gap.sm,
+												paddingVertical: 0,
 												backgroundColor: 'rgba(124,58,237,0.05)',
 												borderRadius: tokens.radius.lg
 											}}
