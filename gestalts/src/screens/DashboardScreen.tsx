@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
 import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function DashboardScreen() {
