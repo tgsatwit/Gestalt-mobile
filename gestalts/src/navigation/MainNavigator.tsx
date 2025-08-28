@@ -13,22 +13,7 @@ import AddMilestoneScreen from '../screens/AddMilestoneScreen';
 import AppointmentNoteScreen from '../screens/AppointmentNoteScreen';
 import GestaltListsScreen from '../screens/GestaltListsScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
-
-export type MainStackParamList = {
-  Dashboard: undefined;
-  Coach: { initialMode?: 'Language Coach' | 'Parent Support' | 'Child Mode' };
-  Memories: undefined;
-  Play: undefined;
-  Report: undefined;
-  PlayAnalyzer: undefined;
-  Storybook: undefined;
-  Knowledge: undefined;
-  AddJournal: undefined;
-  AddMilestone: undefined;
-  AppointmentNote: { id?: string } | undefined;
-  GestaltLists: undefined;
-  ChildProfile: undefined;
-};
+import type { MainStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 

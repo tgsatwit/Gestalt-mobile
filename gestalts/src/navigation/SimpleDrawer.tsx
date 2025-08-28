@@ -5,7 +5,7 @@ import { Text, useTheme } from '../theme';
 import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { MainStackParamList } from './MainNavigator';
+import type { MainStackParamList } from './types';
 import type { NavigationProp } from '@react-navigation/native';
 
 interface DrawerContextType {
@@ -108,6 +108,12 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
       icon: 'sync',
       iconColor: '#7C3AED',
       count: playSessions.length
+    },
+    {
+      name: 'Storybook',
+      label: 'Storybook',
+      icon: 'book',
+      iconColor: '#7C3AED'
     },
     {
       name: 'Report',
