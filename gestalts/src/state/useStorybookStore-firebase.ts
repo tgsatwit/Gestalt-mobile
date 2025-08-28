@@ -147,12 +147,29 @@ export const useStorybookStore = create<StorybookState>()(
           const characters: Character[] = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
+            
+            // Ensure dates are properly converted
+            let createdAt: Date;
+            let updatedAt: Date;
+            
+            try {
+              createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+            } catch {
+              createdAt = new Date();
+            }
+            
+            try {
+              updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
+            } catch {
+              updatedAt = new Date();
+            }
+            
             characters.push({
               id: doc.id,
               name: data.name,
               avatarUrl: data.avatarUrl,
-              createdAt: data.createdAt?.toDate() || new Date(),
-              updatedAt: data.updatedAt?.toDate() || new Date()
+              createdAt,
+              updatedAt
             });
           });
           
@@ -310,6 +327,22 @@ export const useStorybookStore = create<StorybookState>()(
           const stories: Story[] = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
+            // Ensure dates are properly converted
+            let createdAt: Date;
+            let updatedAt: Date;
+            
+            try {
+              createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+            } catch {
+              createdAt = new Date();
+            }
+            
+            try {
+              updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
+            } catch {
+              updatedAt = new Date();
+            }
+            
             stories.push({
               id: doc.id,
               title: data.title,
@@ -319,8 +352,8 @@ export const useStorybookStore = create<StorybookState>()(
               pages: data.pages || [],
               status: data.status || 'complete',
               generationProgress: data.generationProgress || 100,
-              createdAt: data.createdAt?.toDate() || new Date(),
-              updatedAt: data.updatedAt?.toDate() || new Date(),
+              createdAt,
+              updatedAt,
               theme: data.theme,
               ageGroup: data.ageGroup
             });
