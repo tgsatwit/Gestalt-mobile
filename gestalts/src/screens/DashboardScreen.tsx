@@ -101,6 +101,12 @@ export default function DashboardScreen() {
 			title: 'Gestalts',
 			navigateTo: 'GestaltLists',
 			size: 'medium'
+		},
+		{ 
+			icon: 'book-outline', 
+			title: 'Storybook',
+			navigateTo: 'Storybook',
+			size: 'medium'
 		}
 	];
 

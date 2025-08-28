@@ -6,6 +6,9 @@ export const color = {
 			end: '#FB923C',
 		},
 	},
+	primary: {
+		default: '#5B21B6', // Using brand gradient start as primary
+	},
 	surface: '#FFFFFF',
 	bg: { muted: '#F9FAFB' },
 	border: { default: '#E5E7EB', hover: '#D1D5DB' },
@@ -20,8 +23,11 @@ export const color = {
 
 export const radius = {
 	pill: 9999,
+	sm: 8,
+	md: 10,
 	lg: 12,
-	'2xl': 16,
+	xl: 16,
+	'2xl': 20,
 };
 
 export const elevation = {

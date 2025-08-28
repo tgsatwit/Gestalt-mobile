@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // DEVELOPMENT MODE: Allow all access for testing
+    // TODO: Enable authentication and user-specific rules for production
+    match /{allPaths=**} {
+      allow read, write, create, delete: if true;
+    }
+    
+    // PRODUCTION RULES (commented out for development):
+    // Users can only access their own files
+    // match /users/{userId}/{allPaths=**} {
+    //   allow read, write, create, delete: if request.auth != null && request.auth.uid == userId;
+    // }
+    //
+    // User avatar images
+    // match /users/{userId}/avatars/{fileName} {
+    //   allow read, write, create, delete: if request.auth != null && request.auth.uid == userId
+    //     && fileName.matches('.*\\.(jpg|jpeg|png|gif|webp)$');
+    // }
+    //
+    // User story images
+    // match /users/{userId}/stories/{storyId}/{fileName} {
+    //   allow read, write, create, delete: if request.auth != null && request.auth.uid == userId
+    //     && fileName.matches('.*\\.(jpg|jpeg|png|gif|webp)$');
+    // }
+  }
+}

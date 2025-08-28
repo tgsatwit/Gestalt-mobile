@@ -16,14 +16,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode; fontLoaded: bo
 
 export const useTheme = () => useContext(ThemeContext);
 
-export type TextProps = RNTextProps & { weight?: 'regular' | 'medium' | 'semibold'; color?: keyof ThemeTokens['color']['text'] };
+export type TextProps = RNTextProps & { 
+	weight?: 'regular' | 'medium' | 'semibold' | 'bold'; 
+	color?: keyof ThemeTokens['color']['text'] | 'white';
+	size?: keyof ThemeTokens['font']['size'];
+};
 
-export const Text: React.FC<TextProps> = ({ style, weight = 'regular', color = 'primary', children, ...rest }) => {
+export const Text: React.FC<TextProps> = ({ style, weight = 'regular', color = 'primary', size = 'body', children, ...rest }) => {
 	const { tokens } = useTheme();
-	const fontFamily = weight === 'semibold' ? `${tokens.font.family.primary}-SemiBold` : weight === 'medium' ? `${tokens.font.family.primary}-Medium` : tokens.font.family.primary;
+	
+	// Map 'bold' weight to 'semibold' font family since we don't have a Bold variant
+	const fontWeight = weight === 'bold' ? 'semibold' : weight;
+	const fontFamily = fontWeight === 'semibold' ? `${tokens.font.family.primary}-SemiBold` : fontWeight === 'medium' ? `${tokens.font.family.primary}-Medium` : tokens.font.family.primary;
+	
+	// Handle special color values
+	const textColor = color === 'white' ? '#FFFFFF' : tokens.color.text[color as keyof ThemeTokens['color']['text']];
+	
+	// Get font size from tokens
+	const fontSize = tokens.font.size[size];
+	const lineHeight = Math.round(fontSize * 1.6);
+	
 	return (
 		<RNText
-			style={[{ color: tokens.color.text[color], fontFamily, fontSize: tokens.font.size.body, lineHeight: Math.round(tokens.font.size.body * 1.6) }, style]}
+			style={[{ color: textColor, fontFamily, fontSize, lineHeight }, style]}
 			{...rest}
 		>
 			{children}
@@ -38,3 +53,7 @@ export const View: React.FC<RNViewProps> = ({ style, children, ...rest }) => {
 		</RNView>
 	);
 };
+
+// Re-export tokens for direct access
+export { tokens } from './tokens';
+export type { ThemeTokens } from './tokens';
