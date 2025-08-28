@@ -96,12 +96,35 @@ class GeminiService {
     try {
       this.checkInitialized();
       
-      const style = request.style || 'pixar';
-      const prompt = `Transform this person into a ${style}-style animated character. 
-        The character should maintain the key facial features and expression from the photo.
-        Make it child-friendly, colorful, and appealing. 
-        Style: 3D animated ${style} character portrait.
-        ${request.characterName ? `This character is named ${request.characterName}.` : ''}`;
+      const style = 'pixar'; // Consistent Pixar style per storybook guidelines
+      const prompt = `Transform this person into a professional Pixar-style 3D animated character following storybook illustration guidelines.
+        
+        PIXAR CHARACTER DESIGN REQUIREMENTS:
+        - Professional Pixar 3D animation aesthetic (like characters from Toy Story, Finding Nemo, Coco)
+        - Maintain the person's key facial features, expressions, and recognizable characteristics
+        - Child-friendly, appealing design with rounded, soft features
+        - Vibrant, rich colors with smooth, polished surfaces
+        - Expressive eyes and friendly facial expressions
+        - Age-appropriate stylization that preserves the person's identity
+        - Distinctive visual traits that will be easily recognizable in story illustrations
+        
+        CHARACTER CONSISTENCY GUIDELINES:
+        - Create a character design that can be consistently reproduced across multiple story pages
+        - Ensure clear, memorable features (hairstyle, eye color, facial structure)
+        - Use a distinctive color palette and clothing style
+        - Design should work well in various poses and expressions
+        - Character should integrate seamlessly into children's storybook scenes
+        
+        TECHNICAL SPECIFICATIONS:
+        - High-quality 3D rendered portrait in Pixar animation style
+        - Clear, sharp details with proper lighting and depth
+        - Suitable for use as a character reference in story generation
+        - Professional children's media quality
+        ${request.characterName ? `
+        
+        CHARACTER IDENTITY: This character represents ${request.characterName} and should embody a friendly, engaging personality suitable for children's storytelling.` : ''}
+        
+        The result should be a character that children will instantly recognize and connect with in their personalized stories.`;
 
       // Convert base64 to image part for Gemini
       const imagePart = {
@@ -137,13 +160,17 @@ class GeminiService {
   }
 
   /**
-   * Generate a story illustration with character references
+   * Generate a story illustration with consistent Pixar-style character references
+   * Following storybook guidelines for character consistency and visual quality
    */
   async generateStoryImage(request: ImageGenerationRequest & {
     context?: {
       concept?: string;
       characterNames?: string[];
       childName?: string;
+      storyContext?: string; // Full story context for consistency
+      pageNumber?: number;
+      totalPages?: number;
       advanced?: {
         density: 'one-word' | 'one-sentence' | 'multiple-sentences';
         narrative: 'first-person' | 'third-person';
@@ -155,50 +182,143 @@ class GeminiService {
     };
   }): Promise<string> {
     try {
-      const style = request.style || 'pixar';
-      let enhancedPrompt = `Create a children's book illustration in ${style} style.
-        Scene: ${request.prompt}
-        Make it vibrant, child-friendly, and magical.
-        Style: High-quality children's book illustration, ${style} animation style.`;
+      const style = 'pixar'; // Consistent Pixar style per guidelines
+      const mainCharacter = request.context?.childName || request.context?.characterNames?.[0] || 'the child';
       
-      // Add context for concept learning
-      if (request.context) {
-        if (request.context.concept) {
-          enhancedPrompt += `
-        Learning Focus: This illustration should visually represent the concept of ${request.context.concept}.`;
-        }
+      // Build comprehensive prompt following storybook guidelines
+      let enhancedPrompt = `Create a high-quality children's storybook illustration in professional Pixar 3D animation style.
         
-        if (request.context.childName) {
+        SCENE TO ILLUSTRATE: ${request.prompt}
+        
+        PIXAR STYLE REQUIREMENTS:
+        - Professional Pixar 3D animation aesthetic (like Toy Story, Finding Nemo, Coco)
+        - Vibrant, saturated colors with soft, warm lighting
+        - Rounded, child-friendly character designs
+        - Smooth, polished surfaces with subtle texture details
+        - Dynamic composition with depth and visual interest
+        - Expressive character emotions and body language
+        - Rich environmental details and atmospheric depth
+        
+        CHARACTER CONSISTENCY GUIDELINES:
+        - Maintain identical character appearance across all illustrations
+        - Use provided reference images to ensure character likeness
+        - Keep character proportions, clothing, and features consistent
+        - Characters should have distinctive, memorable visual traits
+        - Facial features, hair style, and clothing must match references exactly`;
+      
+      // Add character-specific details
+      if (request.context) {
+        if (mainCharacter && mainCharacter !== 'the child') {
           enhancedPrompt += `
-        Main Character: Feature ${request.context.childName} prominently in the illustration as a relatable child character.`;
+        
+        MAIN CHARACTER: ${mainCharacter}
+        - Feature ${mainCharacter} as the central focus of the illustration
+        - ${mainCharacter} should be easily recognizable and consistent with previous pages
+        - Show ${mainCharacter}'s personality through pose and expression`;
         }
         
         if (request.context.characterNames && request.context.characterNames.length > 0) {
           enhancedPrompt += `
-        Characters to Include: ${request.context.characterNames.join(', ')}`;
+        
+        ALL CHARACTERS IN SCENE: ${request.context.characterNames.join(', ')}
+        - Each character must be visually distinct and consistent
+        - Maintain the same design language for all characters
+        - Ensure characters interact naturally within the scene`;
         }
         
-        if (request.context.advanced?.tone) {
+        // Add story context for consistency
+        if (request.context.storyContext) {
           enhancedPrompt += `
-        Mood: Create a ${request.context.advanced.tone} atmosphere in the illustration.`;
+        
+        STORY CONTEXT: ${request.context.storyContext}
+        - This illustration should fit naturally within the overall story narrative
+        - Maintain visual continuity with the story's theme and setting`;
+        }
+        
+        // Add page context for story flow
+        if (request.context.pageNumber && request.context.totalPages) {
+          enhancedPrompt += `
+        
+        PAGE CONTEXT: Page ${request.context.pageNumber} of ${request.context.totalPages}
+        - Consider the story's progression and pacing
+        - Ensure visual flow that connects to previous and next pages`;
+        }
+        
+        // Add learning concept integration
+        if (request.context.concept) {
+          enhancedPrompt += `
+        
+        EDUCATIONAL FOCUS: ${request.context.concept}
+        - Subtly incorporate visual elements that reinforce learning about "${request.context.concept}"
+        - Show the concept through character actions and environmental details
+        - Make the learning element feel natural, not forced`;
+        }
+        
+        // Add mood and tone specifications
+        if (request.context.advanced?.tone) {
+          const toneMapping = {
+            'playful': 'bright, energetic colors with dynamic poses and joyful expressions',
+            'gentle': 'soft, warm lighting with calm, nurturing expressions and peaceful settings',
+            'encouraging': 'uplifting composition with confident character poses and hopeful lighting',
+            'educational': 'clear, focused composition that highlights learning elements while maintaining engagement'
+          };
+          
+          enhancedPrompt += `
+        
+        MOOD AND TONE: ${request.context.advanced.tone}
+        - Visual style: ${toneMapping[request.context.advanced.tone] || 'engaging and age-appropriate'}
+        - Emotional atmosphere should support the story's message`;
         }
       }
+      
+      enhancedPrompt += `
+        
+        TECHNICAL SPECIFICATIONS:
+        - High resolution, publication-quality illustration
+        - Professional children's book layout and composition
+        - Clear focal hierarchy with main subject prominent
+        - Rich detail that rewards close examination
+        - Color palette suitable for young children (bright but not overwhelming)
+        - Ensure all elements are clearly readable and visually appealing
+        
+        SAFETY AND APPROPRIATENESS:
+        - 100% child-friendly content with no scary or inappropriate elements
+        - Positive, uplifting imagery that supports child development
+        - Inclusive and diverse representation when possible
+        - Educational value embedded naturally in the visual storytelling`;
 
-      // If reference images are provided, include them
+      // If reference images are provided, include them with detailed instructions
       const parts: any[] = [enhancedPrompt];
       
       if (request.referenceImages && request.referenceImages.length > 0) {
-        for (const refImage of request.referenceImages) {
+        enhancedPrompt += `
+        
+        REFERENCE IMAGES PROVIDED:
+        - Use the provided reference images to maintain character consistency
+        - Match the character appearance, features, and style exactly
+        - Adapt the characters naturally into the new scene while preserving their identity`;
+        
+        for (let i = 0; i < request.referenceImages.length; i++) {
+          const refImage = request.referenceImages[i];
           parts.push({
             inlineData: {
               mimeType: 'image/jpeg',
               data: refImage.replace(/^data:image\/\w+;base64,/, '')
             }
           });
+          
+          if (i === 0 && request.context?.childName) {
+            enhancedPrompt += `
+        - First reference image: Use this as the visual reference for ${request.context.childName}`;
+          }
         }
+        
+        // Update the parts array with the enhanced prompt
+        parts[0] = enhancedPrompt;
       }
 
       try {
+        console.log('Generating Pixar-style story illustration with character consistency...');
         const result = await this.model.generateContent(parts);
         const response = await result.response;
         
@@ -206,20 +326,16 @@ class GeminiService {
         if (response.candidates && response.candidates[0]) {
           console.log('Gemini 2.5 story image generation response received');
           // For now, return placeholder until we can extract actual image data
-          const seed = request.context?.concept ? 
-            `${request.prompt}-${request.context.concept}` : 
-            request.prompt;
-          return this.generatePlaceholderImage(style, seed);
+          const seed = `${request.prompt}-${mainCharacter}-${request.context?.concept || 'story'}-pixar`;
+          return this.generatePlaceholderImage('pixar', seed);
         }
       } catch (error) {
         console.warn('Gemini story image generation failed, using placeholder:', error);
       }
       
-      // Fallback to placeholder
-      const seed = request.context?.concept ? 
-        `${request.prompt}-${request.context.concept}` : 
-        request.prompt;
-      return this.generatePlaceholderImage(style, seed);
+      // Fallback to placeholder with character-specific seed
+      const seed = `${request.prompt}-${mainCharacter}-${request.context?.concept || 'story'}-pixar`;
+      return this.generatePlaceholderImage('pixar', seed);
     } catch (error) {
       console.error('Story image generation failed:', error);
       throw this.handleError(error);
@@ -258,7 +374,7 @@ class GeminiService {
   }
 
   /**
-   * Generate story text using AI
+   * Generate story text using AI with character names woven throughout
    */
   async generateStoryText(
     title: string, 
@@ -281,29 +397,36 @@ class GeminiService {
     try {
       this.checkInitialized();
       
-      // Build enhanced prompt with concept learning context
-      let prompt = `Create a children's story with the following details:
-        Title: ${title}
-        Description: ${description}
-        Characters: ${characterNames.join(', ')}
-        Number of pages: ${pageCount}`;
+      // Build enhanced prompt with specific character usage requirements
+      const mainCharacter = context?.childName || characterNames[0] || 'the main character';
+      const allCharacters = characterNames.length > 0 ? characterNames : [mainCharacter];
+      
+      let prompt = `Create an engaging children's story with the following specifications:
+        
+        Title: "${title}"
+        Story Theme: ${description}
+        Main Character: ${mainCharacter}
+        All Characters: ${allCharacters.join(', ')}
+        Number of Pages: ${pageCount}
+        
+        CRITICAL REQUIREMENTS:
+        - Use the actual character names (${allCharacters.join(', ')}) throughout the story - NOT generic terms like "the child" or "the main character"
+        - ${mainCharacter} should be the hero/protagonist and appear in every page
+        - Each character must be referred to by their actual name when they appear
+        - Make the story personal and specific to these named characters`;
       
       // Add concept learning context if provided
       if (context?.concept) {
         prompt += `
-        Learning Concept: ${context.concept}`;
-        prompt += `
-        Educational Goal: This story should help teach the concept of ${context.concept}.`;
+        
+        Learning Focus: ${context.concept}
+        Educational Goal: Naturally teach the concept of "${context.concept}" through ${mainCharacter}'s adventure
+        Integration: The concept should be woven into the story naturally, not forced`;
         
         if (context.advanced?.goal) {
           prompt += `
         Specific Learning Objective: ${context.advanced.goal}`;
         }
-      }
-      
-      if (context?.childName) {
-        prompt += `
-        Special Character: Include ${context.childName} as a main character in the story. Make ${context.childName} relatable and central to learning the concept.`;
       }
       
       // Add advanced settings if provided
@@ -312,36 +435,52 @@ class GeminiService {
         
         prompt += `
         
-        Story Requirements:
+        Story Style Requirements:
         - Text Density: ${density === 'one-word' ? 'Very brief, one key word or phrase per page' : 
                         density === 'one-sentence' ? 'One simple sentence per page' : 
                         'Multiple sentences per page (2-4)'}
-        - Narrative Style: ${narrative === 'first-person' ? 'Written from the character\'s perspective (I, me, we)' : 'Third-person narration (he, she, they)'}
-        - Language Complexity: ${complexity} vocabulary and sentence structure
-        - Tone: ${tone} and engaging for children`;
+        - Narrative Style: ${narrative === 'first-person' ? `Written from ${mainCharacter}'s perspective using "I" and "me"` : `Third-person narration using character names like "${mainCharacter}" and "they"`}
+        - Language Complexity: ${complexity} vocabulary and sentence structure appropriate for children
+        - Tone: ${tone} and engaging for young readers`;
       }
       
       prompt += `
         
-        Write a complete story with ${pageCount} paragraphs (one per page).
-        Make it engaging, educational, and age-appropriate.
-        Include all character names naturally in the story.
+        Story Structure Instructions:
+        1. Write exactly ${pageCount} distinct pages/scenes
+        2. Each page should be a complete thought or scene
+        3. Use ${mainCharacter}'s name frequently - at least once per page
+        4. Include other character names when they appear: ${allCharacters.slice(1).join(', ')}
+        5. Create a clear beginning, middle, and end
+        6. Make it visually descriptive for illustration purposes
         
-        Format: Return only the story text, with each page's text on a new line.`;
+        Output Format: 
+        Return ONLY the story text with each page separated by a line break.
+        Page 1: [First scene with ${mainCharacter}]
+        Page 2: [Second scene continuing ${mainCharacter}'s story]
+        And so on...`;
 
-      console.log('Generating story text with Gemini API...');
+      console.log('Generating personalized story text with character names...');
       const result = await this.model!.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
       console.log('Story text generated successfully');
       
-      // Split into pages
-      const pages = text.split('\n').filter((line: string) => line.trim().length > 0);
+      // Split into pages and clean up
+      const pages = text.split('\n')
+        .map(line => line.replace(/^Page \d+:\s*/i, '').trim()) // Remove "Page X:" prefixes
+        .filter((line: string) => line.length > 0);
       
       // Ensure we have the right number of pages
       while (pages.length < pageCount) {
-        pages.push('The adventure continues...');
+        pages.push(`${mainCharacter} continues the adventure...`);
+      }
+      
+      // Verify character names are included (basic check)
+      const storyText = pages.join(' ');
+      if (mainCharacter !== 'the main character' && !storyText.includes(mainCharacter)) {
+        console.warn('Generated story may not include main character name properly');
       }
       
       return pages.slice(0, pageCount);
@@ -379,13 +518,27 @@ class GeminiService {
    * Generate a placeholder image URL (temporary until real image generation)
    */
   private generatePlaceholderImage(style: string, seed: string): string {
-    // Using picsum for placeholder images
+    // Create a simple hash from the seed for consistent but varied colors
     const hash = seed.split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0);
     
-    return `https://picsum.photos/seed/${Math.abs(hash)}/1024/1024`;
+    const hashAbs = Math.abs(hash);
+    
+    // Use via.placeholder.com which is more reliable for mobile apps
+    // Generate colors based on the hash for consistency
+    const colors = [
+      'FFB6C1', 'FFE4B5', 'E6E6FA', 'B0E0E6', 'F0E68C', 
+      'DDA0DD', 'FFE4E1', 'F5DEB3', 'D3D3D3', 'AFEEEE'
+    ];
+    const bgColor = colors[hashAbs % colors.length];
+    const textColor = '333333';
+    
+    // Create a placeholder with text indicating it's generating
+    const text = style === 'pixar' ? 'Pixar\nStyle' : 'Story\nImage';
+    
+    return `https://via.placeholder.com/1024x1024/${bgColor}/${textColor}?text=${encodeURIComponent(text)}`;
   }
 
   /**

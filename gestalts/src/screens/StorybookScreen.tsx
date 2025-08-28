@@ -247,11 +247,14 @@ export default function StorybookScreen() {
 							<View style={{ flex: 1 }}>
 								<Text weight="semibold">{story.title}</Text>
 								<Text color="secondary" size="sm">
-									Created {story.createdAt.toLocaleDateString('en-US', { 
-										month: 'short', 
-										day: 'numeric', 
-										year: 'numeric' 
-									})}
+									Created {story.createdAt instanceof Date ? 
+										story.createdAt.toLocaleDateString('en-US', { 
+											month: 'short', 
+											day: 'numeric', 
+											year: 'numeric' 
+										}) : 
+										'Recently'
+									}
 								</Text>
 							</View>
 							<Ionicons name="chevron-forward" size={20} color={tokens.color.text.secondary} />
