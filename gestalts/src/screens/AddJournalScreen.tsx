@@ -11,7 +11,7 @@ import { BottomNavigation } from '../components/BottomNavigation';
 export default function AddJournalScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
-	const { addJournal, profile } = useMemoriesStore((s) => ({ addJournal: s.addJournal, profile: s.profile }));
+	const { addJournal, currentProfile } = useMemoriesStore((s) => ({ addJournal: s.addJournal, currentProfile: s.currentProfile }));
 	
 	const [entry, setEntry] = useState('');
 	const [mood, setMood] = useState<'good' | 'neutral' | 'tough' | null>(null);

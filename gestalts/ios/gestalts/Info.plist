@@ -27,7 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.anonymous.gestalts</string>
+          <string>com.yourteam.gestalts</string>
         </array>
       </dict>
     </array>

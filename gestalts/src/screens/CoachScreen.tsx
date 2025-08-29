@@ -31,7 +31,7 @@ export default function CoachScreen() {
 	const route = useRoute<CoachScreenRouteProp>();
 	const addJournal = useMemoriesStore((s) => s.addJournal);
 	const addAppointmentNote = useMemoriesStore((s) => s.addAppointmentNote);
-	const profile = useMemoriesStore((s) => s.profile);
+	const currentProfile = useMemoriesStore((s) => s.currentProfile);
 	
 	// State management
 	const [mode, setMode] = useState<Mode>('Language Coach');
@@ -292,7 +292,7 @@ export default function CoachScreen() {
 		switch (selectedMode) {
 			case 'Language Coach':
 				return {
-					greeting: `Hello! I'm your Language Coach. I'm here to help you support ${profile?.childName ? `${profile.childName}'s` : 'your child\'s'} language development. What would you like to explore today?`,
+					greeting: `Hello! I'm your Language Coach. I'm here to help you support ${currentProfile?.childName ? `${currentProfile.childName}'s` : 'your child\'s'} language development. What would you like to explore today?`,
 					placeholder: 'Ask me anything...',
 				};
 			case 'Parent Support':
@@ -302,7 +302,7 @@ export default function CoachScreen() {
 				};
 			case 'Child Mode':
 				return {
-					greeting: `Hello! I\'m excited to chat with ${profile?.childName || 'you'} today. What would you like to talk about or play?`,
+					greeting: `Hello! I\'m excited to chat with ${currentProfile?.childName || 'you'} today. What would you like to talk about or play?`,
 					placeholder: 'Ask me anything...',
 				};
 		}

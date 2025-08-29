@@ -30,8 +30,9 @@ interface DrawerProviderProps {
 
 export function DrawerProvider({ children }: DrawerProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [profileSectionExpanded, setProfileSectionExpanded] = useState(false);
   const { tokens } = useTheme();
-  const profile = useMemoriesStore((s) => s.profile);
+  const currentProfile = useMemoriesStore((s) => s.currentProfile);
   const journal = useMemoriesStore((s) => s.journal);
   const milestones = useMemoriesStore((s) => s.milestones);
   const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
@@ -264,36 +265,180 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
                 ))}
               </View>
 
-              {/* Footer */}
+              {/* Profiles Section */}
               <View style={{ 
-                marginTop: 'auto',
-                paddingHorizontal: tokens.spacing.containerX,
-                paddingVertical: tokens.spacing.gap.lg,
+                marginTop: tokens.spacing.gap.lg,
+                paddingHorizontal: tokens.spacing.gap.sm,
+                paddingVertical: tokens.spacing.gap.md,
                 borderTopWidth: 1,
                 borderTopColor: tokens.color.border.default
+              }}>
+                {/* Profiles Header */}
+                <TouchableOpacity
+                  onPress={() => setProfileSectionExpanded(!profileSectionExpanded)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: tokens.spacing.gap.sm,
+                    paddingHorizontal: tokens.spacing.gap.md,
+                    borderRadius: tokens.radius.lg,
+                    backgroundColor: profileSectionExpanded ? tokens.color.bg.muted : 'transparent'
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: tokens.color.brand.gradient.start + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: tokens.spacing.gap.md
+                    }}
+                  >
+                    <Ionicons 
+                      name="people" 
+                      size={20} 
+                      color={tokens.color.brand.gradient.start} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text 
+                      weight="medium"
+                      style={{ 
+                        fontSize: tokens.font.size.body,
+                        color: tokens.color.text.primary,
+                        fontFamily: 'PlusJakartaSans-Medium'
+                      }}
+                    >
+                      Profiles
+                    </Text>
+                  </View>
+                  <Ionicons 
+                    name={profileSectionExpanded ? "chevron-up" : "chevron-down"} 
+                    size={16} 
+                    color={tokens.color.text.secondary} 
+                  />
+                </TouchableOpacity>
+
+                {/* Expandable Profile Options */}
+                {profileSectionExpanded && (
+                  <View style={{
+                    paddingLeft: tokens.spacing.gap.xl,
+                    marginTop: tokens.spacing.gap.xs
+                  }}>
+                    {/* My Profile */}
+                    <TouchableOpacity
+                      onPress={() => handleNavigate('UserProfile')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: tokens.spacing.gap.sm,
+                        paddingHorizontal: tokens.spacing.gap.md,
+                        borderRadius: tokens.radius.lg,
+                        marginBottom: tokens.spacing.gap.xs
+                      }}
+                    >
+                      <Ionicons 
+                        name="person" 
+                        size={18} 
+                        color={tokens.color.text.secondary}
+                        style={{ marginRight: tokens.spacing.gap.sm }}
+                      />
+                      <Text style={{ 
+                        fontSize: tokens.font.size.sm,
+                        color: tokens.color.text.primary,
+                        fontFamily: 'PlusJakartaSans-Regular'
+                      }}>
+                        My Profile
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Child Profiles */}
+                    <TouchableOpacity
+                      onPress={() => handleNavigate('ChildProfilesList')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: tokens.spacing.gap.sm,
+                        paddingHorizontal: tokens.spacing.gap.md,
+                        borderRadius: tokens.radius.lg,
+                        marginBottom: tokens.spacing.gap.xs
+                      }}
+                    >
+                      <Ionicons 
+                        name="happy" 
+                        size={18} 
+                        color={tokens.color.text.secondary}
+                        style={{ marginRight: tokens.spacing.gap.sm }}
+                      />
+                      <Text style={{ 
+                        fontSize: tokens.font.size.sm,
+                        color: tokens.color.text.primary,
+                        fontFamily: 'PlusJakartaSans-Regular'
+                      }}>
+                        Child Profiles
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Specialist Profiles */}
+                    <TouchableOpacity
+                      onPress={() => handleNavigate('SpecialistProfiles')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: tokens.spacing.gap.sm,
+                        paddingHorizontal: tokens.spacing.gap.md,
+                        borderRadius: tokens.radius.lg,
+                        marginBottom: tokens.spacing.gap.xs
+                      }}
+                    >
+                      <Ionicons 
+                        name="medical" 
+                        size={18} 
+                        color={tokens.color.text.secondary}
+                        style={{ marginRight: tokens.spacing.gap.sm }}
+                      />
+                      <Text style={{ 
+                        fontSize: tokens.font.size.sm,
+                        color: tokens.color.text.primary,
+                        fontFamily: 'PlusJakartaSans-Regular'
+                      }}>
+                        Specialist Profiles
+                      </Text>
+                      <View style={{
+                        backgroundColor: tokens.color.brand.gradient.start + '20',
+                        paddingHorizontal: tokens.spacing.gap.xs,
+                        paddingVertical: 2,
+                        borderRadius: tokens.radius.sm,
+                        marginLeft: 'auto'
+                      }}>
+                        <Text style={{
+                          fontSize: tokens.font.size.xs,
+                          color: tokens.color.brand.gradient.start,
+                          fontWeight: '600'
+                        }}>
+                          NEW
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Footer */}
+              <View style={{ 
+                paddingHorizontal: tokens.spacing.gap.sm,
+                paddingVertical: tokens.spacing.gap.md,
+                marginTop: 'auto'
               }}>
                 <TouchableOpacity
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    paddingVertical: tokens.spacing.gap.sm
-                  }}
-                >
-                  <Ionicons name="settings-outline" size={20} color={tokens.color.text.secondary} />
-                  <Text color="secondary" style={{ 
-                    marginLeft: tokens.spacing.gap.sm, 
-                    fontSize: tokens.font.size.body,
-                    fontFamily: 'PlusJakartaSans-Regular'
-                  }}>
-                    Settings
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: tokens.spacing.gap.sm
+                    paddingVertical: tokens.spacing.gap.sm,
+                    paddingHorizontal: tokens.spacing.gap.md,
+                    borderRadius: tokens.radius.lg
                   }}
                 >
                   <Ionicons name="help-circle-outline" size={20} color={tokens.color.text.secondary} />

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyBKbyX8olzmv6F7WcYy3bXXGbTGcny2IXA</string>
+	<key>GCM_SENDER_ID</key>
+	<string>630723947096</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.yourteam.gestalts</string>
+	<key>PROJECT_ID</key>
+	<string>gestalts-mobile</string>
+	<key>STORAGE_BUCKET</key>
+	<string>gestalts-mobile.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:630723947096:ios:34f39e2aa6b0781375b82d</string>
+</dict>
+</plist>

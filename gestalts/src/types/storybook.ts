@@ -8,6 +8,13 @@ export interface Character {
   createdAt: Date;
   updatedAt: Date;
   aiAttributes?: string; // Any AI-generated descriptors
+  // Visual consistency fields for story generation
+  visualProfile?: {
+    appearance: string; // Detailed physical description for consistency
+    style: string; // Clothing and visual style notes
+    personality: string; // Visual personality traits
+    keyFeatures: string[]; // Distinctive features to maintain
+  };
 }
 
 export interface StoryPage {
@@ -84,9 +91,17 @@ export interface ConceptLearningRequest {
   characterIds: string[];
   
   // Generated content
+  title?: string; // AI-generated and user-editable title
   storyPages?: StoryPageDraft[];
   storySummary?: string;
   imageContext?: string;
+  // Visual continuity tracking
+  sceneContext?: {
+    setting: string; // Primary location/environment
+    mood: string; // Overall visual mood
+    colorPalette: string[]; // Consistent color scheme
+    visualStyle: string; // Art direction notes
+  };
 }
 
 export interface StoryPageDraft {
@@ -95,6 +110,13 @@ export interface StoryPageDraft {
   isEdited: boolean;
   imagePrompt?: string;
   notes?: string; // For context/guidance
+  // Enhanced visual context for consistency
+  visualContext?: {
+    characters: string[]; // Characters present in this page
+    setting: string; // Scene location/environment
+    action: string; // Main action/event happening
+    previousPageVisualNotes?: string; // Context from previous page
+  };
 }
 
 export interface StoryGenerationRequest {
@@ -122,6 +144,9 @@ export interface StoryGenerationRequest {
     tone: 'playful' | 'gentle' | 'encouraging' | 'educational';
     goal: string; // Learning objective
   };
+  
+  // Pre-generated/edited story pages from wizard
+  customStoryPages?: string[];
 }
 
 export interface GenerationProgress {
@@ -143,10 +168,11 @@ export interface StoryCreationStep {
 }
 
 export type StoryWizardStep = 
-  | 'child-concept'
+  | 'character-selection'
+  | 'concept-selection'
+  | 'child-concept' // Legacy support
   | 'mode-selection' 
   | 'advanced-options'
-  | 'character-selection'
   | 'text-generation'
   | 'text-editing'
   | 'image-generation'

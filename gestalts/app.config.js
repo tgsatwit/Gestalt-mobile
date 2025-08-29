@@ -30,7 +30,7 @@ export default ({config}) => ({
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.gestalts",
+      "bundleIdentifier": "com.yourteam.gestalts",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for AI voice interactions."
       }

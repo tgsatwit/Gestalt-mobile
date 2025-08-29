@@ -13,6 +13,11 @@ import AddMilestoneScreen from '../screens/AddMilestoneScreen';
 import AppointmentNoteScreen from '../screens/AppointmentNoteScreen';
 import GestaltListsScreen from '../screens/GestaltListsScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
+import ChildProfilesListScreen from '../screens/ChildProfilesListScreen';
+import UserProfileScreen from '../screens/UserProfileScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import SpecialistProfilesScreen from '../screens/SpecialistProfilesScreen';
+import ProfileSelectionScreen from '../screens/ProfileSelectionScreen';
 import type { MainStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -84,6 +89,36 @@ const ChildProfileWithDrawer = () => (
   </DrawerProvider>
 );
 
+const ChildProfilesListWithDrawer = () => (
+  <DrawerProvider>
+    <ChildProfilesListScreen />
+  </DrawerProvider>
+);
+
+const UserProfileWithDrawer = () => (
+  <DrawerProvider>
+    <UserProfileScreen />
+  </DrawerProvider>
+);
+
+const ProfileWithDrawer = () => (
+  <DrawerProvider>
+    <ProfileScreen />
+  </DrawerProvider>
+);
+
+const SpecialistProfilesWithDrawer = () => (
+  <DrawerProvider>
+    <SpecialistProfilesScreen />
+  </DrawerProvider>
+);
+
+const ProfileSelectionWithDrawer = () => (
+  <DrawerProvider>
+    <ProfileSelectionScreen />
+  </DrawerProvider>
+);
+
 // Screens without bottom nav (colored header style)
 const PlayAnalyzerWithDrawer = () => (
   <DrawerProvider>
@@ -125,7 +160,12 @@ export default function MainNavigator() {
       <Stack.Screen name="GestaltLists" component={GestaltListsWithDrawer} />
       
       {/* Profile Screens */}
+      <Stack.Screen name="Profile" component={ProfileWithDrawer} />
       <Stack.Screen name="ChildProfile" component={ChildProfileWithDrawer} />
+      <Stack.Screen name="ChildProfilesList" component={ChildProfilesListWithDrawer} />
+      <Stack.Screen name="UserProfile" component={UserProfileWithDrawer} />
+      <Stack.Screen name="SpecialistProfiles" component={SpecialistProfilesWithDrawer} />
+      <Stack.Screen name="ProfileSelection" component={ProfileSelectionWithDrawer} />
     </Stack.Navigator>
   );
 }

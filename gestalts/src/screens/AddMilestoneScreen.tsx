@@ -11,7 +11,7 @@ import { BottomNavigation } from '../components/BottomNavigation';
 export default function AddMilestoneScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
-	const { addMilestone, profile } = useMemoriesStore((s) => ({ addMilestone: s.addMilestone, profile: s.profile }));
+	const { addMilestone, currentProfile } = useMemoriesStore((s) => ({ addMilestone: s.addMilestone, currentProfile: s.currentProfile }));
 	
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');

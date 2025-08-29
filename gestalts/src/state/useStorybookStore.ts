@@ -103,17 +103,22 @@ export const useStorybookStore = create<StorybookState>()(
           });
 
           // Generate avatar using Gemini (this will use placeholder for now)
-          const avatarUrl = await geminiService.generateAvatar({
+          const avatarResult = await geminiService.generateAvatar({
             photoData: `data:image/jpeg;base64,${photoData}`,
             style: 'pixar',
             characterName: name
           });
+
+          // Handle both string and object return types
+          const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+          const visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
 
           // Create character object
           const character: Character = {
             id: `char_${Date.now()}`,
             name,
             avatarUrl: avatarUrl,
+            visualProfile: visualProfile,
             createdAt: new Date(),
             updatedAt: new Date()
           };

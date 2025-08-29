@@ -11,5 +11,10 @@ export type MainStackParamList = {
   AddMilestone: undefined;
   AppointmentNote: { id?: string } | undefined;
   GestaltLists: undefined;
-  ChildProfile: undefined;
+  Profile: undefined;
+  ChildProfile: { profileId?: string } | undefined;
+  ChildProfilesList: undefined;
+  UserProfile: undefined;
+  SpecialistProfiles: undefined;
+  ProfileSelection: undefined;
 };
