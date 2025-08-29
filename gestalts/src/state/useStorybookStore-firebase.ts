@@ -211,12 +211,14 @@ export const useStorybookStore = create<StorybookState>()(
             }
           });
 
-          // Generate avatar using Gemini
-          const avatarUrl = await geminiService.generateAvatar({
+          // Generate avatar using Gemini with visual profile extraction
+          const avatarResult = await geminiService.generateAvatar({
             photoData: `data:image/jpeg;base64,${photoData}`,
             style: 'pixar',
             characterName: name
           });
+          
+          const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
 
           // Upload to Firebase Storage if configured, otherwise use generated URL
           let finalAvatarUrl = avatarUrl;
@@ -233,13 +235,14 @@ export const useStorybookStore = create<StorybookState>()(
             }
           }
 
-          // Create character object
+          // Create character object with visual profile
           const character: Character = {
             id: `char_${Date.now()}`,
             name,
             avatarUrl: finalAvatarUrl,
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            visualProfile: typeof avatarResult === 'string' ? undefined : avatarResult.visualProfile
           };
 
           // Save to Firebase Firestore
@@ -398,18 +401,28 @@ export const useStorybookStore = create<StorybookState>()(
             allCharacterNames.push(request.childProfile.name);
           }
 
-          // Generate story text with concept learning context
-          const storyTexts = await geminiService.generateStoryText(
-            request.title,
-            request.description,
-            allCharacterNames,
-            request.pageCount || 5,
-            {
-              concept: request.concept,
-              childName: request.childProfile?.includeAsCharacter ? request.childProfile.name : undefined,
-              advanced: request.advanced
-            }
-          );
+          // Use custom story pages if provided, otherwise generate new ones
+          let storyTexts: string[];
+          
+          if (request.customStoryPages && request.customStoryPages.length > 0) {
+            // Use the edited story pages from the wizard
+            storyTexts = request.customStoryPages;
+            console.log('Using custom story pages from wizard:', storyTexts.length, 'pages');
+          } else {
+            // Generate new story text with concept learning context
+            storyTexts = await geminiService.generateStoryText(
+              request.title,
+              request.description,
+              allCharacterNames,
+              request.pageCount || 5,
+              {
+                concept: request.concept,
+                childName: request.childProfile?.includeAsCharacter ? request.childProfile.name : undefined,
+                advanced: request.advanced
+              }
+            );
+            console.log('Generated new story text:', storyTexts.length, 'pages');
+          }
 
           // Create story object
           const story: Story = {
@@ -446,8 +459,34 @@ export const useStorybookStore = create<StorybookState>()(
 
             // Get character avatar URLs as references
             const referenceImages = characters.map(c => c.avatarUrl);
+            
+            // Build character profiles for visual consistency
+            const characterProfiles = characters.map(char => ({
+              name: char.name,
+              appearance: char.visualProfile?.appearance || `${char.name} has distinctive Pixar-style features`,
+              style: char.visualProfile?.style || 'Child-friendly design with consistent visual identity',
+              keyFeatures: char.visualProfile?.keyFeatures || ['Memorable appearance', 'Consistent design']
+            }));
+            
+            // Add child profile if included as character
+            if (request.childProfile?.includeAsCharacter) {
+              characterProfiles.push({
+                name: request.childProfile.name,
+                appearance: `${request.childProfile.name} has warm, child-friendly Pixar-style features`,
+                style: 'Age-appropriate design that appeals to children',
+                keyFeatures: ['Friendly demeanor', 'Expressive eyes', 'Engaging personality']
+              });
+            }
+            
+            // Build scene context for visual continuity
+            const sceneContext = {
+              setting: i === 0 ? 'Establishing the story world' : `Continuing from previous scene`,
+              mood: request.advanced?.tone || 'gentle',
+              colorPalette: ['warm', 'bright', 'friendly', 'inviting'],
+              visualStyle: 'Professional Pixar 3D animation style'
+            };
 
-            // Generate illustration with character and concept context
+            // Generate illustration with enhanced character and scene context
             const imageUrl = await geminiService.generateStoryImage({
               prompt: storyTexts[i],
               style: 'pixar',
@@ -456,6 +495,12 @@ export const useStorybookStore = create<StorybookState>()(
                 concept: request.concept,
                 characterNames: allCharacterNames,
                 childName: request.childProfile?.includeAsCharacter ? request.childProfile.name : undefined,
+                pageNumber: i + 1,
+                totalPages: storyTexts.length,
+                previousPageContext: i > 0 ? `Previous page showed: ${storyTexts[i - 1].substring(0, 100)}...` : undefined,
+                sceneContext,
+                characterProfiles,
+                storyContext: `This is part of a learning story about ${request.concept} featuring ${allCharacterNames.join(', ')}`,
                 advanced: request.advanced
               }
             });

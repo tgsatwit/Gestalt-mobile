@@ -7,6 +7,7 @@ import { ThemeProvider } from './src/theme';
 import { tokens } from './src/theme/tokens';
 import RootNavigator from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/NavigationService';
+import { AuthProvider } from './src/contexts/AuthContext';
 import {
   useFonts as usePlusJakarta,
   PlusJakartaSans_400Regular,
@@ -44,14 +45,16 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider fontLoaded={fontLoaded}>
-          <ElevenLabsProvider>
-            <NavigationContainer ref={navigationRef} theme={navTheme}>
-              <StatusBar style="dark" />
-              <RootNavigator />
-            </NavigationContainer>
-          </ElevenLabsProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider fontLoaded={fontLoaded}>
+            <ElevenLabsProvider>
+              <NavigationContainer ref={navigationRef} theme={navTheme}>
+                <StatusBar style="dark" />
+                <RootNavigator />
+              </NavigationContainer>
+            </ElevenLabsProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

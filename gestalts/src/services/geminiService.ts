@@ -43,7 +43,7 @@ const getGeminiApiKey = (): string => {
     // For development, let's try a hardcoded approach as fallback
     // This is not recommended for production but helps with development
     const hardcodedKey = 'AIzaSyBWthPCLGAKUDVhZmEzY8Y76cfS2V7Y4FA'; // From your .env file
-    if (hardcodedKey && hardcodedKey !== 'your_api_key_here') {
+    if (hardcodedKey) {
       console.warn('⚠️ Using hardcoded API key for development');
       return hardcodedKey;
     }
@@ -66,14 +66,18 @@ class GeminiService {
 
   private initialize() {
     try {
+      console.log('🚀 Initializing Gemini service...');
       const apiKey = getGeminiApiKey();
+      console.log('🔑 API key retrieved, initializing GoogleGenerativeAI...');
+      
       this.genAI = new GoogleGenerativeAI(apiKey);
       // Using gemini-2.5-flash-image-preview for image generation capabilities
       this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' });
       this.initialized = true;
-      console.log('Gemini service initialized successfully');
+      console.log('✅ Gemini service initialized successfully with model: gemini-2.5-flash-image-preview');
     } catch (error) {
-      console.error('Failed to initialize Gemini service:', error);
+      console.error('❌ Failed to initialize Gemini service:', error);
+      console.error('Initialization error details:', (error as Error).message || error);
       this.initialized = false;
       // Don't throw here - let individual methods handle the error
     }
@@ -81,18 +85,29 @@ class GeminiService {
 
   private checkInitialized() {
     if (!this.initialized || !this.genAI || !this.model) {
+      console.log('🔄 Service not initialized, attempting to reinitialize...');
       // Try to reinitialize
       this.initialize();
       if (!this.initialized) {
+        console.error('❌ Failed to initialize Gemini service');
         throw new Error('Gemini service not initialized. Please check your API key configuration.');
       }
+      console.log('✅ Service reinitialized successfully');
     }
   }
 
   /**
    * Generate a Pixar-style avatar from a photo
    */
-  async generateAvatar(request: AvatarGenerationRequest): Promise<string> {
+  async generateAvatar(request: AvatarGenerationRequest): Promise<string | {
+    imageUrl: string;
+    visualProfile?: {
+      appearance: string;
+      style: string;
+      personality: string;
+      keyFeatures: string[];
+    };
+  }> {
     try {
       this.checkInitialized();
       
@@ -155,7 +170,7 @@ class GeminiService {
       return this.generatePlaceholderImage(style, request.characterName || 'avatar');
     } catch (error) {
       console.error('Avatar generation failed:', error);
-      throw this.handleError(error);
+      throw this.handleError(error as Error);
     }
   }
 
@@ -171,6 +186,19 @@ class GeminiService {
       storyContext?: string; // Full story context for consistency
       pageNumber?: number;
       totalPages?: number;
+      previousPageContext?: string; // Visual continuity from previous page
+      sceneContext?: {
+        setting: string;
+        mood: string;
+        colorPalette: string[];
+        visualStyle: string;
+      };
+      characterProfiles?: Array<{
+        name: string;
+        appearance: string;
+        style: string;
+        keyFeatures: string[];
+      }>;
       advanced?: {
         density: 'one-word' | 'one-sentence' | 'multiple-sentences';
         narrative: 'first-person' | 'third-person';
@@ -185,63 +213,107 @@ class GeminiService {
       const style = 'pixar'; // Consistent Pixar style per guidelines
       const mainCharacter = request.context?.childName || request.context?.characterNames?.[0] || 'the child';
       
-      // Build comprehensive prompt following storybook guidelines
-      let enhancedPrompt = `Create a high-quality children's storybook illustration in professional Pixar 3D animation style.
+      // Build comprehensive prompt following Gemini 2.5 Flash best practices for sequential consistency
+      let enhancedPrompt = `Create a single, high-quality children's storybook illustration panel in professional Pixar 3D animation style.
         
         SCENE TO ILLUSTRATE: ${request.prompt}
         
-        PIXAR STYLE REQUIREMENTS:
-        - Professional Pixar 3D animation aesthetic (like Toy Story, Finding Nemo, Coco)
-        - Vibrant, saturated colors with soft, warm lighting
-        - Rounded, child-friendly character designs
-        - Smooth, polished surfaces with subtle texture details
-        - Dynamic composition with depth and visual interest
-        - Expressive character emotions and body language
-        - Rich environmental details and atmospheric depth
+        PIXAR STYLE REQUIREMENTS (Hyper-Specific for Consistency):
+        - Professional Pixar 3D animation aesthetic matching Toy Story, Finding Nemo, and Coco visual quality
+        - Vibrant, saturated color palette with soft, warm directional lighting from upper left
+        - Rounded, child-friendly character designs with smooth, polished surfaces
+        - Subtle texture details on clothing and environmental elements
+        - Dynamic composition following rule of thirds with clear focal hierarchy
+        - Expressive character emotions through eyebrow position, mouth shape, and body posture
+        - Rich environmental details with atmospheric perspective and depth cues
         
-        CHARACTER CONSISTENCY GUIDELINES:
-        - Maintain identical character appearance across all illustrations
-        - Use provided reference images to ensure character likeness
-        - Keep character proportions, clothing, and features consistent
-        - Characters should have distinctive, memorable visual traits
-        - Facial features, hair style, and clothing must match references exactly`;
+        CRITICAL CHARACTER CONSISTENCY GUIDELINES:
+        - MAINTAIN IDENTICAL character appearance across ALL illustrations in this story sequence
+        - Each character MUST have the same facial structure, hair color/style, eye color, and body proportions
+        - Clothing styles and colors MUST remain consistent throughout the story
+        - Character expressions should vary naturally while preserving core facial features
+        - Use step-by-step character description approach for precision`;
       
-      // Add character-specific details
+      // Add detailed character profiles for consistency (following Gemini 2.5 best practices)
       if (request.context) {
+        // Main character detailed description
         if (mainCharacter && mainCharacter !== 'the child') {
           enhancedPrompt += `
         
-        MAIN CHARACTER: ${mainCharacter}
-        - Feature ${mainCharacter} as the central focus of the illustration
-        - ${mainCharacter} should be easily recognizable and consistent with previous pages
-        - Show ${mainCharacter}'s personality through pose and expression`;
+        MAIN CHARACTER PROFILE - ${mainCharacter} (Central Focus):
+        - NAME: ${mainCharacter} (use this name consistently, never "the child" or generic terms)
+        - POSITION: Central focal point of the illustration, clearly prominent
+        - VISUAL CONSISTENCY: Must match previous pages exactly in all physical characteristics
+        - PERSONALITY EXPRESSION: Show ${mainCharacter}'s character through natural pose and authentic facial expression`;
+          
+          // Add detailed character profile if available
+          if (request.context.characterProfiles) {
+            const characterProfile = request.context.characterProfiles.find(p => p.name === mainCharacter);
+            if (characterProfile) {
+              enhancedPrompt += `
+        - APPEARANCE: ${characterProfile.appearance}
+        - STYLE NOTES: ${characterProfile.style}
+        - KEY DISTINCTIVE FEATURES: ${characterProfile.keyFeatures.join(', ')}`;
+            }
+          }
         }
         
+        // All characters with specific descriptions
         if (request.context.characterNames && request.context.characterNames.length > 0) {
           enhancedPrompt += `
         
-        ALL CHARACTERS IN SCENE: ${request.context.characterNames.join(', ')}
-        - Each character must be visually distinct and consistent
-        - Maintain the same design language for all characters
-        - Ensure characters interact naturally within the scene`;
+        ALL CHARACTERS IN THIS SCENE: ${request.context.characterNames.join(', ')}
+        CRITICAL CONSISTENCY REQUIREMENTS:
+        - Each character must maintain IDENTICAL appearance to previous pages
+        - Use the same character design language and art style for all figures
+        - Characters should interact naturally while preserving their established visual identity
+        - No character design variations or artistic interpretations - EXACT consistency required`;
+          
+          // Add individual character profiles
+          request.context.characterProfiles?.forEach(profile => {
+            enhancedPrompt += `
+        
+        CHARACTER: ${profile.name}
+        - Appearance: ${profile.appearance}
+        - Style: ${profile.style}
+        - Key Features: ${profile.keyFeatures.join(', ')}`;
+          });
         }
         
-        // Add story context for consistency
-        if (request.context.storyContext) {
+        // Add visual continuity context (critical for sequential consistency)
+        if (request.context.previousPageContext) {
           enhancedPrompt += `
         
-        STORY CONTEXT: ${request.context.storyContext}
-        - This illustration should fit naturally within the overall story narrative
-        - Maintain visual continuity with the story's theme and setting`;
+        SEQUENTIAL VISUAL CONTINUITY:
+        - PREVIOUS PAGE CONTEXT: ${request.context.previousPageContext}
+        - TRANSITION REQUIREMENT: This illustration should flow naturally from the previous scene
+        - ENVIRONMENTAL CONSISTENCY: Maintain similar lighting, color scheme, and visual atmosphere
+        - CHARACTER CONTINUITY: Characters should show natural progression while maintaining identical appearance`;
         }
         
-        // Add page context for story flow
+        // Add scene context for environmental consistency
+        if (request.context.sceneContext) {
+          enhancedPrompt += `
+        
+        ENVIRONMENTAL CONSISTENCY PROFILE:
+        - PRIMARY SETTING: ${request.context.sceneContext.setting}
+        - VISUAL MOOD: ${request.context.sceneContext.mood}
+        - COLOR PALETTE: ${request.context.sceneContext.colorPalette.join(', ')} tones throughout
+        - VISUAL STYLE: ${request.context.sceneContext.visualStyle}
+        - LIGHTING CONSISTENCY: Maintain similar lighting direction and warmth across scenes`;
+        }
+        
+        // Add page progression context
         if (request.context.pageNumber && request.context.totalPages) {
+          const progressPercentage = Math.round((request.context.pageNumber / request.context.totalPages) * 100);
           enhancedPrompt += `
         
-        PAGE CONTEXT: Page ${request.context.pageNumber} of ${request.context.totalPages}
-        - Consider the story's progression and pacing
-        - Ensure visual flow that connects to previous and next pages`;
+        STORY PROGRESSION CONTEXT:
+        - PAGE: ${request.context.pageNumber} of ${request.context.totalPages} (${progressPercentage}% through story)
+        - PACING: ${request.context.pageNumber <= 2 ? 'Story introduction/setup' : 
+                   request.context.pageNumber >= request.context.totalPages - 1 ? 'Story conclusion/resolution' : 
+                   'Story development/action'}
+        - VISUAL FLOW: This page should naturally connect to the overall story arc`;
         }
         
         // Add learning concept integration
@@ -287,30 +359,48 @@ class GeminiService {
         - Inclusive and diverse representation when possible
         - Educational value embedded naturally in the visual storytelling`;
 
-      // If reference images are provided, include them with detailed instructions
+      // Enhanced reference image handling for character consistency (Gemini 2.5 best practice)
       const parts: any[] = [enhancedPrompt];
       
       if (request.referenceImages && request.referenceImages.length > 0) {
         enhancedPrompt += `
         
-        REFERENCE IMAGES PROVIDED:
-        - Use the provided reference images to maintain character consistency
-        - Match the character appearance, features, and style exactly
-        - Adapt the characters naturally into the new scene while preserving their identity`;
+        CHARACTER REFERENCE IMAGES PROVIDED (CRITICAL FOR CONSISTENCY):
+        INSTRUCTION: Use these reference images as EXACT templates for character appearance
+        - MATCHING REQUIREMENT: Character features, proportions, and style must match references precisely
+        - ADAPTATION APPROACH: Naturally integrate reference characters into this new scene
+        - CONSISTENCY CHECK: Every character detail should be verifiable against the provided references
+        - NO CREATIVE LIBERTIES: Do not add, remove, or modify character design elements`;
         
-        for (let i = 0; i < request.referenceImages.length; i++) {
+        // Process reference images with specific instructions
+        for (let i = 0; i < Math.min(request.referenceImages.length, 3); i++) { // Limit to 3 as per Gemini 2.5 best practices
           const refImage = request.referenceImages[i];
+          
+          // Convert reference image (handle both base64 and URL)
+          let imageData: string;
+          if (refImage.startsWith('data:')) {
+            imageData = refImage.replace(/^data:image\/\w+;base64,/, '');
+          } else {
+            // For URL-based images, we'd need to download first (placeholder for now)
+            console.warn('URL-based reference images not yet supported, using placeholder');
+            continue;
+          }
+          
           parts.push({
             inlineData: {
               mimeType: 'image/jpeg',
-              data: refImage.replace(/^data:image\/\w+;base64,/, '')
+              data: imageData
             }
           });
           
-          if (i === 0 && request.context?.childName) {
-            enhancedPrompt += `
-        - First reference image: Use this as the visual reference for ${request.context.childName}`;
-          }
+          // Add specific character reference instructions
+          const characterName = request.context?.characterNames?.[i] || `Character ${i + 1}`;
+          enhancedPrompt += `
+        
+        REFERENCE IMAGE ${i + 1}: ${characterName}
+        - Use this as the EXACT visual template for ${characterName}
+        - Match facial features, hair style, clothing, and proportions precisely
+        - Adapt pose and expression naturally while maintaining character identity`;
         }
         
         // Update the parts array with the enhanced prompt
@@ -318,27 +408,51 @@ class GeminiService {
       }
 
       try {
-        console.log('Generating Pixar-style story illustration with character consistency...');
+        console.log('Generating sequential Pixar-style story illustration with Gemini 2.5 Flash Image Preview...');
+        console.log(`Page ${request.context?.pageNumber || 1} of ${request.context?.totalPages || 1}`);
+        
         const result = await this.model.generateContent(parts);
         const response = await result.response;
         
-        // Check if the response contains generated image data
+        // Enhanced response handling for Gemini 2.5 Flash Image Preview
         if (response.candidates && response.candidates[0]) {
-          console.log('Gemini 2.5 story image generation response received');
-          // For now, return placeholder until we can extract actual image data
-          const seed = `${request.prompt}-${mainCharacter}-${request.context?.concept || 'story'}-pixar`;
-          return this.generatePlaceholderImage('pixar', seed);
+          const candidate = response.candidates[0];
+          console.log('Gemini 2.5 Flash Image Preview response received');
+          
+          // TODO: Extract actual image data when Gemini 2.5 Flash Image Preview API is fully available
+          // For now, return enhanced placeholder with sequential context
+          const sequentialSeed = `page-${request.context?.pageNumber || 1}-${request.prompt}-${mainCharacter}-${request.context?.concept || 'story'}`;
+          console.log(`Using sequential seed for consistency: ${sequentialSeed}`);
+          
+          return this.generatePlaceholderImage('pixar-sequential', sequentialSeed);
         }
       } catch (error) {
-        console.warn('Gemini story image generation failed, using placeholder:', error);
+        console.error('❌ GEMINI API ERROR - Image Generation Failed:', error);
+        console.error('Error details:', (error as Error).message || error);
+        console.error('Error type:', typeof error);
+        
+        // Enhanced error handling with context preservation
+        if ((error as Error).message?.includes('not supported') || (error as Error).message?.includes('quota')) {
+          console.log('📝 API quota or feature not supported - using placeholder');
+        } else if ((error as Error).message?.includes('API key')) {
+          console.log('🔑 API key issue detected - using placeholder');
+        } else {
+          console.log('🔧 Generic API error - using placeholder');
+        }
+        
+        // Return fallback image immediately on API error
+        const errorFallbackSeed = `page-${request.context?.pageNumber || 1}-${request.prompt}-${mainCharacter}-error-fallback`;
+        console.log('🎨 Generating fallback placeholder image with seed:', errorFallbackSeed);
+        return this.generatePlaceholderImage('pixar-sequential', errorFallbackSeed);
       }
       
-      // Fallback to placeholder with character-specific seed
-      const seed = `${request.prompt}-${mainCharacter}-${request.context?.concept || 'story'}-pixar`;
-      return this.generatePlaceholderImage('pixar', seed);
+      // Enhanced fallback with sequential context
+      const sequentialSeed = `page-${request.context?.pageNumber || 1}-${request.prompt}-${mainCharacter}-${request.context?.sceneContext?.setting || 'scene'}`;
+      return this.generatePlaceholderImage('pixar-sequential', sequentialSeed);
     } catch (error) {
-      console.error('Story image generation failed:', error);
-      throw this.handleError(error);
+      console.error('❌ OUTER CATCH - Story image generation failed completely:', error);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      throw this.handleError(error as Error);
     }
   }
 
@@ -369,12 +483,13 @@ class GeminiService {
       return request.imageUrl; // Return original for now
     } catch (error) {
       console.error('Image refinement failed:', error);
-      throw this.handleError(error);
+      throw this.handleError(error as Error);
     }
   }
 
   /**
    * Generate story text using AI with character names woven throughout
+   * Enhanced with visual context generation for image consistency
    */
   async generateStoryText(
     title: string, 
@@ -467,26 +582,205 @@ class GeminiService {
       
       console.log('Story text generated successfully');
       
-      // Split into pages and clean up
-      const pages = text.split('\n')
-        .map(line => line.replace(/^Page \d+:\s*/i, '').trim()) // Remove "Page X:" prefixes
-        .filter((line: string) => line.length > 0);
+      // Enhanced parsing to handle various response formats
+      let pages: string[] = [];
       
-      // Ensure we have the right number of pages
-      while (pages.length < pageCount) {
-        pages.push(`${mainCharacter} continues the adventure...`);
+      // First, try to extract pages with "Page X:" format
+      const pageMatches = text.match(/Page\s+\d+:?\s*[^\n]+/gi);
+      
+      if (pageMatches && pageMatches.length >= pageCount) {
+        // Found page markers, extract the content
+        pages = pageMatches.map((match: string) => {
+          // Remove "Page X:" prefix and clean up
+          return match.replace(/^Page\s+\d+:?\s*/i, '').trim();
+        });
+      } else {
+        // Fallback: Split by double newlines or single newlines
+        const lines = text.split(/\n+/)
+          .map((line: string) => line.trim())
+          .filter((line: string) => line.length > 0);
+        
+        // Filter out common non-story elements
+        const filteredLines = lines.filter((line: string) => {
+          // Skip lines that are just titles or meta text
+          const lowerLine = line.toLowerCase();
+          if (lowerLine.startsWith('title:') || 
+              lowerLine.startsWith('story:') ||
+              lowerLine === 'page 1' ||
+              lowerLine === 'page 2' ||
+              lowerLine === 'page 3' ||
+              lowerLine === 'page 4' ||
+              lowerLine === 'page 5' ||
+              line.match(/^Page\s+\d+$/i) ||
+              line.match(/^\d+\.?\s*$/) ||
+              line.length < 20) { // Skip very short lines that might be labels
+            return false;
+          }
+          return true;
+        });
+        
+        // If we have a potential title at the start (like "Olivia Learns About..."), skip it
+        let startIndex = 0;
+        if (filteredLines.length > 0 && 
+            filteredLines[0].toLowerCase().includes('learns about') && 
+            filteredLines[0].length < 100) {
+          startIndex = 1;
+        }
+        
+        pages = filteredLines.slice(startIndex);
       }
       
-      // Verify character names are included (basic check)
+      // Clean up each page text
+      pages = pages.map(page => {
+        // Remove any remaining "Page X" prefixes
+        page = page.replace(/^Page\s+\d+:?\s*/i, '');
+        // Remove quotes if the entire page is quoted
+        if (page.startsWith('"') && page.endsWith('"')) {
+          page = page.slice(1, -1);
+        }
+        return page.trim();
+      }).filter(page => page.length > 0);
+      
+      // Ensure we have exactly the right number of pages
+      if (pages.length > pageCount) {
+        // If we have too many, take the first pageCount pages
+        pages = pages.slice(0, pageCount);
+      } else if (pages.length < pageCount) {
+        // If we have too few, try to regenerate with clearer instructions
+        console.warn(`Only found ${pages.length} pages, expected ${pageCount}. Attempting to generate missing pages...`);
+        
+        const missingPages = pageCount - pages.length;
+        for (let i = 0; i < missingPages; i++) {
+          const pageNum = pages.length + 1;
+          const continuePrompt = `Continue the story of "${title}" featuring ${allCharacters.join(', ')}. Write page ${pageNum} of ${pageCount}. This should be a complete scene that continues naturally from the previous pages. Make sure to use character names (especially ${mainCharacter}) and not generic terms. Write only the story text for this page:`;
+          
+          try {
+            const continueResult = await this.model!.generateContent(continuePrompt);
+            const continueResponse = await continueResult.response;
+            let pageText = continueResponse.text().trim();
+            
+            // Clean up the generated page
+            pageText = pageText.replace(/^Page\s+\d+:?\s*/i, '');
+            if (pageText.startsWith('"') && pageText.endsWith('"')) {
+              pageText = pageText.slice(1, -1);
+            }
+            
+            pages.push(pageText);
+          } catch (error) {
+            console.error(`Failed to generate page ${pageNum}:`, error);
+            // Only as last resort, add a meaningful continuation
+            pages.push(`${mainCharacter} continued their journey, discovering new things and learning important lessons along the way.`);
+          }
+        }
+      }
+      
+      // Verify character names are included
       const storyText = pages.join(' ');
       if (mainCharacter !== 'the main character' && !storyText.includes(mainCharacter)) {
         console.warn('Generated story may not include main character name properly');
+        // Try to inject the character name if missing
+        pages = pages.map(page => {
+          if (!page.includes(mainCharacter) && page.includes('the child')) {
+            return page.replace(/the child/gi, mainCharacter);
+          }
+          return page;
+        });
       }
       
-      return pages.slice(0, pageCount);
+      console.log(`Parsed ${pages.length} story pages`);
+      return pages;
     } catch (error) {
       console.error('Story text generation failed:', error);
-      throw this.handleError(error);
+      throw this.handleError(error as Error);
+    }
+  }
+
+  /**
+   * Regenerate a single page of story text
+   */
+  async regenerateStoryPage(
+    storyTitle: string,
+    pageNumber: number,
+    totalPages: number,
+    characterNames: string[],
+    concept?: string,
+    regenerationPrompt?: string,
+    previousPages?: string[]
+  ): Promise<string> {
+    try {
+      this.checkInitialized();
+      
+      const mainCharacter = characterNames[0] || 'the main character';
+      
+      let prompt = `Regenerate page ${pageNumber} of ${totalPages} for the story "${storyTitle}".
+      
+Characters: ${characterNames.join(', ')}
+Main character: ${mainCharacter}`;
+      
+      if (concept) {
+        prompt += `\nLearning concept: ${concept}`;
+      }
+      
+      if (previousPages && previousPages.length > 0) {
+        prompt += `\n\nPrevious pages for context:\n${previousPages.map((page, i) => `Page ${i + 1}: ${page}`).join('\n\n')}`;
+      }
+      
+      if (regenerationPrompt) {
+        prompt += `\n\nSpecific instructions: ${regenerationPrompt}`;
+      }
+      
+      prompt += `\n\nWrite only the story text for page ${pageNumber}. Use the character names (especially ${mainCharacter}) and make it engaging for children. Do not include "Page ${pageNumber}:" in your response.`;
+      
+      const result = await this.model!.generateContent(prompt);
+      const response = await result.response;
+      let pageText = response.text().trim();
+      
+      // Clean up the response
+      pageText = pageText.replace(/^Page\s+\d+:?\s*/i, '');
+      if (pageText.startsWith('"') && pageText.endsWith('"')) {
+        pageText = pageText.slice(1, -1);
+      }
+      
+      return pageText;
+    } catch (error) {
+      console.error('Page regeneration failed:', error);
+      throw this.handleError(error as Error);
+    }
+  }
+
+  /**
+   * Regenerate entire story with optional instructions
+   */
+  async regenerateEntireStory(
+    title: string,
+    description: string,
+    characterNames: string[],
+    pageCount: number = 5,
+    regenerationPrompt?: string,
+    context?: {
+      concept?: string;
+      childName?: string;
+      advanced?: {
+        density: 'one-word' | 'one-sentence' | 'multiple-sentences';
+        narrative: 'first-person' | 'third-person';
+        complexity: 'very-simple' | 'simple' | 'moderate' | 'complex';
+        communicationStyle: 'visual-heavy' | 'balanced' | 'text-heavy';
+        tone: 'playful' | 'gentle' | 'encouraging' | 'educational';
+        goal: string;
+      };
+    }
+  ): Promise<string[]> {
+    try {
+      // Use the existing generateStoryText method but with additional regeneration instructions
+      let enhancedDescription = description;
+      if (regenerationPrompt) {
+        enhancedDescription += `\n\nAdditional instructions: ${regenerationPrompt}`;
+      }
+      
+      return await this.generateStoryText(title, enhancedDescription, characterNames, pageCount, context);
+    } catch (error) {
+      console.error('Story regeneration failed:', error);
+      throw this.handleError(error as Error);
     }
   }
 
@@ -515,30 +809,141 @@ class GeminiService {
   }
 
   /**
-   * Generate a placeholder image URL (temporary until real image generation)
+   * Generate enhanced placeholder images with sequential consistency context
    */
   private generatePlaceholderImage(style: string, seed: string): string {
-    // Create a simple hash from the seed for consistent but varied colors
-    const hash = seed.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
+    // Enhanced hash generation for better distribution
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
     
     const hashAbs = Math.abs(hash);
     
-    // Use via.placeholder.com which is more reliable for mobile apps
-    // Generate colors based on the hash for consistency
-    const colors = [
-      'FFB6C1', 'FFE4B5', 'E6E6FA', 'B0E0E6', 'F0E68C', 
-      'DDA0DD', 'FFE4E1', 'F5DEB3', 'D3D3D3', 'AFEEEE'
-    ];
-    const bgColor = colors[hashAbs % colors.length];
+    // Enhanced color palettes for better visual consistency
+    const colorPalettes = {
+      'pixar': ['87CEEB', 'F0E68C', 'FFB6C1', 'DDA0DD', 'F5DEB3'],          // Pixar-inspired soft colors
+      'pixar-sequential': ['4169E1', 'FF6347', 'FFD700', '32CD32', 'FF69B4'], // Bright, distinct colors for sequence
+      'story': ['E6E6FA', 'B0E0E6', 'FFFFE0', 'FFF0F5', 'F0FFF0']           // Gentle story colors
+    };
+    
+    const palette = colorPalettes[style as keyof typeof colorPalettes] || colorPalettes['story'];
+    const bgColor = palette[hashAbs % palette.length];
     const textColor = '333333';
     
-    // Create a placeholder with text indicating it's generating
-    const text = style === 'pixar' ? 'Pixar\nStyle' : 'Story\nImage';
+    // Enhanced placeholder text based on style and context
+    let placeholderText = 'Story\nImage';
+    if (style === 'pixar' || style === 'pixar-sequential') {
+      placeholderText = 'Pixar\nStyle';
+    }
     
-    return `https://via.placeholder.com/1024x1024/${bgColor}/${textColor}?text=${encodeURIComponent(text)}`;
+    // Add page context for sequential placeholders
+    if (style === 'pixar-sequential' && seed.includes('page-')) {
+      const pageMatch = seed.match(/page-(\d+)/);
+      if (pageMatch) {
+        placeholderText = `Page\n${pageMatch[1]}`;
+      }
+    }
+    
+    // Use picsum.photos for more varied placeholder images with consistent seeding
+    const seedNumber = Math.abs(hash) % 1000;
+    return `https://picsum.photos/seed/${seedNumber}/1024/1024`;
+  }
+
+  /**
+   * Extract character visual profile from AI response text
+   */
+  private extractCharacterProfile(responseText: string, characterName: string): {
+    appearance: string;
+    style: string;
+    personality: string;
+    keyFeatures: string[];
+  } {
+    // Parse AI response for character details (basic implementation)
+    // In real implementation, this would use structured AI response parsing
+    
+    const appearance = this.extractSection(responseText, 'appearance') || 
+      `Pixar-style 3D animated character with friendly, approachable features`;
+    
+    const style = this.extractSection(responseText, 'style') || 
+      `Colorful, child-friendly clothing with rounded, soft design elements`;
+    
+    const personality = this.extractSection(responseText, 'personality') || 
+      `Warm, expressive, and engaging personality suitable for children's stories`;
+    
+    const keyFeatures = this.extractFeaturesList(responseText) || [
+      'Distinctive facial features',
+      'Memorable color scheme',
+      'Expressive eyes',
+      'Friendly demeanor'
+    ];
+
+    return {
+      appearance,
+      style,
+      personality,
+      keyFeatures
+    };
+  }
+
+  /**
+   * Generate basic character profile for consistency
+   */
+  private generateBasicCharacterProfile(characterName: string): {
+    appearance: string;
+    style: string;
+    personality: string;
+    keyFeatures: string[];
+  } {
+    return {
+      appearance: `${characterName} has a friendly Pixar-style appearance with warm, expressive features suitable for children's storytelling`,
+      style: `Colorful, age-appropriate clothing with a consistent design aesthetic that maintains visual identity across story pages`,
+      personality: `Warm, engaging, and child-friendly personality that comes through in poses and expressions`,
+      keyFeatures: [
+        'Consistent facial structure',
+        'Distinctive color palette',
+        'Expressive eyes and smile',
+        'Memorable silhouette',
+        'Child-appropriate design'
+      ]
+    };
+  }
+
+  /**
+   * Extract specific sections from AI response text
+   */
+  private extractSection(text: string, sectionName: string): string | null {
+    // Basic text parsing - in real implementation would use more sophisticated NLP
+    const patterns = {
+      'appearance': /appearance[:\s]*(.*?)(?:\n|$)/i,
+      'style': /style[:\s]*(.*?)(?:\n|$)/i,
+      'personality': /personality[:\s]*(.*?)(?:\n|$)/i
+    };
+    
+    const pattern = patterns[sectionName as keyof typeof patterns];
+    if (pattern) {
+      const match = text.match(pattern);
+      return match?.[1]?.trim() || null;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extract list of key features from AI response
+   */
+  private extractFeaturesList(text: string): string[] | null {
+    // Look for bullet points or listed features
+    const listPattern = /[-•*]\s*([^\n]+)/g;
+    const matches = text.match(listPattern);
+    
+    if (matches && matches.length > 0) {
+      return matches.map((match: string) => match.replace(/^[-•*]\s*/, '').trim()).slice(0, 5);
+    }
+    
+    return null;
   }
 
   /**

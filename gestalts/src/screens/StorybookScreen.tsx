@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, TextInput, Image, FlatList, Modal, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, TextInput, Image, FlatList, Modal, Alert, ActivityIndicator, Text as RNText } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +21,15 @@ export default function StorybookScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
 	const navigation = useNavigation<StorybookScreenNavigationProp>();
+	
+	// Add mounting ref to prevent state updates on unmounted component
+	const isMounted = useRef(true);
+	
+	useEffect(() => {
+		return () => {
+			isMounted.current = false;
+		};
+	}, []);
 
 	// --- Zustand Store ---
 	const {
@@ -50,6 +59,8 @@ export default function StorybookScreen() {
 	const [isStoryModalVisible, setStoryModalVisible] = useState(false);
 	const [isStoryViewerVisible, setStoryViewerVisible] = useState(false);
 	const [isRefineModalVisible, setRefineModalVisible] = useState(false);
+	const [isRegenerateModalVisible, setRegenerateModalVisible] = useState(false);
+	const [isPageRegenerateModalVisible, setPageRegenerateModalVisible] = useState(false);
 
 	// Wizard states
 	const [avatarStep, setAvatarStep] = useState('upload'); // upload, generating, review
@@ -80,6 +91,128 @@ export default function StorybookScreen() {
 	const [refinementPrompt, setRefinementPrompt] = useState('');
 	const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 	
+	// Regeneration states
+	const [regenerationPrompt, setRegenerationPrompt] = useState('');
+	const [pageToRegenerate, setPageToRegenerate] = useState(0);
+	const [isRegenerating, setIsRegenerating] = useState(false);
+	
+	// Story viewer state
+	const [currentPageIndex, setCurrentPageIndex] = useState(0);
+	
+	// Menu state for story options
+	const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+	
+	// Story page component to avoid hook violations
+	const StoryPageComponent = ({ item, index, screenWidth, screenHeight }: { item: any, index: number, screenWidth: number, screenHeight: number }) => {
+		const [imageLoading, setImageLoading] = useState(true);
+		const [imageError, setImageError] = useState(false);
+		
+		return (
+			<View style={{ width: screenWidth, height: screenHeight, alignItems: 'center', justifyContent: 'center' }}>
+				{item.imageUrl && !imageError ? (
+					<>
+						<Image 
+							source={{ uri: item.imageUrl }} 
+							style={{ 
+								width: screenWidth, 
+								height: screenHeight,
+								resizeMode: 'cover'
+							}} 
+							onLoad={() => setImageLoading(false)}
+							onError={(error) => {
+								console.log('Image load error:', error);
+								console.log('Failed image URL:', item.imageUrl);
+								setImageError(true);
+								setImageLoading(false);
+							}}
+						/>
+						{imageLoading && (
+							<View style={{ 
+								position: 'absolute',
+								width: screenWidth, 
+								height: screenHeight, 
+								backgroundColor: '#222', 
+								alignItems: 'center', 
+								justifyContent: 'center' 
+							}}>
+								<ActivityIndicator size="large" color="white" />
+								<Text style={{ color: 'white', marginTop: 20 }}>Loading image...</Text>
+							</View>
+						)}
+					</>
+				) : (
+					<View style={{ 
+						width: screenWidth, 
+						height: screenHeight, 
+						backgroundColor: '#333', 
+						alignItems: 'center', 
+						justifyContent: 'center' 
+					}}>
+						<Ionicons name="image-outline" size={100} color="#666" />
+						<Text style={{ color: '#666', marginTop: 20 }}>
+							{imageError ? 'Failed to load image' : 'No image available'}
+						</Text>
+						{imageError && (
+							<Text style={{ color: '#666', marginTop: 10, textAlign: 'center', paddingHorizontal: 20, fontSize: 12 }}>
+								{item.imageUrl}
+							</Text>
+						)}
+					</View>
+				)}
+			
+				{/* Refine Image Button */}
+				<TouchableOpacity 
+					onPress={() => { 
+						setPageToRefine(index); 
+						setRefinementPrompt(''); 
+						setRefineModalVisible(true); 
+					}} 
+					style={{ 
+						position: 'absolute', 
+						top: 120, 
+						right: 20, 
+						backgroundColor: 'rgba(0,0,0,0.7)', 
+						padding: 10, 
+						borderRadius: tokens.radius.lg, 
+						flexDirection: 'row', 
+						alignItems: 'center', 
+						gap: 8 
+					}}
+				>
+					<Ionicons name="color-wand" size={16} color="white" />
+					<Text style={{ color: 'white', fontSize: 12 }}>Refine Image</Text>
+				</TouchableOpacity>
+				
+				{/* Story Text Overlay */}
+				<LinearGradient
+					colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)']}
+					style={{ 
+						position: 'absolute', 
+						bottom: 0, 
+						left: 0, 
+						right: 0, 
+						paddingTop: 60,
+						paddingHorizontal: 40, 
+						paddingBottom: 60
+					}}
+				>
+					<Text style={{ 
+						color: 'white', 
+						fontSize: 18, 
+						textAlign: 'center',
+						lineHeight: 24,
+						fontWeight: '500',
+						textShadowColor: 'rgba(0,0,0,0.8)',
+						textShadowOffset: { width: 0, height: 1 },
+						textShadowRadius: 3
+					}}>
+						{item.text}
+					</Text>
+				</LinearGradient>
+			</View>
+		);
+	};
+	
 	// Suggested concepts for swipable cards
 	const [suggestedConcepts] = useState([
 		{ id: '1', concept: 'Sharing', description: 'Learning to share toys and take turns', message: 'Teach the importance of sharing toys with others' },
@@ -99,40 +232,215 @@ export default function StorybookScreen() {
 		loadStories();
 	}, []);
 
-	// State for simulated progress
-	const [simulatedProgress, setSimulatedProgress] = useState(0);
+	// Story regeneration functions
+	const regenerateEntireStory = async (customPrompt?: string) => {
+		try {
+			setIsRegenerating(true);
+			
+			// Get character names for story generation
+			const selectedCharacters = characters.filter(char => 
+				conceptLearning.characterIds.includes(char.id)
+			);
+			const characterNames = selectedCharacters.map(char => char.name);
 
-	// Simulate progress for text generation step and auto-advance
+			// Include child as character if selected
+			const allCharacterNames = [...characterNames];
+			if (conceptLearning.includeChildAsCharacter && profile?.childName) {
+				allCharacterNames.push(profile.childName);
+			}
+
+			// Generate title if not already set
+			let storyTitle = conceptLearning.title;
+			if (!storyTitle) {
+				const mainCharacter = profile?.childName || allCharacterNames[0] || 'a child';
+				storyTitle = `${mainCharacter} Learns About ${conceptLearning.concept.charAt(0).toUpperCase() + conceptLearning.concept.slice(1)}`;
+			}
+
+			// Import geminiService
+			const geminiService = require('../services/geminiService').default;
+			
+			// Regenerate story text using Gemini
+			const storyTexts = await geminiService.regenerateEntireStory(
+				storyTitle,
+				`A learning story about ${conceptLearning.concept}`,
+				allCharacterNames,
+				conceptLearning.advanced?.pageCount || 5,
+				customPrompt,
+				{
+					concept: conceptLearning.concept,
+					childName: conceptLearning.includeChildAsCharacter ? profile?.childName : undefined,
+					advanced: conceptLearning.advanced
+				}
+			);
+
+			// Convert to StoryPageDraft format
+			const storyPages: typeof conceptLearning.storyPages = storyTexts.map((text: string, index: number) => ({
+				pageNumber: index + 1,
+				text,
+				isEdited: false, // Mark as not edited since this is a fresh generation
+				visualContext: {
+					characters: allCharacterNames,
+					setting: `Scene ${index + 1}`,
+					action: text.substring(0, 100) + '...',
+					previousPageVisualNotes: index > 0 ? `Previous: ${storyTexts[index - 1].substring(0, 50)}...` : undefined
+				}
+			}));
+
+			// Update concept learning with regenerated content
+			setConceptLearning(prevState => ({
+				...prevState,
+				title: storyTitle,
+				storyPages,
+				storySummary: `A story about ${conceptLearning.concept} featuring ${allCharacterNames.join(', ')}`,
+				sceneContext: {
+					setting: 'A warm, child-friendly environment',
+					mood: conceptLearning.advanced?.tone || 'gentle',
+					colorPalette: ['warm', 'bright', 'friendly'],
+					visualStyle: 'Pixar-style 3D animation'
+				}
+			}));
+
+		} catch (error) {
+			console.error('Story regeneration failed:', error);
+			Alert.alert('Error', 'Failed to regenerate story. Please try again.');
+		} finally {
+			setIsRegenerating(false);
+		}
+	};
+
+	const regenerateSinglePage = async (pageNumber: number, customPrompt?: string) => {
+		try {
+			setIsRegenerating(true);
+			
+			// Get character names
+			const selectedCharacters = characters.filter(char => 
+				conceptLearning.characterIds.includes(char.id)
+			);
+			const characterNames = selectedCharacters.map(char => char.name);
+
+			// Include child as character if selected
+			const allCharacterNames = [...characterNames];
+			if (conceptLearning.includeChildAsCharacter && profile?.childName) {
+				allCharacterNames.push(profile.childName);
+			}
+
+			const storyTitle = conceptLearning.title || 'Learning Story';
+			const previousPages = conceptLearning.storyPages?.slice(0, pageNumber - 1).map(p => p.text) || [];
+			
+			// Import geminiService
+			const geminiService = require('../services/geminiService').default;
+			
+			// Regenerate the specific page
+			const newPageText = await geminiService.regenerateStoryPage(
+				storyTitle,
+				pageNumber,
+				conceptLearning.storyPages?.length || 5,
+				allCharacterNames,
+				conceptLearning.concept,
+				customPrompt,
+				previousPages
+			);
+
+			// Update the specific page in conceptLearning
+			if (conceptLearning.storyPages) {
+				const updatedPages = conceptLearning.storyPages.map(page => 
+					page.pageNumber === pageNumber 
+						? { ...page, text: newPageText, isEdited: false } // Mark as not edited since this is a fresh generation
+						: page
+				);
+				
+				setConceptLearning(prevState => ({
+					...prevState,
+					storyPages: updatedPages
+				}));
+			}
+
+		} catch (error) {
+			console.error('Page regeneration failed:', error);
+			Alert.alert('Error', 'Failed to regenerate page. Please try again.');
+		} finally {
+			setIsRegenerating(false);
+		}
+	};
+
+	// Real story generation function
+	const generateStoryContent = async () => {
+		try {
+			// Get character names for story generation
+			const selectedCharacters = characters.filter(char => 
+				conceptLearning.characterIds.includes(char.id)
+			);
+			const characterNames = selectedCharacters.map(char => char.name);
+
+			// Include child as character if selected
+			const allCharacterNames = [...characterNames];
+			if (conceptLearning.includeChildAsCharacter && profile?.childName) {
+				allCharacterNames.push(profile.childName);
+			}
+
+			// Generate title if not already set
+			let storyTitle = conceptLearning.title;
+			if (!storyTitle) {
+				const mainCharacter = profile?.childName || allCharacterNames[0] || 'a child';
+				storyTitle = `${mainCharacter} Learns About ${conceptLearning.concept.charAt(0).toUpperCase() + conceptLearning.concept.slice(1)}`;
+			}
+
+			// Import geminiService
+			const geminiService = require('../services/geminiService').default;
+			
+			// Generate story text using Gemini
+			const storyTexts = await geminiService.generateStoryText(
+				storyTitle,
+				`A learning story about ${conceptLearning.concept}`,
+				allCharacterNames,
+				conceptLearning.advanced?.pageCount || 5,
+				{
+					concept: conceptLearning.concept,
+					childName: conceptLearning.includeChildAsCharacter ? profile?.childName : undefined,
+					advanced: conceptLearning.advanced
+				}
+			);
+
+			// Convert to StoryPageDraft format
+			const storyPages: typeof conceptLearning.storyPages = storyTexts.map((text: string, index: number) => ({
+				pageNumber: index + 1,
+				text,
+				isEdited: false,
+				visualContext: {
+					characters: allCharacterNames,
+					setting: `Scene ${index + 1}`,
+					action: text.substring(0, 100) + '...',
+					previousPageVisualNotes: index > 0 ? `Previous: ${storyTexts[index - 1].substring(0, 50)}...` : undefined
+				}
+			}));
+
+			// Update concept learning with generated content
+			setConceptLearning(prevState => ({
+				...prevState,
+				title: storyTitle,
+				storyPages,
+				storySummary: `A story about ${conceptLearning.concept} featuring ${allCharacterNames.join(', ')}`,
+				sceneContext: {
+					setting: 'A warm, child-friendly environment',
+					mood: conceptLearning.advanced?.tone || 'gentle',
+					colorPalette: ['warm', 'bright', 'friendly'],
+					visualStyle: 'Pixar-style 3D animation'
+				}
+			}));
+
+			// Advance to text editing step
+			setStoryWizardStep('text-editing');
+		} catch (error) {
+			console.error('Story generation failed:', error);
+			// Set error and revert to mode selection
+			setStoryWizardStep('mode-selection');
+		}
+	};
+
+	// Trigger real story generation when entering text-generation step
 	useEffect(() => {
 		if (storyWizardStep === 'text-generation') {
-			// Reset and start progress simulation
-			setSimulatedProgress(0);
-			const interval = setInterval(() => {
-				setSimulatedProgress(prev => {
-					if (prev >= 100) {
-						clearInterval(interval);
-						// Auto-advance to text editing step after a short delay
-						setTimeout(() => {
-							// Initialize story pages draft for editing
-							setConceptLearning(prevState => ({
-								...prevState,
-								storyPages: [
-									{ pageNumber: 1, text: `Once upon a time, there was a little child who wanted to learn about ${prevState.concept.toLowerCase()}.`, isEdited: false },
-									{ pageNumber: 2, text: `They discovered that ${prevState.concept.toLowerCase()} was all around them.`, isEdited: false },
-									{ pageNumber: 3, text: `Through their adventures, they learned how to practice ${prevState.concept.toLowerCase()} every day.`, isEdited: false },
-									{ pageNumber: 4, text: `Now they could share their knowledge about ${prevState.concept.toLowerCase()} with their friends.`, isEdited: false },
-									{ pageNumber: 5, text: `And they lived happily, always remembering the importance of ${prevState.concept.toLowerCase()}.`, isEdited: false }
-								]
-							}));
-							setStoryWizardStep('text-editing');
-						}, 1000); // 1 second delay to show completion
-						return 100;
-					}
-					return prev + 10;
-				});
-			}, 300);
-
-			return () => clearInterval(interval);
+			generateStoryContent();
 		}
 	}, [storyWizardStep]);
 
@@ -147,10 +455,9 @@ export default function StorybookScreen() {
 						text: 'OK', 
 						onPress: () => {
 							clearError();
-							// If error occurred during story generation, revert to character selection
+							// If error occurred during story generation, revert to mode selection
 							if (storyWizardStep === 'text-generation' || storyWizardStep === 'image-generation') {
-								setStoryWizardStep('character-selection');
-								setSimulatedProgress(0);
+								setStoryWizardStep('mode-selection');
 							}
 						}
 					}
@@ -193,7 +500,7 @@ export default function StorybookScreen() {
 
 					{/* Close Button */}
 					<TouchableOpacity
-						onPress={() => navigation.navigate('Dashboard')}
+						onPress={() => navigation.goBack()}
 						activeOpacity={0.7}
 						style={{
 							padding: 6
@@ -223,74 +530,206 @@ export default function StorybookScreen() {
 
 	const renderStoriesTab = () => (
 		<View style={{ flex: 1 }}>
-			<ScrollView contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 100 }}>
+			<ScrollView 
+				contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 100 }}
+				onScrollBeginDrag={() => setOpenMenuId(null)}
+			>
 				<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.sm }}>Your Library</Text>
 				<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
 					Revisit your magical adventures or create a new one.
 				</Text>
-				{stories.map(story => (
-					<View key={story.id} style={{
-						flexDirection: 'row',
-						alignItems: 'center',
-						backgroundColor: tokens.color.surface,
-						borderRadius: tokens.radius.lg,
-						padding: tokens.spacing.gap.md,
-						marginBottom: tokens.spacing.gap.sm,
-						borderColor: tokens.color.border.default,
-						borderWidth: 1
-					}}>
-						<TouchableOpacity 
-							onPress={() => { setCurrentStory(story); setStoryViewerVisible(true); }}
-							style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
-						>
-							<Image source={{ uri: story.coverUrl }} style={{ width: 60, height: 60, borderRadius: tokens.radius.md, marginRight: tokens.spacing.gap.md }} />
-							<View style={{ flex: 1 }}>
-								<Text weight="semibold">{story.title}</Text>
-								<Text color="secondary" size="sm">
-									Created {story.createdAt instanceof Date ? 
-										story.createdAt.toLocaleDateString('en-US', { 
-											month: 'short', 
-											day: 'numeric', 
-											year: 'numeric' 
-										}) : 
-										'Recently'
+				{stories.map(story => {
+					const isGenerating = story.status === 'generating' || story.status === 'draft';
+					const isComplete = story.status === 'complete';
+					const hasError = story.status === 'error';
+					
+					return (
+						<View key={story.id} style={{
+							flexDirection: 'row',
+							alignItems: 'center',
+							backgroundColor: isGenerating ? 'rgba(124, 58, 237, 0.05)' : tokens.color.surface,
+							borderRadius: tokens.radius.lg,
+							padding: tokens.spacing.gap.md,
+							marginBottom: tokens.spacing.gap.sm,
+							borderColor: isGenerating ? tokens.color.primary.default : tokens.color.border.default,
+							borderWidth: isGenerating ? 1 : 1,
+							borderStyle: isGenerating ? 'dashed' : 'solid',
+							opacity: isGenerating ? 0.7 : 1
+						}}>
+							<TouchableOpacity 
+								onPress={() => { 
+									if (isComplete) {
+										setCurrentStory(story); 
+										setStoryViewerVisible(true);
+									} else if (isGenerating) {
+										// Show generating message
+										Alert.alert(
+											'Story Still Creating', 
+											'This story is still being created with custom illustrations. Please check back in a few minutes!',
+											[{ text: 'OK' }]
+										);
 									}
-								</Text>
-							</View>
-							<Ionicons name="chevron-forward" size={20} color={tokens.color.text.secondary} />
-						</TouchableOpacity>
-						
-						{/* Delete button */}
-						<TouchableOpacity 
-							onPress={() => {
-								Alert.alert(
-									'Delete Story',
-									`Are you sure you want to delete "${story.title}"? This action cannot be undone.`,
-									[
-										{ text: 'Cancel', style: 'cancel' },
-										{ 
-											text: 'Delete', 
-											style: 'destructive',
-											onPress: async () => {
-												try {
-													await deleteStory(story.id);
-												} catch (error) {
-													console.error('Failed to delete story:', error);
-												}
-											}
-										}
-									]
-								);
-							}}
-							style={{
-								padding: 8,
-								marginLeft: 8
-							}}
-						>
-							<Ionicons name="trash-outline" size={20} color="#EF4444" />
-						</TouchableOpacity>
-					</View>
-				))}
+								}}
+								style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+								disabled={isGenerating}
+							>
+								{/* Cover Image or Placeholder */}
+								{isComplete && story.coverUrl ? (
+									<Image source={{ uri: story.coverUrl }} style={{ width: 60, height: 60, borderRadius: tokens.radius.md, marginRight: tokens.spacing.gap.md }} />
+								) : (
+									<View style={{
+										width: 60,
+										height: 60,
+										borderRadius: tokens.radius.md,
+										marginRight: tokens.spacing.gap.md,
+										backgroundColor: isGenerating ? 'rgba(124, 58, 237, 0.1)' : tokens.color.border.default,
+										alignItems: 'center',
+										justifyContent: 'center'
+									}}>
+										{isGenerating ? (
+											<ActivityIndicator size="small" color={tokens.color.primary.default} />
+										) : hasError ? (
+											<Ionicons name="alert-circle" size={24} color="#EF4444" />
+										) : (
+											<Ionicons name="image-outline" size={24} color={tokens.color.text.secondary} />
+										)}
+									</View>
+								)}
+								
+								<View style={{ flex: 1 }}>
+									<Text weight="semibold" style={{ color: isGenerating ? tokens.color.primary.default : tokens.color.text.primary }}>
+										{story.title}
+									</Text>
+									<Text color="secondary" size="sm">
+										{isGenerating ? (
+											<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+												<Text size="sm" style={{ color: tokens.color.primary.default }}>Creating illustrations...</Text>
+												{story.generationProgress && (
+													<Text size="sm" style={{ color: tokens.color.primary.default, marginLeft: 4 }}>
+														({Math.round(story.generationProgress)}%)
+													</Text>
+												)}
+											</View>
+										) : hasError ? (
+											'Generation failed'
+										) : (
+											`Created ${story.createdAt instanceof Date ? 
+												story.createdAt.toLocaleDateString('en-US', { 
+													month: 'short', 
+													day: 'numeric', 
+													year: 'numeric' 
+												}) : 
+												'Recently'
+											}`
+										)}
+									</Text>
+								</View>
+								
+								{isGenerating ? (
+									<View style={{ 
+										width: 8, 
+										height: 8, 
+										borderRadius: 4, 
+										backgroundColor: tokens.color.primary.default 
+									}} />
+								) : null}
+							</TouchableOpacity>
+							
+							{/* Ellipsis menu - only show for completed or error stories */}
+							{(isComplete || hasError) && (
+								<View style={{ position: 'relative' }}>
+									<TouchableOpacity 
+										onPress={(e) => {
+											e.stopPropagation();
+											setOpenMenuId(openMenuId === story.id ? null : story.id);
+										}}
+										style={{
+											padding: 8,
+											marginLeft: 8
+										}}
+									>
+										<Ionicons name="ellipsis-horizontal" size={20} color={tokens.color.text.secondary} />
+									</TouchableOpacity>
+									
+									{/* Dropdown menu */}
+									{openMenuId === story.id && (
+										<View style={{
+											position: 'absolute',
+											top: 40,
+											right: 0,
+											backgroundColor: 'white',
+											borderRadius: tokens.radius.md,
+											shadowColor: '#000',
+											shadowOffset: { width: 0, height: 2 },
+											shadowOpacity: 0.1,
+											shadowRadius: 8,
+											elevation: 4,
+											borderWidth: 1,
+											borderColor: tokens.color.border.default,
+											minWidth: 120,
+											zIndex: 1000
+										}}>
+											{/* Edit option */}
+											<TouchableOpacity 
+												onPress={() => {
+													setOpenMenuId(null);
+													// TODO: Implement edit functionality
+													Alert.alert('Edit Story', 'Edit functionality will be implemented soon.');
+												}}
+												style={{
+													flexDirection: 'row',
+													alignItems: 'center',
+													padding: 12,
+													gap: 8
+												}}
+											>
+												<Ionicons name="pencil-outline" size={16} color={tokens.color.text.primary} />
+												<Text>Edit</Text>
+											</TouchableOpacity>
+											
+											{/* Separator */}
+											<View style={{ height: 1, backgroundColor: tokens.color.border.default, marginHorizontal: 8 }} />
+											
+											{/* Delete option */}
+											<TouchableOpacity 
+												onPress={() => {
+													setOpenMenuId(null);
+													Alert.alert(
+														'Delete Story',
+														`Are you sure you want to delete "${story.title}"? This action cannot be undone.`,
+														[
+															{ text: 'Cancel', style: 'cancel' },
+															{ 
+																text: 'Delete', 
+																style: 'destructive',
+																onPress: async () => {
+																	try {
+																		await deleteStory(story.id);
+																	} catch (error) {
+																		console.error('Failed to delete story:', error);
+																	}
+																}
+															}
+														]
+													);
+												}}
+												style={{
+													flexDirection: 'row',
+													alignItems: 'center',
+													padding: 12,
+													gap: 8
+												}}
+											>
+												<Ionicons name="trash-outline" size={16} color="#EF4444" />
+												<Text style={{ color: '#EF4444' }}>Delete</Text>
+											</TouchableOpacity>
+										</View>
+									)}
+								</View>
+							)}
+						</View>
+					);
+				})}
 			</ScrollView>
 			<View style={{ position: 'absolute', bottom: 30, right: 20 }}>
 				<GradientButton
@@ -303,7 +742,7 @@ export default function StorybookScreen() {
 							mode: 'simple',
 							characterIds: []
 						});
-						setStoryWizardStep('child-concept');
+						setStoryWizardStep('character-selection');
 						setStoryModalVisible(true);
 					}}
 				/>
@@ -355,14 +794,14 @@ export default function StorybookScreen() {
 		<Modal visible={isAvatarModalVisible} animationType="slide" transparent>
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
 				<View style={{ width: '90%', backgroundColor: 'white', borderRadius: tokens.radius.xl, padding: tokens.spacing.gap.lg }}>
-					<TouchableOpacity onPress={() => setAvatarModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
+					<TouchableOpacity onPress={() => isMounted.current && setAvatarModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
 						<Ionicons name="close-circle" size={24} color={tokens.color.text.secondary} />
 					</TouchableOpacity>
-					<Text size="h2" weight="bold" style={{ textAlign: 'center', marginBottom: tokens.spacing.gap.md }}>Create Character</Text>
+					<RNText style={{ fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: tokens.spacing.gap.md, color: tokens.color.text.primary }}>Create Character</RNText>
 					
 					{avatarStep === 'upload' && (
 						<>
-							<Text color="secondary" style={{ textAlign: 'center', marginBottom: tokens.spacing.gap.lg }}>Upload a clear, front-facing photo to generate a Pixar-style avatar.</Text>
+							<RNText style={{ color: tokens.color.text.secondary, textAlign: 'center', marginBottom: tokens.spacing.gap.lg }}>Upload a clear, front-facing photo to generate a Pixar-style avatar.</RNText>
 							<TouchableOpacity style={{
 								height: 150,
 								borderWidth: 2,
@@ -393,7 +832,12 @@ export default function StorybookScreen() {
 						<>
 							<Image source={{ uri: 'https://picsum.photos/seed/new-avatar/300' }} style={{ width: 150, height: 150, borderRadius: 75, alignSelf: 'center', marginBottom: tokens.spacing.gap.lg }} />
 							<TextInput placeholder="Enter character name" style={{ borderWidth: 1, borderColor: tokens.color.border.default, borderRadius: tokens.radius.md, padding: 12, marginBottom: tokens.spacing.gap.sm }} />
-							<GradientButton title="Save Character" onPress={() => { setAvatarModalVisible(false); setAvatarStep('upload'); }} />
+							<GradientButton title="Save Character" onPress={() => { 
+								if (isMounted.current) {
+									setAvatarModalVisible(false); 
+									setAvatarStep('upload');
+								}
+							}} />
 							<TouchableOpacity onPress={() => setAvatarStep('generating')} style={{ marginTop: 12 }}>
 								<Text style={{ textAlign: 'center', color: tokens.color.primary.default }}>Regenerate</Text>
 							</TouchableOpacity>
@@ -406,7 +850,7 @@ export default function StorybookScreen() {
 
 	const renderProgressSteps = () => {
 		// Simplified steps - just numbers with fun colors
-		const allSteps = ['child-concept', 'mode-selection', 'advanced-options', 'character-selection', 'text-generation', 'text-editing', 'review'];
+		const allSteps = ['character-selection', 'concept-selection', 'mode-selection', 'advanced-options', 'text-generation', 'text-editing', 'review'];
 		const activeSteps = conceptLearning.mode === 'simple' 
 			? allSteps.filter(s => s !== 'advanced-options')
 			: allSteps;
@@ -478,7 +922,7 @@ export default function StorybookScreen() {
 			'text-generation': 'Creating Story',
 			'text-editing': 'Edit Your Story',
 			'image-generation': 'Generating Images',
-			'review': 'Complete!'
+			'review': 'Submitted!'
 		};
 		return titles[step] || '';
 	};
@@ -486,7 +930,7 @@ export default function StorybookScreen() {
 	const renderStoryCreationModal = () => (
 		<Modal visible={isStoryModalVisible} animationType="slide">
 			<View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
-				<TouchableOpacity onPress={() => setStoryModalVisible(false)} style={{ position: 'absolute', top: 60, right: 20, zIndex: 1 }}>
+				<TouchableOpacity onPress={() => isMounted.current && setStoryModalVisible(false)} style={{ position: 'absolute', top: 60, right: 20, zIndex: 1 }}>
 					<Ionicons name="close-circle" size={24} color={tokens.color.text.secondary} />
 				</TouchableOpacity>
 				
@@ -611,6 +1055,72 @@ export default function StorybookScreen() {
 							</>
 						)}
 
+						{storyWizardStep === 'concept-selection' && (
+							<>
+								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Choose Learning Message</Text>
+								<Text color="secondary" style={{ marginBottom: 30 }}>What concept or value do you want your child to learn from this story?</Text>
+								
+								<Text weight="semibold" style={{ marginBottom: 16 }}>Popular Concepts</Text>
+								<FlatList
+									data={suggestedConcepts}
+									horizontal
+									showsHorizontalScrollIndicator={false}
+									keyExtractor={(item) => item.id}
+									contentContainerStyle={{ paddingRight: 20, paddingBottom: 20 }}
+									renderItem={({ item }) => (
+										<TouchableOpacity
+											onPress={() => setConceptLearning({...conceptLearning, concept: item.message})}
+											style={{
+												width: 160,
+												padding: 20,
+												marginRight: 16,
+												borderRadius: tokens.radius.lg,
+												borderWidth: 2,
+												borderColor: conceptLearning.concept === item.message ? tokens.color.primary.default : tokens.color.border.default,
+												backgroundColor: conceptLearning.concept === item.message ? "#F3E8FF" : tokens.color.surface
+											}}
+										>
+											<Text weight="bold" size="md" style={{ textAlign: 'center', marginBottom: 8 }}>{item.concept}</Text>
+											<Text size="sm" color="secondary" style={{ textAlign: 'center', lineHeight: 18 }}>{item.description}</Text>
+										</TouchableOpacity>
+									)}
+									style={{ marginBottom: 30 }}
+								/>
+
+								<Text weight="semibold" style={{ marginBottom: 12 }}>Or Create Your Own</Text>
+								<TextInput 
+									placeholder="e.g., sharing toys, saying please and thank you, being brave" 
+									value={conceptLearning.concept}
+									onChangeText={(text) => setConceptLearning({...conceptLearning, concept: text})}
+									style={{ 
+										borderWidth: 1, 
+										borderColor: tokens.color.border.default, 
+										borderRadius: tokens.radius.md, 
+										padding: 16, 
+										marginBottom: 30,
+										fontSize: 16
+									}} 
+								/>
+
+								<View style={{ flexDirection: 'row', gap: 12 }}>
+									<TouchableOpacity 
+										onPress={() => setStoryWizardStep('character-selection')}
+										style={{ flex: 1, padding: 12, alignItems: 'center' }}
+									>
+										<Text style={{ color: tokens.color.text.secondary }}>Back</Text>
+									</TouchableOpacity>
+									<GradientButton 
+										title="Next: Choose Mode" 
+										disabled={!conceptLearning.concept.trim()}
+										onPress={() => {
+											setStoryWizardStep('mode-selection');
+										}} 
+										style={{ flex: 2 }}
+									/>
+								</View>
+							</>
+						)}
+
 						{storyWizardStep === 'mode-selection' && (
 							<>
 								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Choose Creation Mode</Text>
@@ -653,14 +1163,14 @@ export default function StorybookScreen() {
 
 								<View style={{ flexDirection: 'row', gap: 12 }}>
 									<TouchableOpacity 
-										onPress={() => setStoryWizardStep('child-concept')}
+										onPress={() => setStoryWizardStep('concept-selection')}
 										style={{ flex: 1, padding: 12, alignItems: 'center' }}
 									>
 										<Text style={{ color: tokens.color.text.secondary }}>Back</Text>
 									</TouchableOpacity>
 									<GradientButton 
-										title={conceptLearning.mode === 'advanced' ? 'Next: Options' : 'Next: Characters'}
-										onPress={() => setStoryWizardStep(conceptLearning.mode === 'advanced' ? 'advanced-options' : 'character-selection')}
+										title={conceptLearning.mode === 'advanced' ? 'Next: Options' : 'Create Story'}
+										onPress={() => setStoryWizardStep(conceptLearning.mode === 'advanced' ? 'advanced-options' : 'text-generation')}
 										style={{ flex: 2 }}
 									/>
 								</View>
@@ -910,7 +1420,51 @@ export default function StorybookScreen() {
 						{storyWizardStep === 'character-selection' && (
 							<>
 								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Choose Characters</Text>
-								<Text color="secondary" style={{ marginBottom: 20 }}>Select characters for your story, create new ones, or skip this step.</Text>
+								<Text color="secondary" style={{ marginBottom: 30 }}>Select who will be in your story. You can include your child and other family characters.</Text>
+								
+								{/* Child Selection Section */}
+								{profile && (
+									<>
+										<Text weight="semibold" style={{ marginBottom: 12 }}>Your Child</Text>
+										<TouchableOpacity 
+											onPress={() => setConceptLearning({...conceptLearning, childProfileId: profile.id, includeChildAsCharacter: !conceptLearning.includeChildAsCharacter})}
+											style={{
+												width: 120,
+												alignItems: 'center',
+												padding: 16,
+												borderRadius: tokens.radius.lg,
+												borderWidth: 2,
+												borderColor: conceptLearning.includeChildAsCharacter ? tokens.color.primary.default : tokens.color.border.default,
+												backgroundColor: conceptLearning.includeChildAsCharacter ? "#F3E8FF" : tokens.color.surface,
+												marginBottom: 30
+											}}
+										>
+											{/* Child Avatar - we'll use a generic avatar for now */}
+											<View style={{
+												width: 60,
+												height: 60,
+												borderRadius: 30,
+												backgroundColor: tokens.color.primary.default,
+												alignItems: 'center',
+												justifyContent: 'center',
+												marginBottom: 8
+											}}>
+												<Ionicons name="person" size={30} color="white" />
+											</View>
+											<Text weight="semibold" size="sm" style={{ textAlign: 'center' }}>{profile.childName}</Text>
+											<Text size="xs" color="secondary" style={{ textAlign: 'center' }}>Main Character</Text>
+											{conceptLearning.includeChildAsCharacter && (
+												<View style={{ position: 'absolute', top: 8, right: 8 }}>
+													<Ionicons name="checkmark-circle" size={20} color={tokens.color.primary.default} />
+												</View>
+											)}
+										</TouchableOpacity>
+									</>
+								)}
+								
+								{/* Other Characters Section */}
+								<Text weight="semibold" style={{ marginBottom: 12 }}>Other Characters</Text>
+								<Text color="secondary" size="sm" style={{ marginBottom: 16 }}>Add family members or friends to make the story more personal</Text>
 								
 								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 30 }}>
 									{characters.map((char: Character) => {
@@ -984,19 +1538,17 @@ export default function StorybookScreen() {
 									</View>
 								)}
 
-								<View style={{ flexDirection: 'row', gap: 12 }}>
-									<TouchableOpacity 
-										onPress={() => setStoryWizardStep(conceptLearning.mode === 'advanced' ? 'advanced-options' : 'mode-selection')}
-										style={{ flex: 1, padding: 12, alignItems: 'center' }}
-									>
-										<Text style={{ color: tokens.color.text.secondary }}>Back</Text>
-									</TouchableOpacity>
-									<GradientButton 
-										title={conceptLearning.characterIds.length === 0 ? "Skip & Continue" : "Generate Story"}
-										onPress={() => setStoryWizardStep('text-generation')}
-										style={{ flex: 2 }}
-									/>
-								</View>
+								<GradientButton 
+									title="Next: Choose Message"
+									disabled={!conceptLearning.includeChildAsCharacter && conceptLearning.characterIds.length === 0}
+									onPress={() => {
+										if (profile && !conceptLearning.childProfileId && conceptLearning.includeChildAsCharacter) {
+											setConceptLearning({...conceptLearning, childProfileId: profile.id});
+										}
+										setStoryWizardStep('concept-selection');
+									}} 
+									style={{ marginTop: 20 }}
+								/>
 							</>
 						)}
 
@@ -1004,19 +1556,15 @@ export default function StorybookScreen() {
 							<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 100 }}>
 								<ActivityIndicator size="large" color={tokens.color.primary.default} style={{ marginBottom: 20 }} />
 								<Text size="h3" weight="bold">Creating Your Learning Story</Text>
-								<Text color="secondary" style={{ textAlign: 'center', marginHorizontal: 20 }}>Generating a story about "{conceptLearning.concept}" for your child...</Text>
-								<View style={{ width: 200, height: 4, backgroundColor: tokens.color.border.default, borderRadius: 2, marginTop: 20 }}>
-									<View style={{ width: `${simulatedProgress}%`, height: '100%', backgroundColor: tokens.color.primary.default, borderRadius: 2 }} />
-								</View>
+								<Text color="secondary" style={{ textAlign: 'center', marginHorizontal: 20 }}>Creating a personalised story about "{conceptLearning.concept}"...</Text>
 								
-								{/* Show completion message when progress is 100% */}
-								{simulatedProgress >= 100 && (
-									<View style={{ marginTop: 20, alignItems: 'center' }}>
-										<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-											<Ionicons name="checkmark-circle" size={20} color={tokens.color.support.green} style={{ marginRight: 8 }} />
-											<Text style={{ color: tokens.color.support.green, fontWeight: '600' }}>Story created! Moving to next step...</Text>
+								{generationProgress.status === 'generating' && (
+									<>
+										<View style={{ width: 200, height: 4, backgroundColor: tokens.color.border.default, borderRadius: 2, marginTop: 20 }}>
+											<View style={{ width: `${generationProgress.progress}%`, height: '100%', backgroundColor: tokens.color.primary.default, borderRadius: 2 }} />
 										</View>
-									</View>
+										<Text size="sm" color="secondary" style={{ marginTop: 10, textAlign: 'center' }}>{generationProgress.message}</Text>
+									</>
 								)}
 							</View>
 						)}
@@ -1024,9 +1572,51 @@ export default function StorybookScreen() {
 						{storyWizardStep === 'text-editing' && (
 							<>
 								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Edit Your Story</Text>
-								<Text color="secondary" style={{ marginBottom: 20 }}>Review and customize each page of your story. Tap any page to edit the text.</Text>
+								<Text color="secondary" style={{ marginBottom: 20 }}>Review and customize your story title and each page of text.</Text>
 								
-								<ScrollView style={{ maxHeight: 400, marginBottom: 20 }}>
+								{/* Title Editing */}
+								<View style={{ marginBottom: 20 }}>
+									<Text weight="semibold" style={{ marginBottom: 8 }}>Story Title</Text>
+									<TextInput
+										value={conceptLearning.title || ''}
+										onChangeText={(text) => setConceptLearning({ ...conceptLearning, title: text })}
+										placeholder="Enter your story title..."
+										style={{
+											borderWidth: 1,
+											borderColor: tokens.color.border.default,
+											borderRadius: tokens.radius.md,
+											padding: 12,
+											fontSize: 16,
+											fontWeight: '600',
+											backgroundColor: tokens.color.surface
+										}}
+									/>
+								</View>
+								
+								<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+							<Text weight="semibold">Story Pages</Text>
+							<TouchableOpacity
+								onPress={() => {
+									setRegenerationPrompt('');
+									setRegenerateModalVisible(true);
+								}}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									gap: 6,
+									padding: 8,
+									borderRadius: tokens.radius.md,
+									backgroundColor: 'rgba(124, 58, 237, 0.1)',
+									borderWidth: 1,
+									borderColor: tokens.color.primary.default
+								}}
+							>
+								<Ionicons name="refresh" size={16} color={tokens.color.primary.default} />
+								<Text size="sm" style={{ color: tokens.color.primary.default }}>Regenerate Story</Text>
+							</TouchableOpacity>
+						</View>
+						
+						<ScrollView style={{ maxHeight: 400, marginBottom: 20 }}>
 									{conceptLearning.storyPages?.map((page, index) => (
 										<View key={page.pageNumber} style={{
 											backgroundColor: tokens.color.surface,
@@ -1038,12 +1628,28 @@ export default function StorybookScreen() {
 										}}>
 											<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
 												<Text weight="semibold">Page {page.pageNumber}</Text>
-												{page.isEdited && (
-													<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-														<Ionicons name="checkmark-circle" size={16} color={tokens.color.primary.default} />
-														<Text size="xs" color="primary" style={{ marginLeft: 4 }}>Edited</Text>
-													</View>
-												)}
+												<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+													{page.isEdited && (
+														<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+															<Ionicons name="checkmark-circle" size={16} color={tokens.color.primary.default} />
+															<Text size="xs" color="primary" style={{ marginLeft: 4 }}>Edited</Text>
+														</View>
+													)}
+													<TouchableOpacity
+														onPress={() => {
+															setPageToRegenerate(page.pageNumber);
+															setRegenerationPrompt('');
+															setPageRegenerateModalVisible(true);
+														}}
+														style={{
+															padding: 4,
+															borderRadius: 4,
+															backgroundColor: 'rgba(124, 58, 237, 0.1)'
+														}}
+													>
+														<Ionicons name="refresh" size={14} color={tokens.color.primary.default} />
+													</TouchableOpacity>
+												</View>
 											</View>
 											<TextInput
 												value={page.text}
@@ -1072,7 +1678,7 @@ export default function StorybookScreen() {
 
 								<View style={{ flexDirection: 'row', gap: 12 }}>
 									<TouchableOpacity 
-										onPress={() => setStoryWizardStep('character-selection')}
+										onPress={() => setStoryWizardStep(conceptLearning.mode === 'advanced' ? 'advanced-options' : 'mode-selection')}
 										style={{ flex: 1, padding: 12, alignItems: 'center' }}
 									>
 										<Text style={{ color: tokens.color.text.secondary }}>Back</Text>
@@ -1080,9 +1686,15 @@ export default function StorybookScreen() {
 									<GradientButton 
 										title="Generate Images"
 										onPress={async () => {
-											// Generate story summary and context
-											const summary = `A learning story about ${conceptLearning.concept} for ${profile?.childName || 'a child'}`;
-											const imageContext = `Child-friendly illustrations for a story teaching ${conceptLearning.concept}`;
+											// Validate we have title and story pages
+											if (!conceptLearning.title || !conceptLearning.storyPages || conceptLearning.storyPages.length === 0) {
+												Alert.alert('Error', 'Please ensure you have a title and story pages before generating images.');
+												return;
+											}
+											
+											// Generate story summary and context from edited content
+											const summary = `${conceptLearning.title}: A learning story about ${conceptLearning.concept} for ${profile?.childName || 'a child'}`;
+											const imageContext = `Child-friendly Pixar-style illustrations for a story teaching ${conceptLearning.concept}`;
 											
 											setConceptLearning({
 												...conceptLearning,
@@ -1092,7 +1704,7 @@ export default function StorybookScreen() {
 											
 											setStoryWizardStep('review');
 											
-											// Create the actual story using the existing createStory function
+											// Create the actual story using edited content from wizard
 											const selectedCharacterNames = characters
 												.filter(char => conceptLearning.characterIds.includes(char.id))
 												.map(char => char.name);
@@ -1111,17 +1723,24 @@ export default function StorybookScreen() {
 											}
 											
 											try {
+												// Create story with the user-edited title and pages
 												await createStory({
-													title: `Learning About ${conceptLearning.concept}`,
+													title: conceptLearning.title, // Use the edited title
 													description: summary,
 													characterIds: conceptLearning.characterIds,
-													pageCount: conceptLearning.storyPages?.length || (conceptLearning.advanced?.pageCount || 5),
+													pageCount: conceptLearning.storyPages.length,
 													concept: conceptLearning.concept,
 													childProfile: childProfile,
-													advanced: conceptLearning.advanced
+													advanced: conceptLearning.advanced,
+													// Pass the edited story pages to preserve user changes
+													customStoryPages: conceptLearning.storyPages.map(page => page.text)
 												});
-												setStoryModalVisible(false);
-												setStoryViewerVisible(true);
+												
+												// Only update state if component is still mounted
+												if (isMounted.current) {
+													// Go to review step to show submission confirmation
+													setStoryWizardStep('review');
+												}
 											} catch (error) {
 												console.error('Failed to create story:', error);
 											}
@@ -1134,8 +1753,8 @@ export default function StorybookScreen() {
 
 						{storyWizardStep === 'review' && (
 							<>
-								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Story Complete!</Text>
-								<Text color="secondary" style={{ marginBottom: 20 }}>Your learning story has been created and is ready to view.</Text>
+								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Story Submitted!</Text>
+								<Text color="secondary" style={{ marginBottom: 20 }}>Your learning story is being created with custom illustrations. You can close this wizard and it will appear in your library when ready.</Text>
 								
 								<View style={{ 
 									backgroundColor: tokens.color.surface, 
@@ -1160,13 +1779,54 @@ export default function StorybookScreen() {
 									</Text>
 								</View>
 
-								<GradientButton 
-									title="View Your Story"
-									onPress={() => {
-										setStoryModalVisible(false);
-										// Story viewer will open automatically from the createStory success
-									}}
-								/>
+								<View style={{ flexDirection: 'row', gap: 12 }}>
+									<TouchableOpacity 
+										onPress={() => {
+											console.log('Close Wizard button pressed');
+											if (isMounted.current) {
+												setStoryModalVisible(false);
+												// Reset wizard state for next time
+												setStoryWizardStep('character-selection');
+												setConceptLearning({
+													concept: '',
+													includeChildAsCharacter: false,
+													mode: 'simple',
+													characterIds: []
+												});
+											}
+										}}
+										style={{ 
+											flex: 1, 
+											padding: 12, 
+											alignItems: 'center',
+											borderRadius: tokens.radius.md,
+											borderWidth: 1,
+											borderColor: tokens.color.border.default
+										}}
+									>
+										<Text style={{ color: tokens.color.text.secondary }}>Close Wizard</Text>
+									</TouchableOpacity>
+									<GradientButton 
+										title="Go to Library"
+										onPress={() => {
+											console.log('Go to Library button pressed');
+											if (isMounted.current) {
+												setStoryModalVisible(false);
+												// Switch to stories tab to see the generating story
+												setActiveTab('stories');
+												// Reset wizard state for next time
+												setStoryWizardStep('character-selection');
+												setConceptLearning({
+													concept: '',
+													includeChildAsCharacter: false,
+													mode: 'simple',
+													characterIds: []
+												});
+											}
+										}}
+										style={{ flex: 2 }}
+									/>
+								</View>
 							</>
 						)}
 					</View>
@@ -1177,7 +1837,6 @@ export default function StorybookScreen() {
 
 	const renderStoryViewerModal = () => {
 		const { width: screenWidth, height: screenHeight } = require('react-native').Dimensions.get('window');
-		const [currentPageIndex, setCurrentPageIndex] = useState(0);
 		
 		return (
 			<Modal visible={isStoryViewerVisible} animationType="slide">
@@ -1219,80 +1878,12 @@ export default function StorybookScreen() {
 								setCurrentPageIndex(index);
 							}}
 							renderItem={({ item, index }) => (
-								<View style={{ width: screenWidth, height: screenHeight, alignItems: 'center', justifyContent: 'center' }}>
-									{item.imageUrl ? (
-										<Image 
-											source={{ uri: item.imageUrl }} 
-											style={{ 
-												width: screenWidth, 
-												height: screenHeight,
-												resizeMode: 'cover'
-											}} 
-											onError={(error) => console.log('Image load error:', error)}
-										/>
-									) : (
-										<View style={{ 
-											width: screenWidth, 
-											height: screenHeight, 
-											backgroundColor: '#333', 
-											alignItems: 'center', 
-											justifyContent: 'center' 
-										}}>
-											<Ionicons name="image-outline" size={100} color="#666" />
-											<Text style={{ color: '#666', marginTop: 20 }}>No image available</Text>
-										</View>
-									)}
-									
-									{/* Refine Image Button */}
-									<TouchableOpacity 
-										onPress={() => { 
-											setPageToRefine(index); 
-											setRefinementPrompt(''); 
-											setRefineModalVisible(true); 
-										}} 
-										style={{ 
-											position: 'absolute', 
-											top: 120, 
-											right: 20, 
-											backgroundColor: 'rgba(0,0,0,0.7)', 
-											padding: 10, 
-											borderRadius: tokens.radius.lg, 
-											flexDirection: 'row', 
-											alignItems: 'center', 
-											gap: 8 
-										}}
-									>
-										<Ionicons name="color-wand" size={16} color="white" />
-										<Text style={{ color: 'white', fontSize: 12 }}>Refine Image</Text>
-									</TouchableOpacity>
-									
-									{/* Story Text Overlay */}
-									<LinearGradient
-										colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)']}
-										style={{ 
-											position: 'absolute', 
-											bottom: 0, 
-											left: 0, 
-											right: 0, 
-											paddingTop: 60,
-											paddingHorizontal: 40, 
-											paddingBottom: 60
-										}}
-									>
-										<Text style={{ 
-											color: 'white', 
-											fontSize: 18, 
-											textAlign: 'center',
-											lineHeight: 24,
-											fontWeight: '500',
-											textShadowColor: 'rgba(0,0,0,0.8)',
-											textShadowOffset: { width: 0, height: 1 },
-											textShadowRadius: 3
-										}}>
-											{item.text}
-										</Text>
-									</LinearGradient>
-								</View>
+								<StoryPageComponent 
+									item={item} 
+									index={index} 
+									screenWidth={screenWidth} 
+									screenHeight={screenHeight} 
+								/>
 							)}
 						/>
 					) : (
@@ -1309,7 +1900,7 @@ export default function StorybookScreen() {
 		<Modal visible={isRefineModalVisible} animationType="fade" transparent>
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
 				<View style={{ width: '90%', backgroundColor: 'white', borderRadius: tokens.radius.xl, padding: tokens.spacing.gap.lg }}>
-					<TouchableOpacity onPress={() => setRefineModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
+					<TouchableOpacity onPress={() => isMounted.current && setRefineModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
 						<Ionicons name="close-circle" size={24} color={tokens.color.text.secondary} />
 					</TouchableOpacity>
 					<Text size="h3" weight="bold" style={{ marginBottom: 8 }}>Refine Illustration</Text>
@@ -1330,8 +1921,10 @@ export default function StorybookScreen() {
 									if (currentStory && refinementPrompt.trim()) {
 										try {
 											await refineStoryImage(currentStory.id, pageToRefine, refinementPrompt.trim());
-											setRefineModalVisible(false);
-											setRefinementPrompt('');
+											if (isMounted.current) {
+												setRefineModalVisible(false);
+												setRefinementPrompt('');
+											}
 										} catch (error) {
 											console.error('Failed to refine image:', error);
 										}
@@ -1345,6 +1938,133 @@ export default function StorybookScreen() {
 		</Modal>
 	);
 
+	const renderRegenerateModal = () => (
+		<Modal visible={isRegenerateModalVisible} animationType="fade" transparent>
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
+				<View style={{ width: '90%', backgroundColor: 'white', borderRadius: tokens.radius.xl, padding: tokens.spacing.gap.lg }}>
+					<TouchableOpacity onPress={() => isMounted.current && setRegenerateModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
+						<Ionicons name="close-circle" size={24} color={tokens.color.text.secondary} />
+					</TouchableOpacity>
+					<Text size="h3" weight="bold" style={{ marginBottom: 8 }}>Regenerate Entire Story</Text>
+					<Text color="secondary" style={{ marginBottom: 16 }}>Provide specific instructions to improve the story or leave blank for a fresh version.</Text>
+					
+					<TextInput 
+						placeholder="e.g., 'Make it more exciting', 'Add more dialogue', 'Focus more on friendship'..." 
+						value={regenerationPrompt}
+						onChangeText={setRegenerationPrompt}
+						multiline
+						style={{ 
+							borderWidth: 1, 
+							borderColor: tokens.color.border.default, 
+							borderRadius: tokens.radius.md, 
+							padding: 12, 
+							height: 80,
+							marginBottom: 16,
+							textAlignVertical: 'top'
+						}} 
+					/>
+					
+					<View style={{ flexDirection: 'row', gap: 12 }}>
+						<TouchableOpacity 
+							onPress={() => setRegenerateModalVisible(false)}
+							style={{ 
+								flex: 1, 
+								padding: 12, 
+								alignItems: 'center',
+								borderRadius: tokens.radius.md,
+								borderWidth: 1,
+								borderColor: tokens.color.border.default
+							}}
+						>
+							<Text style={{ color: tokens.color.text.secondary }}>Cancel</Text>
+						</TouchableOpacity>
+						<GradientButton 
+							title={isRegenerating ? 'Regenerating...' : 'Regenerate Story'}
+							disabled={isRegenerating}
+							onPress={async () => {
+								await regenerateEntireStory(regenerationPrompt.trim() || undefined);
+								if (isMounted.current) {
+									setRegenerateModalVisible(false);
+									setRegenerationPrompt('');
+								}
+							}}
+							style={{ flex: 2 }}
+						/>
+					</View>
+				</View>
+			</View>
+		</Modal>
+	);
+
+	const renderPageRegenerateModal = () => (
+		<Modal visible={isPageRegenerateModalVisible} animationType="fade" transparent>
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
+				<View style={{ width: '90%', backgroundColor: 'white', borderRadius: tokens.radius.xl, padding: tokens.spacing.gap.lg }}>
+					<TouchableOpacity onPress={() => isMounted.current && setPageRegenerateModalVisible(false)} style={{ alignSelf: 'flex-end' }}>
+						<Ionicons name="close-circle" size={24} color={tokens.color.text.secondary} />
+					</TouchableOpacity>
+					<Text size="h3" weight="bold" style={{ marginBottom: 8 }}>Regenerate Page {pageToRegenerate}</Text>
+					<Text color="secondary" style={{ marginBottom: 16 }}>Provide specific instructions for this page or leave blank for a fresh version.</Text>
+					
+					{conceptLearning.storyPages && conceptLearning.storyPages[pageToRegenerate - 1] && (
+						<View style={{
+							backgroundColor: tokens.color.surface,
+							borderRadius: tokens.radius.md,
+							padding: 12,
+							marginBottom: 16
+						}}>
+							<Text size="sm" weight="semibold" style={{ marginBottom: 4 }}>Current Page {pageToRegenerate}:</Text>
+							<Text size="sm" color="secondary">{conceptLearning.storyPages[pageToRegenerate - 1].text}</Text>
+						</View>
+					)}
+					
+					<TextInput 
+						placeholder="e.g., 'Add more emotion', 'Include more action', 'Make it funnier'..." 
+						value={regenerationPrompt}
+						onChangeText={setRegenerationPrompt}
+						multiline
+						style={{ 
+							borderWidth: 1, 
+							borderColor: tokens.color.border.default, 
+							borderRadius: tokens.radius.md, 
+							padding: 12, 
+							height: 80,
+							marginBottom: 16,
+							textAlignVertical: 'top'
+						}} 
+					/>
+					
+					<View style={{ flexDirection: 'row', gap: 12 }}>
+						<TouchableOpacity 
+							onPress={() => setPageRegenerateModalVisible(false)}
+							style={{ 
+								flex: 1, 
+								padding: 12, 
+								alignItems: 'center',
+								borderRadius: tokens.radius.md,
+								borderWidth: 1,
+								borderColor: tokens.color.border.default
+							}}
+						>
+							<Text style={{ color: tokens.color.text.secondary }}>Cancel</Text>
+						</TouchableOpacity>
+						<GradientButton 
+							title={isRegenerating ? 'Regenerating...' : 'Regenerate Page'}
+							disabled={isRegenerating}
+							onPress={async () => {
+								await regenerateSinglePage(pageToRegenerate, regenerationPrompt.trim() || undefined);
+								if (isMounted.current) {
+									setPageRegenerateModalVisible(false);
+									setRegenerationPrompt('');
+								}
+							}}
+							style={{ flex: 2 }}
+						/>
+					</View>
+				</View>
+			</View>
+		</Modal>
+	);
 
 	return (
 		<LinearGradient
@@ -1365,6 +2085,9 @@ export default function StorybookScreen() {
 			{renderStoryCreationModal()}
 			{renderStoryViewerModal()}
 			{renderRefineModal()}
+			{renderRegenerateModal()}
+			{renderPageRegenerateModal()}
 		</LinearGradient>
 	);
 }
+

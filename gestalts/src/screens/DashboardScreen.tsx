@@ -1,23 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Animated, Image, StyleSheet } from 'react-native';
-import { Text, useTheme } from '../theme';
+import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Image, StyleSheet } from 'react-native';
+import { Text } from '../theme';
 import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../components/BottomNavigation';
+import { ProfileSetupNotification } from '../components/ProfileSetupNotification';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function DashboardScreen() {
-	const { tokens } = useTheme();
+	// const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
 	const navigation = useNavigation();
-	const profile = useMemoriesStore((s) => s.profile);
+	const { isUserOnboarded } = useAuth();
+	const currentProfile = useMemoriesStore((s) => s.currentProfile);
+	const profiles = useMemoriesStore((s) => s.profiles);
 	const journal = useMemoriesStore((s) => s.journal);
 	const milestones = useMemoriesStore((s) => s.milestones);
-	const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
+	// const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
+	
+	// Show notification if user is onboarded but has no child profiles
+	const shouldShowNotification = isUserOnboarded() && profiles.length === 0;
 	const screenWidth = Dimensions.get('window').width;
-	const scrollX = useRef(new Animated.Value(0)).current;
+	// const scrollX = useRef(new Animated.Value(0)).current;
 	const pulseAnim = useRef(new Animated.Value(1)).current;
 
 	// Pulse animation for mic button
@@ -110,15 +117,10 @@ export default function DashboardScreen() {
 		}
 	];
 
-	const [showProfileMenu, setShowProfileMenu] = useState(false);
-	const profileMenuAnim = useRef(new Animated.Value(0)).current;
 	const [showAddMenu, setShowAddMenu] = useState(false);
+	const [showProfileMenu, setShowProfileMenu] = useState(false);
 	const addMenuAnim = useRef(new Animated.Value(0)).current;
-
-	const profileMenuOptions = [
-		{ title: 'Child Profile', icon: 'person-outline', navigateTo: 'ChildProfile' },
-		{ title: 'Settings', icon: 'settings-outline', navigateTo: 'MyProfile' }
-	];
+	const profileMenuAnim = useRef(new Animated.Value(0)).current;
 
 	const addMenuOptions = [
 		{ title: 'Journal', icon: 'create-outline', navigateTo: 'AddJournal' },
@@ -126,23 +128,13 @@ export default function DashboardScreen() {
 		{ title: 'Note', icon: 'calendar-outline', navigateTo: 'AddAppointmentNote' }
 	];
 
-	const toggleProfileMenu = () => {
-		if (showProfileMenu) {
-			Animated.timing(profileMenuAnim, {
-				toValue: 0,
-				duration: 200,
-				useNativeDriver: true,
-			}).start(() => setShowProfileMenu(false));
-		} else {
-			if (showAddMenu) toggleAddMenu();
-			setShowProfileMenu(true);
-			Animated.timing(profileMenuAnim, {
-				toValue: 1,
-				duration: 200,
-				useNativeDriver: true,
-			}).start();
-		}
-	};
+	const profileMenuOptions = [
+		{ title: 'My Profile', icon: 'person-outline', navigateTo: 'Profile' },
+		{ title: 'Children Profiles', icon: 'people-outline', navigateTo: 'ChildProfilesList' },
+		{ title: 'Specialist Profiles', icon: 'medical-outline', navigateTo: 'SpecialistProfiles' }
+	];
+
+
 
 	const toggleAddMenu = () => {
 		if (showAddMenu) {
@@ -152,9 +144,25 @@ export default function DashboardScreen() {
 				useNativeDriver: true,
 			}).start(() => setShowAddMenu(false));
 		} else {
-			if (showProfileMenu) toggleProfileMenu();
 			setShowAddMenu(true);
 			Animated.timing(addMenuAnim, {
+				toValue: 1,
+				duration: 200,
+				useNativeDriver: true,
+			}).start();
+		}
+	};
+
+	const toggleProfileMenu = () => {
+		if (showProfileMenu) {
+			Animated.timing(profileMenuAnim, {
+				toValue: 0,
+				duration: 200,
+				useNativeDriver: true,
+			}).start(() => setShowProfileMenu(false));
+		} else {
+			setShowProfileMenu(true);
+			Animated.timing(profileMenuAnim, {
 				toValue: 1,
 				duration: 200,
 				useNativeDriver: true,
@@ -180,85 +188,81 @@ export default function DashboardScreen() {
 				style={StyleSheet.absoluteFillObject}
 			/>
 
-			<SafeAreaView style={{ flex: 1 }}>
+			<View style={{ flex: 1, paddingTop: 60 }}>
 				<ScrollView 
 					style={{ flex: 1 }}
 					contentContainerStyle={{ paddingBottom: 100 }}
 					showsVerticalScrollIndicator={false}
 				>
-					{/* Minimal Header with Glass Effect */}
+					{/* Header with Logo and Menu */}
 					<View style={{ 
-						flexDirection: 'row',
-						alignItems: 'center',
-						justifyContent: 'space-between',
 						paddingHorizontal: 20,
 						paddingTop: 10,
 						paddingBottom: 10
 					}}>
-						<TouchableOpacity onPress={openDrawer}>
-							<View style={{
-								width: 44,
-								height: 44,
-								borderRadius: 22,
-								backgroundColor: 'rgba(255,255,255,0.15)',
-								borderWidth: 1,
-								borderColor: 'rgba(255,255,255,0.3)',
-								alignItems: 'center',
-								justifyContent: 'center'
-							}}>
+						{/* Top row with hamburger menu and logo */}
+						<View style={{
+							flexDirection: 'row',
+							alignItems: 'center',
+							justifyContent: 'space-between',
+							marginBottom: 10
+						}}>
+							<TouchableOpacity onPress={openDrawer}>
 								<Ionicons name="menu" size={24} color="white" />
+							</TouchableOpacity>
+							
+							{/* Centered Logo */}
+							<View style={{ flex: 1, alignItems: 'center' }}>
+								<Image 
+									source={require('../../assets/Gestalts-logo.png')} 
+									style={{ 
+										width: 80, 
+										height: 80, 
+										resizeMode: 'contain',
+										tintColor: 'white'
+									}} 
+								/>
 							</View>
-						</TouchableOpacity>
-
-						<TouchableOpacity onPress={toggleProfileMenu}>
-							<View style={{
-								width: 44,
-								height: 44,
-								borderRadius: 22,
-								backgroundColor: 'rgba(255,255,255,0.15)',
-								borderWidth: 1,
-								borderColor: 'rgba(255,255,255,0.3)',
-								alignItems: 'center',
-								justifyContent: 'center',
-								overflow: 'hidden'
-							}}>
-								<Text style={{ 
-									color: 'white', 
-									fontWeight: '700',
-									fontSize: 18
-								}}>
-									{profile?.parentName?.charAt(0)?.toUpperCase() || 'P'}
-								</Text>
-							</View>
-						</TouchableOpacity>
+							
+							{/* Spacer to balance the hamburger menu */}
+							<View style={{ width: 24 }} />
+						</View>
 					</View>
 
-					{/* Bold Welcome */}
+					{/* Welcome Section - Reimplemented */}
 				<View style={{ 
+					marginTop: 20,
 					paddingHorizontal: 20,
-					paddingTop: 20,
-					paddingBottom: 30
+					paddingVertical: 0,
+					paddingBottom: 60,
+					minHeight: 100
 				}}>
-					<Text style={{ 
-						fontSize: 38,
-						fontWeight: '800',
-						color: 'white',
-						letterSpacing: -1,
-						textShadowColor: 'rgba(0,0,0,0.2)',
-						textShadowOffset: { width: 0, height: 2 },
-						textShadowRadius: 4
-					}}>
-						Hey {profile?.parentName?.split(' ')[0] || 'there'}!
-					</Text>
+					<View style={{ marginBottom: 16 }}>
+						<Text style={{ 
+							fontSize: 38,
+							fontWeight: '800',
+							color: 'white',
+							letterSpacing: -1,
+							textShadowColor: 'rgba(0,0,0,0.2)',
+							textShadowOffset: { width: 0, height: 2 },
+							textShadowRadius: 4,
+							lineHeight: 44
+						}}>
+							Hey {currentProfile?.parentName?.split(' ')[0] || 'there'}!
+						</Text>
+					</View>
 					<Text style={{
 						fontSize: 18,
 						color: 'rgba(255,255,255,0.95)',
 						fontWeight: '500',
-						marginTop: 4
+						lineHeight: 22
 					}}>
-						{profile?.childName || 'Your child'}'s journey
+						How can I help with {currentProfile?.childName || 'your child'}'s development today?
 					</Text>
 				</View>
+
+				{/* Profile Setup Notification */}
+				<ProfileSetupNotification show={shouldShowNotification} />
 
 				{/* AI Coach Cards - Liquid Glass Design */}
 				<View style={{ paddingBottom: 30 }}>
@@ -615,7 +619,7 @@ export default function DashboardScreen() {
 					</View>
 				</View>
 				</ScrollView>
-			</SafeAreaView>
+			</View>
 
 			{/* Floating Mic Button - Light Gray Liquid Glass with Purple Icon */}
 			<Animated.View style={{ 
@@ -777,82 +781,6 @@ export default function DashboardScreen() {
 				</>
 			)}
 
-			{/* Profile Menu - Glass Design */}
-			{showProfileMenu && profileMenuAnim && (
-				<>
-					<Animated.View
-						style={{
-							position: 'absolute',
-							top: 0,
-							left: 0,
-							right: 0,
-							bottom: 0,
-							backgroundColor: 'rgba(0,0,0,0.4)',
-							opacity: profileMenuAnim
-						}}
-					>
-						<TouchableOpacity 
-							style={{ flex: 1 }}
-							onPress={toggleProfileMenu}
-							activeOpacity={1}
-						/>
-					</Animated.View>
-					
-					<Animated.View
-						style={{
-							position: 'absolute',
-							top: 100,
-							right: 20,
-							backgroundColor: 'rgba(255,255,255,0.95)',
-							borderRadius: 16,
-							shadowColor: '#000',
-							shadowOffset: { width: 0, height: 4 },
-							shadowOpacity: 0.15,
-							shadowRadius: 12,
-							elevation: 10,
-							minWidth: 160,
-							opacity: profileMenuAnim,
-							transform: [{
-								scale: profileMenuAnim.interpolate({
-									inputRange: [0, 1],
-									outputRange: [0.9, 1],
-								})
-							}]
-						}}
-					>
-						{profileMenuOptions.map((option, index) => (
-							<TouchableOpacity
-								key={index}
-								onPress={() => {
-									(navigation as any).navigate(option.navigateTo);
-									toggleProfileMenu();
-								}}
-								style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									padding: 16,
-									borderBottomWidth: index !== profileMenuOptions.length - 1 ? 1 : 0,
-									borderBottomColor: 'rgba(124,58,237,0.1)'
-								}}
-							>
-								<Ionicons 
-									name={option.icon as any} 
-									size={20} 
-									color="#7C3AED"
-									style={{ marginRight: 12 }}
-								/>
-								<Text style={{
-									fontSize: 14,
-									color: '#374151',
-									fontWeight: '500'
-								}}>
-									{option.title}
-								</Text>
-							</TouchableOpacity>
-						))}
-					</Animated.View>
-				</>
-			)}
 		</View>
 	);
 }
