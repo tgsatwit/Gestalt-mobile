@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "630723947096",
+    "project_id": "gestalts-mobile",
+    "storage_bucket": "gestalts-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:630723947096:android:6c564c1d9213c07375b82d",
+        "android_client_info": {
+          "package_name": "com.anonymous.gestalts"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACgFoLyTsEcxlE8odn36LjdhtdEW1ht34"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

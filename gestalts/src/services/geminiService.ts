@@ -39,15 +39,6 @@ const getGeminiApiKey = (): string => {
   
   if (!apiKey || apiKey === 'undefined' || apiKey.includes('${')) {
     console.error('❌ Gemini API key not found in any source');
-    
-    // For development, let's try a hardcoded approach as fallback
-    // This is not recommended for production but helps with development
-    const hardcodedKey = 'AIzaSyBWthPCLGAKUDVhZmEzY8Y76cfS2V7Y4FA'; // From your .env file
-    if (hardcodedKey) {
-      console.warn('⚠️ Using hardcoded API key for development');
-      return hardcodedKey;
-    }
-    
     throw new Error('Gemini API key not configured. Please ensure GEMINI_API_KEY is in your .env file and restart the app');
   }
   

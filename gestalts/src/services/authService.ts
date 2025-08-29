@@ -1,15 +1,19 @@
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  User as FirebaseUser,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
   updateProfile,
+  User,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-import { OAuthProvider, signInWithCredential } from 'firebase/auth';
 import { getFirebaseServices } from './firebaseConfig';
 
 export interface UserProfile {
@@ -36,22 +40,21 @@ export interface SignInData {
 }
 
 class AuthService {
-  private auth: any;
-  private db: any;
   
   constructor() {
-    const { auth, db } = getFirebaseServices();
-    this.auth = auth;
-    this.db = db;
+    // Firebase services will be accessed via getFirebaseServices()
   }
 
   // Sign up with email and password
   async signUpWithEmail(signUpData: SignUpData): Promise<UserProfile> {
     try {
+      const { auth, db } = getFirebaseServices();
+      if (!auth || !db) throw new Error('Firebase not initialized');
+      
       const { email, password, firstName, lastName, displayName } = signUpData;
       
       // Create Firebase user
-      const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       // Update Firebase Auth profile
@@ -81,8 +84,11 @@ class AuthService {
   // Sign in with email and password
   async signInWithEmail(signInData: SignInData): Promise<UserProfile> {
     try {
+      const { auth } = getFirebaseServices();
+      if (!auth) throw new Error('Firebase not initialized');
+      
       const { email, password } = signInData;
-      const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
       // Get user profile from Firestore
@@ -114,15 +120,14 @@ class AuthService {
         nonce: hashedNonce,
       });
 
-      // Create Firebase credential
-      const provider = new OAuthProvider('apple.com');
-      const credential = provider.credential({
-        idToken: appleCredential.identityToken!,
-        rawNonce: rawNonce,
-      });
+      // Create Firebase credential and sign in
+      const appleCredentialForFirebase = auth.AppleAuthProvider.credential(
+        appleCredential.identityToken!,
+        rawNonce
+      );
 
       // Sign in to Firebase
-      const userCredential = await signInWithCredential(this.auth, credential);
+      const userCredential = await auth().signInWithCredential(appleCredentialForFirebase);
       const user = userCredential.user;
 
       // Check if user profile exists
@@ -160,10 +165,12 @@ class AuthService {
   // Create user profile in Firestore
   private async createUserProfile(userProfile: UserProfile): Promise<void> {
     try {
-      const userDoc = doc(this.db, 'users', userProfile.id);
-      await setDoc(userDoc, {
+      const { db } = getFirebaseServices();
+      if (!db) throw new Error('Firestore not initialized');
+      
+      await setDoc(doc(db, 'users', userProfile.id), {
         ...userProfile,
-        signUpDate: serverTimestamp(), // Use server timestamp for consistency
+        signUpDate: serverTimestamp(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -176,11 +183,13 @@ class AuthService {
   // Get user profile from Firestore
   private async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
-      const userDoc = doc(this.db, 'users', userId);
-      const docSnap = await getDoc(userDoc);
+      const { db } = getFirebaseServices();
+      if (!db) throw new Error('Firestore not initialized');
+      
+      const docSnap = await getDoc(doc(db, 'users', userId));
       
       if (docSnap.exists()) {
-        const data = docSnap.data();
+        const data = docSnap.data()!;
         return {
           id: data.id,
           email: data.email,
@@ -201,7 +210,10 @@ class AuthService {
   // Sign out
   async signOutUser(): Promise<void> {
     try {
-      await signOut(this.auth);
+      const { auth } = getFirebaseServices();
+      if (!auth) throw new Error('Firebase not initialized');
+      
+      await signOut(auth);
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;
@@ -209,13 +221,17 @@ class AuthService {
   }
 
   // Get current user
-  getCurrentUser(): FirebaseUser | null {
-    return this.auth.currentUser;
+  getCurrentUser(): User | null {
+    const { auth } = getFirebaseServices();
+    return auth?.currentUser || null;
   }
 
   // Listen to auth state changes
-  onAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
-    return onAuthStateChanged(this.auth, callback);
+  onAuthStateChanged(callback: (user: User | null) => void) {
+    const { auth } = getFirebaseServices();
+    if (!auth) return () => {};
+    
+    return onAuthStateChanged(auth, callback);
   }
 
   // Check if Apple Sign In is available
