@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyBKbyX8olzmv6F7WcYy3bXXGbTGcny2IXA</string>
+	<string>AIzaSyACgFoLyTsEcxlE8odn36LjdhtdEW1ht34</string>
 	<key>GCM_SENDER_ID</key>
 	<string>630723947096</string>
 	<key>PLIST_VERSION</key>
@@ -15,16 +15,18 @@
 	<key>STORAGE_BUCKET</key>
 	<string>gestalts-mobile.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
-	<false></false>
+	<false/>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
+	<false/>
 	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>IS_GCM_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:630723947096:ios:34f39e2aa6b0781375b82d</string>
+	<string>1:630723947096:ios:6c564c1d9213c07375b82d</string>
+	<key>DATABASE_URL</key>
+	<string></string>
 </dict>
 </plist>

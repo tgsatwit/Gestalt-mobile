@@ -5,13 +5,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
+import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
+import auth from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function AddMilestoneScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
-	const { addMilestone, currentProfile } = useMemoriesStore((s) => ({ addMilestone: s.addMilestone, currentProfile: s.currentProfile }));
+	const { currentProfile } = useMemoriesStore((s) => ({ currentProfile: s.currentProfile }));
+	const { addMilestone } = useFirebaseMemoriesStore();
 	
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
@@ -26,10 +29,8 @@ export default function AddMilestoneScreen() {
 	const [selectedChild, setSelectedChild] = useState<string>('');
 	const [showChildrenDropdown, setShowChildrenDropdown] = useState(false);
 	
-	// For now, simulate multiple children - in the future this would come from store
-	const availableChildren = profile ? [profile.childName] : [];
-	// Simulate multiple children for testing (uncomment this line to test multi-child layout)
-	// const availableChildren = profile ? [profile.childName, 'Emma', 'Alex'] : [];
+	// Get available children from current profile
+	const availableChildren = currentProfile ? [currentProfile.name] : [];
 
 	const milestoneCategories = [
 		{ name: 'First Words', icon: 'chatbubble', color: '#7C3AED' },
@@ -49,12 +50,30 @@ export default function AddMilestoneScreen() {
 		'Initiated conversation'
 	];
 
-	const handleSave = () => {
+	const handleSave = async () => {
 		if (!title.trim()) return;
-		// Use the selected date when saving the milestone
-		// Note: The current store doesn't support childName for milestones, but we're preparing for future enhancement
-		addMilestone(title.trim(), selectedDate.toISOString(), description.trim() || undefined);
-		navigation.goBack();
+		
+		// Check authentication
+		const currentUser = auth().currentUser;
+		if (!currentUser) {
+			alert('Please sign in to save milestones');
+			return;
+		}
+		
+		try {
+			// Save to Firebase
+			await addMilestone(
+				title.trim(),
+				selectedDate.toISOString(),
+				description.trim() || undefined,
+				selectedChild || undefined,
+				currentProfile?.id
+			);
+			navigation.goBack();
+		} catch (error) {
+			console.error('Failed to save milestone:', error);
+			alert('Failed to save milestone. Please try again.');
+		}
 	};
 
 	// Initialize selected child when component mounts

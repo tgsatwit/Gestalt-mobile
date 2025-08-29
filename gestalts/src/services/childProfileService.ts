@@ -1,50 +1,23 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where,
-  orderBy,
-  Timestamp
-} from 'firebase/firestore';
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import { getFirebaseServices } from './firebaseConfig';
 import { ChildProfile, CreateChildProfileData, UpdateChildProfileData } from '../types/profile';
 
 class ChildProfileService {
-  private db: any = null;
-  private initialized: boolean = false;
-
-  constructor() {
-    this.initialize();
-  }
-
-  private initialize() {
-    const services = getFirebaseServices();
-    this.db = services.db;
-    this.initialized = services.initialized;
-  }
-
-  private checkInitialized() {
-    if (!this.initialized || !this.db) {
-      this.initialize();
-      if (!this.initialized || !this.db) {
-        throw new Error('Firebase service not initialized. Please configure Firebase.');
-      }
-    }
+  /**
+   * Check if Firebase is properly configured and initialized
+   */
+  isConfigured(): boolean {
+    const { initialized } = getFirebaseServices();
+    return initialized;
   }
 
   /**
    * Create a new child profile
    */
   async createProfile(userId: string, profileData: CreateChildProfileData): Promise<string> {
-    this.checkInitialized();
-
     try {
-      const profileId = doc(collection(this.db!, 'childProfiles')).id;
+      const profileRef = firestore().collection('childProfiles').doc();
+      const profileId = profileRef.id;
       const now = new Date();
       
       // Filter out undefined values from profile data
@@ -60,11 +33,10 @@ class ChildProfileService {
         updatedAt: now
       };
 
-      const profileRef = doc(this.db!, 'childProfiles', profileId);
-      await setDoc(profileRef, {
+      await profileRef.set({
         ...profile,
-        createdAt: Timestamp.fromDate(now),
-        updatedAt: Timestamp.fromDate(now)
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp()
       });
 
       return profileId;
@@ -78,13 +50,11 @@ class ChildProfileService {
    * Get a specific child profile by ID
    */
   async getProfile(profileId: string): Promise<ChildProfile | null> {
-    this.checkInitialized();
-
     try {
-      const profileRef = doc(this.db!, 'childProfiles', profileId);
-      const profileDoc = await getDoc(profileRef);
+      const profileRef = firestore().collection('childProfiles').doc(profileId);
+      const profileDoc = await profileRef.get();
 
-      if (!profileDoc.exists()) {
+      if (!profileDoc.exists) {
         return null;
       }
 
@@ -92,8 +62,8 @@ class ChildProfileService {
       return {
         ...data,
         id: profileDoc.id,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        createdAt: data?.createdAt?.toDate(),
+        updatedAt: data?.updatedAt?.toDate()
       } as ChildProfile;
     } catch (error) {
       console.error('Failed to get child profile:', error);
@@ -105,23 +75,21 @@ class ChildProfileService {
    * Get all child profiles for a specific user
    */
   async getUserProfiles(userId: string): Promise<ChildProfile[]> {
-    this.checkInitialized();
-
     try {
-      const profilesRef = collection(this.db!, 'childProfiles');
-      const q = query(
-        profilesRef, 
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
+      const query = firestore().collection('childProfiles')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc');
+      const snapshot = await query.get();
 
-      return snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        createdAt: doc.data().createdAt.toDate(),
-        updatedAt: doc.data().updatedAt.toDate()
-      } as ChildProfile));
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate()
+        } as ChildProfile;
+      });
     } catch (error) {
       console.error('Failed to get user profiles:', error);
       throw error;
@@ -132,10 +100,8 @@ class ChildProfileService {
    * Update a child profile
    */
   async updateProfile(profileId: string, userId: string, updates: UpdateChildProfileData): Promise<void> {
-    this.checkInitialized();
-
     try {
-      const profileRef = doc(this.db!, 'childProfiles', profileId);
+      const profileRef = firestore().collection('childProfiles').doc(profileId);
       
       // First check if profile exists and belongs to user
       const existingProfile = await this.getProfile(profileId);
@@ -152,9 +118,9 @@ class ChildProfileService {
         Object.entries(updates).filter(([_, value]) => value !== undefined)
       );
 
-      await updateDoc(profileRef, {
+      await profileRef.update({
         ...cleanUpdates,
-        updatedAt: Timestamp.fromDate(new Date())
+        updatedAt: firestore.FieldValue.serverTimestamp()
       });
     } catch (error) {
       console.error('Failed to update child profile:', error);
@@ -166,8 +132,6 @@ class ChildProfileService {
    * Delete a child profile
    */
   async deleteProfile(profileId: string, userId: string): Promise<void> {
-    this.checkInitialized();
-
     try {
       // First check if profile exists and belongs to user
       const existingProfile = await this.getProfile(profileId);
@@ -179,19 +143,12 @@ class ChildProfileService {
         throw new Error('Unauthorized: Profile does not belong to this user');
       }
 
-      const profileRef = doc(this.db!, 'childProfiles', profileId);
-      await deleteDoc(profileRef);
+      const profileRef = firestore().collection('childProfiles').doc(profileId);
+      await profileRef.delete();
     } catch (error) {
       console.error('Failed to delete child profile:', error);
       throw error;
     }
-  }
-
-  /**
-   * Check if Firebase is properly configured and initialized
-   */
-  isConfigured(): boolean {
-    return this.initialized;
   }
 }
 

@@ -22,12 +22,11 @@ export interface AgentConfig {
 const getEnvVar = (key: string, fallback: string = '') => {
   const extra = Constants.expoConfig?.extra || {};
   
-  // Direct values since we know they work from API testing
   const envMap: Record<string, string> = {
-    'ELEVENLABS_API_KEY': 'sk_85547fd02516d6dd30b819b6fed5708ae70521dfc774769b',
-    'LANGUAGE_COACH_AGENT_ID': 'va8wh90V9tqH3TSuqEky',
-    'PARENT_SUPPORT_AGENT_ID': 'Vh2JDkXXbSsD2sFbm9XG', 
-    'CHILD_MODE_AGENT_ID': 'O9hZSxrfAjdWixrZTfk3'
+    'ELEVENLABS_API_KEY': extra.elevenLabsApiKey || 'your-api-key-here',
+    'LANGUAGE_COACH_AGENT_ID': extra.languageCoachAgentId || 'lang-coach-agent-id',
+    'PARENT_SUPPORT_AGENT_ID': extra.parentSupportAgentId || 'parent-support-agent-id', 
+    'CHILD_MODE_AGENT_ID': extra.childModeAgentId || 'child-mode-agent-id'
   };
   
   return envMap[key] || fallback;

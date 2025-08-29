@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User as FirebaseUser } from 'firebase/auth';
+import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import authService, { UserProfile, SignUpData, SignInData } from '../services/authService';
 
 interface AuthContextType {
   user: UserProfile | null;
-  firebaseUser: FirebaseUser | null;
+  firebaseUser: FirebaseAuthTypes.User | null;
   loading: boolean;
   isAuthenticated: boolean;
   signUp: (signUpData: SignUpData) => Promise<void>;
@@ -18,7 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAppleSignInAvailable, setIsAppleSignInAvailable] = useState(false);
 
@@ -61,15 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
     try {
-      // This is a private method call, so we'll need to modify the AuthService
-      // For now, we'll implement a simple version here
-      const { db } = require('../services/firebaseConfig').getFirebaseServices();
-      const { doc, getDoc } = require('firebase/firestore');
+      const firestore = require('@react-native-firebase/firestore').default;
       
-      const userDoc = doc(db, 'users', userId);
-      const docSnap = await getDoc(userDoc);
+      const docSnap = await firestore().collection('users').doc(userId).get();
       
-      if (docSnap.exists()) {
+      if (docSnap.exists) {
         const data = docSnap.data();
         return {
           id: data.id,

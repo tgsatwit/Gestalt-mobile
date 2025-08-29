@@ -19,6 +19,18 @@ service cloud.firestore {
              request.resource.data.displayName is string;
     }
     
+    // Validate that required string fields are present and not empty
+    function hasValidString(field) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() > 0;
+    }
+    
+    // Validate that userId matches authenticated user
+    function isValidUserId() {
+      return request.resource.data.userId == request.auth.uid;
+    }
+    
+    
     // Users can read and write their own profile
     match /users/{userId} {
       allow read, write: if isOwner(userId);
@@ -50,19 +62,70 @@ service cloud.firestore {
                      request.auth.uid == request.resource.data.userId;
     }
     
-    // Users can read and write their own journals/milestones
+    // Users can read and write their own journals
     match /journals/{journalId} {
-      allow read, write: if isAuthenticated() && 
-                           request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
       allow create: if isAuthenticated() && 
-                     request.auth.uid == request.resource.data.userId;
+                     isValidUserId() &&
+                     hasValidString('content') &&
+                     hasValidString('createdAtISO') &&
+                     request.resource.data.keys().hasAll(['userId', 'content', 'createdAtISO']);
     }
     
+    // Users can read and write their own milestones
     match /milestones/{milestoneId} {
-      allow read, write: if isAuthenticated() && 
-                           request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
       allow create: if isAuthenticated() && 
-                     request.auth.uid == request.resource.data.userId;
+                     isValidUserId() &&
+                     hasValidString('title') &&
+                     hasValidString('dateISO') &&
+                     request.resource.data.keys().hasAll(['userId', 'title', 'dateISO']);
+    }
+    
+    // Users can read and write their own appointment notes
+    match /appointmentNotes/{noteId} {
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && 
+                     isValidUserId() &&
+                     hasValidString('question') &&
+                     hasValidString('createdAtISO') &&
+                     request.resource.data.keys().hasAll(['userId', 'question', 'createdAtISO']);
+    }
+    
+    // Users can read and write their own gestalts
+    match /gestalts/{gestaltId} {
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && 
+                     isValidUserId() &&
+                     hasValidString('phrase') &&
+                     hasValidString('source') &&
+                     hasValidString('stage') &&
+                     request.resource.data.keys().hasAll(['userId', 'phrase', 'source', 'stage']);
+    }
+    
+    // Users can read and write their own play sessions
+    match /playSessions/{sessionId} {
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && 
+                     isValidUserId() &&
+                     hasValidString('activity') &&
+                     hasValidString('createdAtISO') &&
+                     request.resource.data.keys().hasAll(['userId', 'activity', 'createdAtISO']);
     }
     
     // Users can read and write their own characters (for storybook)

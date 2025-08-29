@@ -5,13 +5,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
+import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
+import auth from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../components/BottomNavigation';
 
 export default function AddJournalScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
-	const { addJournal, currentProfile } = useMemoriesStore((s) => ({ addJournal: s.addJournal, currentProfile: s.currentProfile }));
+	const { currentProfile } = useMemoriesStore((s) => ({ currentProfile: s.currentProfile }));
+	const { addJournalEntry } = useFirebaseMemoriesStore();
 	
 	const [entry, setEntry] = useState('');
 	const [mood, setMood] = useState<'good' | 'neutral' | 'tough' | null>(null);
@@ -28,10 +31,8 @@ export default function AddJournalScreen() {
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date>(new Date());
 	
-	// For now, simulate multiple children - in the future this would come from store
-	const availableChildren = profile ? [profile.childName] : [];
-	// Simulate multiple children for testing (uncomment this line to test multi-child layout)
-	// const availableChildren = profile ? [profile.childName, 'Emma', 'Alex'] : [];
+	// Get available children from current profile
+	const availableChildren = currentProfile ? [currentProfile.name] : [];
 
 	const moods = [
 		{ type: 'good' as const, icon: 'happy', color: '#10B981', label: 'Good Day' },
@@ -44,12 +45,34 @@ export default function AddJournalScreen() {
 		'communication', 'play', 'social', 'sensory', 'school'
 	];
 
-	const handleSave = () => {
+	const handleSave = async () => {
 		if (!entry.trim()) return;
+		
+		// Check authentication
+		const currentUser = auth().currentUser;
+		if (!currentUser) {
+			alert('Please sign in to save journal entries');
+			return;
+		}
+		
 		const childName = journalType === 'child' ? selectedChild : undefined;
-		// Use the selected date when saving the journal entry
-		addJournal(entry.trim(), mood || undefined, journalType, childName, selectedDate.toISOString());
-		navigation.goBack();
+		const childProfileId = journalType === 'child' && currentProfile ? currentProfile.id : undefined;
+		
+		try {
+			// Save to Firebase
+			await addJournalEntry(
+				entry,
+				mood || undefined,
+				journalType,
+				childName,
+				childProfileId,
+				selectedDate.toISOString()
+			);
+			navigation.goBack();
+		} catch (error) {
+			console.error('Failed to save journal entry:', error);
+			alert('Failed to save journal entry. Please try again.');
+		}
 	};
 
 	// Calendar helper functions

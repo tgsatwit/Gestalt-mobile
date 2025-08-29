@@ -10,24 +10,8 @@ import {
   AvatarGenerationRequest
 } from '../types/storybook';
 import { getFirebaseServices } from '../services/firebaseConfig';
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  orderBy, 
-  Timestamp,
-  getDoc 
-} from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL, 
-  deleteObject 
-} from 'firebase/storage';
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+// import storage from '@react-native-firebase/storage';
 import geminiService from '../services/geminiService';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -82,39 +66,37 @@ const getUserId = () => {
 
 // Helper to upload image to Firebase Storage
 const uploadImageToStorage = async (imageUri: string, path: string): Promise<string> => {
-  const { storage, initialized } = getFirebaseServices();
-  if (!initialized || !storage) {
+  const { initialized } = getFirebaseServices();
+  if (!initialized) {
     throw new Error('Firebase Storage not initialized');
   }
 
-  // Read image as blob
-  const response = await fetch(imageUri);
-  const blob = await response.blob();
+  // TODO: Implement with React Native Firebase Storage when needed
+  // const storage = require('@react-native-firebase/storage').default;
+  // const storageRef = storage().ref(path);
+  // const snapshot = await storageRef.putFile(imageUri);
+  // const downloadURL = await storageRef.getDownloadURL();
   
-  // Create storage reference
-  const storageRef = ref(storage, path);
-  
-  // Upload file
-  const snapshot = await uploadBytes(storageRef, blob);
-  
-  // Get download URL
-  const downloadURL = await getDownloadURL(snapshot.ref);
-  return downloadURL;
+  console.log('Firebase Storage upload not implemented yet:', path);
+  return imageUri; // Return original URI as placeholder
 };
 
 // Helper to delete image from Firebase Storage
 const deleteImageFromStorage = async (imageUrl: string) => {
-  const { storage, initialized } = getFirebaseServices();
-  if (!initialized || !storage) return;
+  const { initialized } = getFirebaseServices();
+  if (!initialized) return;
 
   try {
-    // Extract path from URL
-    const pathMatch = imageUrl.match(/\/o\/(.+?)\?/);
-    if (pathMatch) {
-      const path = decodeURIComponent(pathMatch[1]);
-      const storageRef = ref(storage, path);
-      await deleteObject(storageRef);
-    }
+    // TODO: Implement with React Native Firebase Storage when needed
+    // const storage = require('@react-native-firebase/storage').default;
+    // const pathMatch = imageUrl.match(/\/o\/(.+?)\?/);
+    // if (pathMatch) {
+    //   const path = decodeURIComponent(pathMatch[1]);
+    //   const storageRef = storage().ref(path);
+    //   await storageRef.delete();
+    // }
+    
+    console.log('Firebase Storage delete not implemented yet:', imageUrl);
   } catch (error) {
     console.warn('Failed to delete image from storage:', error);
   }
@@ -133,16 +115,15 @@ export const useStorybookStore = create<StorybookState>()(
       // Load characters from Firebase
       loadCharacters: async () => {
         try {
-          const { db, initialized } = getFirebaseServices();
-          if (!initialized || !db) {
+          const { initialized } = getFirebaseServices();
+          if (!initialized) {
             console.log('Firebase not initialized, skipping character load');
             return;
           }
 
           const userId = getUserId();
-          const charactersRef = collection(db, 'users', userId, 'characters');
-          const q = query(charactersRef, orderBy('createdAt', 'desc'));
-          const snapshot = await getDocs(q);
+          const query = firestore().collection('users').doc(userId).collection('characters').orderBy('createdAt', 'desc');
+          const snapshot = await query.get();
           
           const characters: Character[] = [];
           snapshot.forEach((doc) => {
@@ -222,8 +203,8 @@ export const useStorybookStore = create<StorybookState>()(
 
           // Upload to Firebase Storage if configured, otherwise use generated URL
           let finalAvatarUrl = avatarUrl;
-          const { storage, initialized } = getFirebaseServices();
-          if (initialized && storage) {
+          const { initialized } = getFirebaseServices();
+          if (initialized) {
             try {
               const userId = getUserId();
               const timestamp = Date.now();
@@ -247,14 +228,14 @@ export const useStorybookStore = create<StorybookState>()(
 
           // Save to Firebase Firestore
           const firebaseDb = getFirebaseServices();
-          if (firebaseDb.initialized && firebaseDb.db) {
+          if (firebaseDb.initialized) {
             const userId = getUserId();
-            const charactersRef = collection(firebaseDb.db, 'users', userId, 'characters');
-            await addDoc(charactersRef, {
+            const charactersRef = firestore().collection('users').doc(userId).collection('characters');
+            await charactersRef.add({
               name: character.name,
               avatarUrl: character.avatarUrl,
-              createdAt: Timestamp.fromDate(character.createdAt),
-              updatedAt: Timestamp.fromDate(character.updatedAt)
+              createdAt: firestore.FieldValue.serverTimestamp(),
+              updatedAt: firestore.FieldValue.serverTimestamp()
             });
           }
 
@@ -290,8 +271,8 @@ export const useStorybookStore = create<StorybookState>()(
       // Delete a character
       deleteCharacter: async (characterId: string) => {
         try {
-          const { db, initialized } = getFirebaseServices();
-          if (initialized && db) {
+          const { initialized } = getFirebaseServices();
+          if (initialized) {
             // Get character to find avatar URL for deletion
             const character = get().characters.find(c => c.id === characterId);
             if (character?.avatarUrl) {
@@ -300,8 +281,8 @@ export const useStorybookStore = create<StorybookState>()(
             
             // Delete from Firestore
             const userId = getUserId();
-            const characterDoc = doc(db, 'users', userId, 'characters', characterId);
-            await deleteDoc(characterDoc);
+            const characterDoc = firestore().collection('users').doc(userId).collection('characters').doc(characterId);
+            await characterDoc.delete();
           }
           
           set(state => ({
@@ -316,16 +297,15 @@ export const useStorybookStore = create<StorybookState>()(
       // Load stories from Firebase
       loadStories: async () => {
         try {
-          const { db, initialized } = getFirebaseServices();
-          if (!initialized || !db) {
+          const { initialized } = getFirebaseServices();
+          if (!initialized) {
             console.log('Firebase not initialized, skipping stories load');
             return;
           }
 
           const userId = getUserId();
-          const storiesRef = collection(db, 'users', userId, 'stories');
-          const q = query(storiesRef, orderBy('createdAt', 'desc'));
-          const snapshot = await getDocs(q);
+          const query = firestore().collection('users').doc(userId).collection('stories').orderBy('createdAt', 'desc');
+          const snapshot = await query.get();
           
           const stories: Story[] = [];
           snapshot.forEach((doc) => {
@@ -507,8 +487,8 @@ export const useStorybookStore = create<StorybookState>()(
 
             // Upload to Firebase Storage if configured, otherwise use generated URL
             let finalImageUrl = imageUrl;
-            const { storage, initialized } = getFirebaseServices();
-            if (initialized && storage) {
+            const { initialized } = getFirebaseServices();
+            if (initialized) {
               try {
                 const userId = getUserId();
                 const path = `users/${userId}/stories/${story.id}/page_${i + 1}.jpg`;
@@ -534,9 +514,9 @@ export const useStorybookStore = create<StorybookState>()(
 
           // Save to Firebase Firestore
           const firebaseStoryDb = getFirebaseServices();
-          if (firebaseStoryDb.initialized && firebaseStoryDb.db) {
+          if (firebaseStoryDb.initialized) {
             const userId = getUserId();
-            const storiesRef = collection(firebaseStoryDb.db, 'users', userId, 'stories');
+            const storiesRef = firestore().collection('users').doc(userId).collection('stories');
             // Filter out undefined values for Firestore
             const storyData: any = {
               title: story.title,
@@ -546,8 +526,8 @@ export const useStorybookStore = create<StorybookState>()(
               pages: story.pages,
               status: story.status,
               generationProgress: story.generationProgress,
-              createdAt: Timestamp.fromDate(story.createdAt),
-              updatedAt: Timestamp.fromDate(story.updatedAt)
+              createdAt: firestore.FieldValue.serverTimestamp(),
+              updatedAt: firestore.FieldValue.serverTimestamp()
             };
             
             // Only add optional fields if they have values
@@ -558,7 +538,7 @@ export const useStorybookStore = create<StorybookState>()(
             if (story.mode) storyData.mode = story.mode;
             if (story.goal) storyData.goal = story.goal;
             
-            await addDoc(storiesRef, storyData);
+            await storiesRef.add(storyData);
           }
 
           // Update local state
@@ -596,8 +576,8 @@ export const useStorybookStore = create<StorybookState>()(
       // Delete a story
       deleteStory: async (storyId: string) => {
         try {
-          const { db, initialized } = getFirebaseServices();
-          if (initialized && db) {
+          const { initialized } = getFirebaseServices();
+          if (initialized) {
             // Get story to find image URLs for deletion
             const story = get().stories.find(s => s.id === storyId);
             if (story) {
@@ -615,8 +595,8 @@ export const useStorybookStore = create<StorybookState>()(
             
             // Delete from Firestore
             const userId = getUserId();
-            const storyDoc = doc(db, 'users', userId, 'stories', storyId);
-            await deleteDoc(storyDoc);
+            const storyDoc = firestore().collection('users').doc(userId).collection('stories').doc(storyId);
+            await storyDoc.delete();
           }
           
           set(state => ({
@@ -656,8 +636,8 @@ export const useStorybookStore = create<StorybookState>()(
           // Upload refined image to Firebase Storage if configured
           let finalImageUrl = refinedImageUrl;
           if (refinedImageUrl !== page.imageUrl) {
-            const { storage, initialized } = getFirebaseServices();
-            if (initialized && storage) {
+            const { initialized } = getFirebaseServices();
+            if (initialized) {
               try {
                 const userId = getUserId();
                 const path = `users/${userId}/stories/${storyId}/page_${pageIndex + 1}_refined_${Date.now()}.jpg`;
@@ -680,12 +660,12 @@ export const useStorybookStore = create<StorybookState>()(
 
           // Save to Firebase Firestore
           const firebaseRefineDb = getFirebaseServices();
-          if (firebaseRefineDb.initialized && firebaseRefineDb.db) {
+          if (firebaseRefineDb.initialized) {
             const userId = getUserId();
-            const storyDoc = doc(firebaseRefineDb.db, 'users', userId, 'stories', storyId);
-            await updateDoc(storyDoc, {
+            const storyDoc = firestore().collection('users').doc(userId).collection('stories').doc(storyId);
+            await storyDoc.update({
               pages: updatedStory.pages,
-              updatedAt: Timestamp.fromDate(updatedStory.updatedAt)
+              updatedAt: firestore.FieldValue.serverTimestamp()
             });
           }
 

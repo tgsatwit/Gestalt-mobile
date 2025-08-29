@@ -30,7 +30,7 @@ export default ({config}) => ({
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourteam.gestalts",
+      "bundleIdentifier": "com.timgillam.gestalts",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for AI voice interactions."
       }
@@ -56,6 +56,8 @@ export default ({config}) => ({
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      "expo-apple-authentication"
+    ]
   }
 });
