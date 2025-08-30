@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   gestaltsBrandText: {
     fontSize: 24,
     fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     color: 'white',
     marginBottom: 24,
   },
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   taglineRegular: {
     color: 'white',
     fontWeight: '500',
-    fontFamily: 'PlusJakartaSans_500SemiBold',
+    fontFamily: 'PlusJakartaSans-Medium',
   },
   segmentedControl: {
     flexDirection: 'row',

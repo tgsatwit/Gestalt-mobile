@@ -31,8 +31,15 @@ export const initializeFirebase = () => {
       firebaseApp = getApp();
     }
 
-    // Initialize Auth with persistence
-    auth = getAuth(firebaseApp);
+    // Initialize Auth with AsyncStorage persistence
+    try {
+      auth = initializeAuth(firebaseApp, {
+        persistence: getReactNativePersistence(AsyncStorage)
+      });
+    } catch (error) {
+      // If auth is already initialized, get the existing instance
+      auth = getAuth(firebaseApp);
+    }
     
     // Initialize Firestore
     db = getFirestore(firebaseApp);

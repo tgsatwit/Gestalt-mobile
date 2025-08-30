@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DrawerProvider } from './SimpleDrawer';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -138,7 +139,12 @@ export default function MainNavigator() {
       initialRouteName="Dashboard"
       screenOptions={{ 
         headerShown: false,
-        gestureEnabled: true
+        gestureEnabled: true,
+        // Fix for iOS pointer events issue with react-native-screens
+        ...(Platform.OS === 'ios' && {
+          headerTransparent: true,
+          headerBackTitleVisible: false,
+        })
       }}
     >
       {/* Main Navigation Screens */}

@@ -45,11 +45,24 @@
       <false/>
       <key>NSAllowsLocalNetworking</key>
       <true/>
+      <key>NSExceptionDomains</key>
+      <dict>
+        <key>localhost</key>
+        <dict>
+          <key>NSExceptionAllowsInsecureHTTPLoads</key>
+          <true/>
+        </dict>
+      </dict>
     </dict>
     <key>NSCameraUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app uses the microphone to record audio for AI voice interactions.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>audio</string>
+      <string>voip</string>
+    </array>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your photos</string>
     <key>UILaunchStoryboardName</key>
