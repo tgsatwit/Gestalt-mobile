@@ -16,13 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
 import { useAuth } from '../contexts/AuthContext';
-import * as AppleAuthentication from 'expo-apple-authentication';
 
 type AuthTab = 'signin' | 'signup';
 
 export default function AuthScreen() {
   const { tokens } = useTheme();
-  const { signUp, signIn, signInWithApple, loading, isAppleSignInAvailable } = useAuth();
+  const { signUp, signIn, loading } = useAuth();
   
   const [activeTab, setActiveTab] = useState<AuthTab>('signin');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,7 +36,6 @@ export default function AuthScreen() {
   const [signUpData, setSignUpData] = useState({
     firstName: '',
     lastName: '',
-    displayName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -63,9 +61,9 @@ export default function AuthScreen() {
   };
 
   const handleSignUp = async () => {
-    const { firstName, lastName, displayName, email, password, confirmPassword } = signUpData;
+    const { firstName, lastName, email, password, confirmPassword } = signUpData;
     
-    if (!firstName || !lastName || !displayName || !email || !password) {
+    if (!firstName || !lastName || !email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -85,7 +83,7 @@ export default function AuthScreen() {
       await signUp({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        displayName: displayName.trim(),
+        displayName: firstName.trim(), // Use first name as display name
         email: email.trim().toLowerCase(),
         password: password,
       });
@@ -96,48 +94,30 @@ export default function AuthScreen() {
     }
   };
 
-  const handleAppleSignIn = async () => {
-    try {
-      setIsSubmitting(true);
-      await signInWithApple();
-    } catch (error: any) {
-      if (error.message !== 'Apple sign-in was cancelled') {
-        Alert.alert('Apple Sign In Failed', error.message);
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
       {/* Logo */}
       <Image
         source={require('../../assets/Gestalts-logo.png')}
-        style={styles.logo}
+        style={[styles.logo, { tintColor: 'white' }]}
         resizeMode="contain"
       />
+      
+      {/* Gestalts Text */}
+      <Text style={styles.gestaltsBrandText}>Gestalts</Text>
       
       {/* Tagline */}
       <View style={styles.taglineContainer}>
         <Text style={[styles.taglineText, styles.taglineRegular]}>
-          Helping your{' '}
-        </Text>
-        <Text style={[styles.taglineText, styles.taglineScript, styles.gradientText]}>
-          love
-        </Text>
-        <Text style={[styles.taglineText, styles.taglineRegular]}>
-          {' '}become{' '}
-        </Text>
-        <Text style={[styles.taglineText, styles.taglineScript, styles.gradientText]}>
-          language
+          Helping your love become language
         </Text>
       </View>
     </View>
   );
 
   const renderSegmentedControl = () => (
-    <View style={[styles.segmentedControl, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+    <View style={styles.segmentedControl}>
       <TouchableOpacity 
         onPress={() => setActiveTab('signin')}
         style={[
@@ -175,42 +155,14 @@ export default function AuthScreen() {
     </View>
   );
 
-  const renderAppleSignInButton = () => {
-    if (!isAppleSignInAvailable) return null;
 
-    return (
-      <TouchableOpacity
-        onPress={handleAppleSignIn}
-        disabled={isSubmitting || loading}
-        style={styles.appleButton}
-      >
-        <Ionicons name="logo-apple" size={20} color="white" />
-        <Text style={styles.appleButtonText}>Continue with Apple</Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderDivider = () => (
-    <View style={styles.dividerContainer}>
-      <View style={styles.dividerLine} />
-      <Text style={styles.dividerText}>or</Text>
-      <View style={styles.dividerLine} />
-    </View>
-  );
 
   const renderSignInForm = () => (
     <View style={styles.formContainer}>
-      <Text size="h2" weight="bold" style={styles.formTitle}>Welcome Back</Text>
-      <Text color="secondary" style={styles.formSubtitle}>
+      <Text weight="bold" style={styles.formTitle}>Welcome Back</Text>
+      <Text style={styles.formSubtitle}>
         Sign in to continue your journey
       </Text>
-
-      {isAppleSignInAvailable && (
-        <>
-          {renderAppleSignInButton()}
-          {renderDivider()}
-        </>
-      )}
 
       <View style={styles.inputContainer}>
         <Text style={styles.inputLabel}>Email Address</Text>
@@ -247,17 +199,10 @@ export default function AuthScreen() {
 
   const renderSignUpForm = () => (
     <View style={styles.formContainer}>
-      <Text size="h2" weight="bold" style={styles.formTitle}>Create Account</Text>
-      <Text color="secondary" style={styles.formSubtitle}>
+      <Text weight="bold" style={styles.formTitle}>Create Account</Text>
+      <Text style={styles.formSubtitle}>
         Join our community and start your language journey
       </Text>
-
-      {isAppleSignInAvailable && (
-        <>
-          {renderAppleSignInButton()}
-          {renderDivider()}
-        </>
-      )}
 
       <View style={styles.nameInputsContainer}>
         <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
@@ -281,17 +226,6 @@ export default function AuthScreen() {
             autoCapitalize="words"
           />
         </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Display Name</Text>
-        <TextInput
-          style={styles.textInput}
-          value={signUpData.displayName}
-          onChangeText={(text) => setSignUpData({ ...signUpData, displayName: text })}
-          placeholder="How should we call you?"
-          autoCapitalize="words"
-        />
       </View>
 
       <View style={styles.inputContainer}>
@@ -357,8 +291,7 @@ export default function AuthScreen() {
       colors={['#7C3AED', '#EC4899', '#FB923C']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
+      style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -401,14 +334,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   headerContainer: {
-    paddingTop: 80,
+    paddingTop: 60,
     paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingBottom: 24,
     alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
   logo: {
-    height: 60,
-    width: 200,
+    height: 80,
+    width: 240,
+    marginBottom: 0,
+  },
+  gestaltsBrandText: {
+    fontSize: 24,
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: 'white',
     marginBottom: 24,
   },
   taglineContainer: {
@@ -417,6 +359,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'baseline',
     paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   taglineText: {
     fontSize: 24,
@@ -425,31 +369,28 @@ const styles = StyleSheet.create({
   },
   taglineRegular: {
     color: 'white',
-    fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-  },
-  taglineScript: {
-    fontSize: 28,
-    fontFamily: 'OoohBaby_400Regular',
-  },
-  gradientText: {
-    color: '#FFD700', // Fallback color for gradient text
+    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans_500SemiBold',
   },
   segmentedControl: {
     flexDirection: 'row',
-    marginHorizontal: 24,
-    borderRadius: 12,
-    padding: 4,
+    marginHorizontal: 60,
+    borderRadius: 8,
+    padding: 2,
     marginBottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   segmentButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
     alignItems: 'center',
   },
   segmentButtonText: {
     textAlign: 'center',
+    fontSize: 14,
   },
   contentContainer: {
     flex: 1,
@@ -457,6 +398,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   formContainer: {
     paddingHorizontal: 24,
@@ -464,44 +410,15 @@ const styles = StyleSheet.create({
   },
   formTitle: {
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     color: '#1F2937',
+    fontSize: 24,
   },
   formSubtitle: {
     textAlign: 'center',
-    marginBottom: 32,
-    fontSize: 16,
-  },
-  appleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
     marginBottom: 24,
-  },
-  appleButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#6B7280',
     fontSize: 14,
+    color: '#6B7280',
   },
   inputContainer: {
     marginBottom: 20,
@@ -511,18 +428,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   textInput: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 14,
     backgroundColor: '#F9FAFB',
     color: '#1F2937',
   },

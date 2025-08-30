@@ -2,14 +2,12 @@ import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 import MainNavigator from './MainNavigator';
-import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import { useMemoriesStore } from '../state/useStore';
 import { useAuth } from '../contexts/AuthContext';
 
 export type RootStackParamList = {
 	Auth: undefined;
-	Onboarding: undefined;
 	Main: undefined;
 };
 
@@ -62,13 +60,9 @@ export default function RootNavigator() {
 		);
 	}
 	
-	// User is authenticated - check if they need onboarding
-	const shouldShowOnboarding = profiles.length === 0;
-	const initialRouteName = shouldShowOnboarding ? 'Onboarding' : 'Main';
-	
+	// User is authenticated - go directly to Main
 	return (
-		<Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
-			<Stack.Screen name="Onboarding" component={OnboardingScreen} />
+		<Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Main">
 			<Stack.Screen name="Main" component={MainNavigator} />
 		</Stack.Navigator>
 	);

@@ -14,15 +14,14 @@ export default function DashboardScreen() {
 	// const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
 	const navigation = useNavigation();
-	const { isUserOnboarded } = useAuth();
 	const currentProfile = useMemoriesStore((s) => s.currentProfile);
 	const profiles = useMemoriesStore((s) => s.profiles);
 	const journal = useMemoriesStore((s) => s.journal);
 	const milestones = useMemoriesStore((s) => s.milestones);
 	// const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
 	
-	// Show notification if user is onboarded but has no child profiles
-	const shouldShowNotification = isUserOnboarded() && profiles.length === 0;
+	// Show notification if user has no child profiles
+	const shouldShowNotification = profiles.length === 0;
 	const screenWidth = Dimensions.get('window').width;
 	// const scrollX = useRef(new Animated.Value(0)).current;
 	const pulseAnim = useRef(new Animated.Value(1)).current;

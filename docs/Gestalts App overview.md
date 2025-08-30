@@ -87,8 +87,9 @@ The **Gestalt Language Coach** offers a streamlined set of features that enhance
 
 **Journey Steps**:
 
-1. **Onboarding and Profile Setup**:
-   - The primary parent signs up and creates a minimal but essential child profile with key information
+1. **Authentication and Profile Setup**:
+   - The primary parent signs up or logs in through the authentication screen
+   - They can create child profiles through the main navigation to access personalized features
    - They learn about the three AI Coach modes and how to use each effectively
 
 2. **Daily AI Coach Interactions**:

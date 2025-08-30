@@ -51,5 +51,5 @@ export const getFirebaseServices = () => {
   if (!initialized) {
     return initializeFirebase();
   }
-  return { app, db, auth, initialized };
+  return { app: firebaseApp, db, auth, initialized };
 };

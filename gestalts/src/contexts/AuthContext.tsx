@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from 'firebase/auth';
 import authService, { UserProfile, SignUpData, SignInData } from '../services/authService';
+import { getFirebaseServices } from '../services/firebaseConfig';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -29,10 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen to Firebase auth state changes
     const unsubscribe = authService.onAuthStateChanged(async (firebaseUser) => {
       setFirebaseUser(firebaseUser);
-      
       if (firebaseUser) {
         try {
-          // Get user profile from Firestore
           const userProfile = await getUserProfileFromFirestore(firebaseUser.uid);
           setUser(userProfile);
         } catch (error) {
@@ -42,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
       }
-      
       setLoading(false);
     });
 
@@ -61,26 +59,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
     try {
-      // TODO: Replace with Firebase Web SDK
-      // const firestore = require('@react-native-firebase/firestore').default;
-      // const docSnap = await firestore().collection('users').doc(userId).get();
-      
-      // For now, return a mock user profile
-      const docSnap = { exists: false, data: () => null };
-      
-      if (docSnap.exists) {
-        const data = docSnap.data();
-        return {
-          id: data.id,
-          email: data.email,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          displayName: data.displayName,
-          signUpDate: data.signUpDate?.toDate() || new Date(),
-          provider: data.provider
-        };
-      }
-      return null;
+      const { db } = getFirebaseServices();
+      if (!db) return null;
+      const { getDoc, doc, Timestamp } = await import('firebase/firestore');
+      const snap = await getDoc(doc(db, 'users', userId));
+      if (!snap.exists()) return null;
+      const data: any = snap.data();
+      return {
+        id: data.id ?? userId,
+        email: data.email ?? '',
+        firstName: data.firstName ?? '',
+        lastName: data.lastName ?? '',
+        displayName: data.displayName ?? '',
+        signUpDate: data.signUpDate?.toDate?.() ?? new Date(),
+        provider: data.provider ?? 'email',
+      };
     } catch (error) {
       console.error('Error getting user profile from Firestore:', error);
       return null;
@@ -140,7 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isAuthenticated = !loading && !!user && !!firebaseUser;
+  // Consider authenticated if Firebase has a current user
+  const isAuthenticated = !loading && !!firebaseUser;
 
   return (
     <AuthContext.Provider value={{
