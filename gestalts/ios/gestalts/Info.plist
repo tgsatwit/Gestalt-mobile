@@ -29,7 +29,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.timgillam.gestalts</string>
+          <string>com.tg.gestalts</string>
         </array>
       </dict>
     </array>

@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.gestalts'
+    namespace 'com.tgsatwit.gestalts'
     defaultConfig {
-        applicationId 'com.anonymous.gestalts'
+        applicationId 'com.tgsatwit.gestalts'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

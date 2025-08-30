@@ -25,7 +25,7 @@ npm run android # or npm run web
 ## Structure
 - `src/theme`: tokens and provider
 - `src/state`: persisted store for Memories and profile
-- `src/screens`: Onboarding, Coach, Memories, Play, Report
+- `src/screens`: Auth, Dashboard, Coach, Memories, Play, Report
 - `src/components`: GradientButton, AppHeader
 - `src/navigation`: Root stack and tabs
 

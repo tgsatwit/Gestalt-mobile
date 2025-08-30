@@ -34,7 +34,7 @@ npm run web      # Web browser
 
 ### Key Directories
 - `gestalts/` - Main app directory containing all source code
-- `gestalts/src/screens/` - Five main screens: Onboarding, Coach, Memories, Play, Report
+- `gestalts/src/screens/` - Main screens: Auth, Coach, Memories, Play, Report, Dashboard
 - `gestalts/src/state/` - Zustand store for persisted app state (memories, profile)
 - `gestalts/src/theme/` - Design tokens and theme provider
 - `gestalts/src/navigation/` - Navigation structure with tabs and stack
@@ -57,9 +57,8 @@ npm run web      # Web browser
 - Action methods for adding new entries
 
 **Navigation Flow**: 
-- Onboarding → Tabs (if no profile exists)
-- Direct to Tabs (if profile exists)
-- Tab navigation between Coach, Memories, Play, and Report screens
+- Auth (Login/Signup) → Main Navigation
+- Tab navigation between Dashboard, Coach, Memories, Play, and Report screens
 
 ## Important Considerations
 
