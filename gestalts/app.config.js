@@ -4,6 +4,7 @@ export default ({config}) => ({
   "expo": {
     "name": "gestalts",
     "slug": "gestalts",
+    "owner": "tgsatwit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,6 +15,9 @@ export default ({config}) => ({
       "parentSupportAgentId": process.env.PARENT_SUPPORT_AGENT_ID,
       "childModeAgentId": process.env.CHILD_MODE_AGENT_ID,
       "geminiApiKey": process.env.GEMINI_API_KEY,
+      "eas": {
+        "projectId": "d01362c3-ba19-4747-9150-6c91b96fea0f"
+      },
       "firebase": {
         "apiKey": process.env.FIREBASE_API_KEY,
         "authDomain": process.env.FIREBASE_AUTH_DOMAIN,
@@ -30,7 +34,7 @@ export default ({config}) => ({
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.timgillam.gestalts",
+      "bundleIdentifier": "com.tg.gestalts",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for AI voice interactions."
       }
@@ -41,7 +45,7 @@ export default ({config}) => ({
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.gestalts",
+      "package": "com.tgsatwit.gestalts",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_NETWORK_STATE",

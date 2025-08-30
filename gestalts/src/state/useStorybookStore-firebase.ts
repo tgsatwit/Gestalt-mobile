@@ -10,7 +10,7 @@ import {
   AvatarGenerationRequest
 } from '../types/storybook';
 import { getFirebaseServices } from '../services/firebaseConfig';
-import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+// import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 // import storage from '@react-native-firebase/storage';
 import geminiService from '../services/geminiService';
 import * as ImagePicker from 'expo-image-picker';
@@ -122,8 +122,10 @@ export const useStorybookStore = create<StorybookState>()(
           }
 
           const userId = getUserId();
-          const query = firestore().collection('users').doc(userId).collection('characters').orderBy('createdAt', 'desc');
-          const snapshot = await query.get();
+          // TODO: Replace with Firebase Web SDK
+          // const query = firestore().collection('users').doc(userId).collection('characters').orderBy('createdAt', 'desc');
+          // const snapshot = await query.get();
+          const snapshot = { docs: [] };
           
           const characters: Character[] = [];
           snapshot.forEach((doc) => {

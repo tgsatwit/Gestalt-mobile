@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import { BottomNavigation } from '../components/BottomNavigation';
-import auth from '@react-native-firebase/auth';
+import { getAuth } from 'firebase/auth';
 
 type MemoryTab = 'journal' | 'milestones' | 'appointments' | 'gestalts';
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
@@ -81,7 +81,8 @@ export default function MemoriesScreenFirebase() {
 	
 	// Load memories from Firebase on mount
 	useEffect(() => {
-		const currentUser = auth().currentUser;
+		const auth = getAuth();
+		const currentUser = auth.currentUser;
 		if (currentUser) {
 			loadAllMemories(currentProfile?.id).finally(() => {
 				setIsInitialLoad(false);
@@ -331,7 +332,8 @@ export default function MemoriesScreenFirebase() {
 	};
 	
 	// Check authentication
-	const currentUser = auth().currentUser;
+	const auth = getAuth();
+	const currentUser = auth.currentUser;
 	if (!currentUser) {
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
