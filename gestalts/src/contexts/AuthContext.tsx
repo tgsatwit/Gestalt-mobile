@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { User } from 'firebase/auth';
 import authService, { UserProfile, SignUpData, SignInData } from '../services/authService';
 
 interface AuthContextType {
   user: UserProfile | null;
-  firebaseUser: FirebaseAuthTypes.User | null;
+  firebaseUser: User | null;
   loading: boolean;
   isAuthenticated: boolean;
   signUp: (signUpData: SignUpData) => Promise<void>;
@@ -18,7 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAppleSignInAvailable, setIsAppleSignInAvailable] = useState(false);
 
@@ -61,9 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
     try {
-      const firestore = require('@react-native-firebase/firestore').default;
+      // TODO: Replace with Firebase Web SDK
+      // const firestore = require('@react-native-firebase/firestore').default;
+      // const docSnap = await firestore().collection('users').doc(userId).get();
       
-      const docSnap = await firestore().collection('users').doc(userId).get();
+      // For now, return a mock user profile
+      const docSnap = { exists: false, data: () => null };
       
       if (docSnap.exists) {
         const data = docSnap.data();

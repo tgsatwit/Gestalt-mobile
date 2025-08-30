@@ -3,22 +3,26 @@
     "name": "gestalts",
     "slug": "gestalts",
     "version": "1.0.0",
+    "owner": "tgsatwit",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "extra": {
-      "elevenLabsApiKey": "${ELEVENLABS_API_KEY}",
-      "languageCoachAgentId": "${LANGUAGE_COACH_AGENT_ID}",
-      "parentSupportAgentId": "${PARENT_SUPPORT_AGENT_ID}",
-      "childModeAgentId": "${CHILD_MODE_AGENT_ID}",
-      "geminiApiKey": "${GEMINI_API_KEY}",
+      "elevenLabsApiKey": "sk_85547fd02516d6dd30b819b6fed5708ae70521dfc774769b",
+      "languageCoachAgentId": "va8wh90V9tqH3TSuqEky",
+      "parentSupportAgentId": "Vh2JDkXXbSsD2sFbm9XG",
+      "childModeAgentId": "O9hZSxrfAjdWixrZTfk3",
+      "geminiApiKey": "AIzaSyBWthPCLGAKUDVhZmEzY8Y76cfS2V7Y4FA",
       "firebase": {
-        "apiKey": "${FIREBASE_API_KEY}",
-        "authDomain": "${FIREBASE_AUTH_DOMAIN}",
-        "projectId": "${FIREBASE_PROJECT_ID}",
-        "storageBucket": "${FIREBASE_STORAGE_BUCKET}",
-        "messagingSenderId": "${FIREBASE_MESSAGING_SENDER_ID}",
-        "appId": "${FIREBASE_APP_ID}"
+        "apiKey": "AIzaSyACgFoLyTsEcxlE8odn36LjdhtdEW1ht34",
+        "authDomain": "gestalts-mobile.firebaseapp.com",
+        "projectId": "gestalts-mobile",
+        "storageBucket": "gestalts-mobile.firebasestorage.app",
+        "messagingSenderId": "630723947096",
+        "appId": "1:630723947096:web:6c564c1d9213c07375b82d"
+      },
+      "eas": {
+        "projectId": "d01362c3-ba19-4747-9150-6c91b96fea0f"
       }
     },
     "splash": {
@@ -28,7 +32,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.gestalts",
+      "bundleIdentifier": "com.tgsatwit.gestalts",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for AI voice interactions."
       }
@@ -39,7 +43,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.gestalts",
+      "package": "com.tgsatwit.gestalts",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_NETWORK_STATE",

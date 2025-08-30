@@ -1,6 +1,6 @@
 import { initializeFirebase } from '../services/firebaseConfig';
 import memoriesService from '../services/memoriesService';
-import auth from '@react-native-firebase/auth';
+import { getAuth } from 'firebase/auth';
 
 export const testFirebaseIntegration = async () => {
   console.log('🔥 Testing Firebase Integration...');
@@ -15,7 +15,8 @@ export const testFirebaseIntegration = async () => {
     console.log('✅ Memories service configured:', isConfigured);
     
     // Test 3: Check auth status
-    const currentUser = auth().currentUser;
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
     console.log('👤 Current user:', currentUser ? 'Authenticated' : 'Not authenticated');
     console.log('👤 User ID:', currentUser?.uid || 'None');
     

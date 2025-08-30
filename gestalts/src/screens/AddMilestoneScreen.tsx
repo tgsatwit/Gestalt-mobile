@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
 import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
-import auth from '@react-native-firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../components/BottomNavigation';
 
@@ -54,7 +54,8 @@ export default function AddMilestoneScreen() {
 		if (!title.trim()) return;
 		
 		// Check authentication
-		const currentUser = auth().currentUser;
+		const auth = getAuth();
+		const currentUser = auth.currentUser;
 		if (!currentUser) {
 			alert('Please sign in to save milestones');
 			return;
