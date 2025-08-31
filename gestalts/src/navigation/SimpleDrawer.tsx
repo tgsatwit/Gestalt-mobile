@@ -99,7 +99,7 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
     {
       name: 'Memories',
       label: 'Memories',
-      icon: 'albums',
+      icon: 'albums-outline',
       iconColor: '#7C3AED',
       count: journal.length + milestones.length + appointmentNotes.length
     },
@@ -113,13 +113,13 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
     {
       name: 'Storybook',
       label: 'Storybook',
-      icon: 'book',
+      icon: 'book-outline',
       iconColor: '#7C3AED'
     },
     {
       name: 'Report',
       label: 'Reports',
-      icon: 'document-text',
+      icon: 'bar-chart',
       iconColor: '#7C3AED'
     }
   ];

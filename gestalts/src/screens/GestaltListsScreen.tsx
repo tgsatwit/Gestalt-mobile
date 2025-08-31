@@ -331,51 +331,7 @@ export default function GestaltListsScreen() {
 			</ScrollView>
 		</View>
 
-		{/* Center Microphone Button */}
-		<TouchableOpacity style={{ 
-			position: 'absolute',
-			bottom: 42,
-			left: '50%',
-			marginLeft: -32,
-			zIndex: 1000
-		}}>
-			<View style={{
-				width: 64,
-				height: 64,
-				borderRadius: 32,
-				overflow: 'hidden',
-				shadowColor: tokens.color.brand.gradient.start,
-				shadowOffset: { width: 0, height: 8 },
-				shadowOpacity: 0.5,
-				shadowRadius: 16,
-				elevation: 12
-			}}>
-				<LinearGradient
-					colors={['#4C1D95', '#5B21B6', '#6D28D9', '#7C3AED']}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 1 }}
-					style={{
-						width: '100%',
-						height: '100%',
-						alignItems: 'center',
-						justifyContent: 'center'
-					}}
-				>
-					{/* Glass overlay for mic button */}
-					<View style={{
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						height: '50%',
-						backgroundColor: 'rgba(255,255,255,0.2)',
-						borderRadius: 28
-					}} />
-					
-					<Ionicons name="mic" size={28} color="white" style={{ zIndex: 1 }} />
-				</LinearGradient>
-			</View>
-		</TouchableOpacity>
+
 
 		<BottomNavigation />
 	</LinearGradient>

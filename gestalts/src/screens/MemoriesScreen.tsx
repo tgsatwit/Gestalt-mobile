@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
+import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../components/BottomNavigation';
 
 type MemoryTab = 'journal' | 'milestones' | 'appointments' | 'gestalts';
@@ -175,8 +175,8 @@ export default function MemoriesScreen() {
 	] as const;
 
 	const tabs = [
-		{ key: 'journal', label: 'Journal', icon: 'journal-outline', count: journal.length },
-		{ key: 'milestones', label: 'Milestones', icon: 'flag-outline', count: milestones.length },
+		{ key: 'journal', label: 'Journal', icon: 'create-outline', count: journal.length },
+		{ key: 'milestones', label: 'Milestones', icon: 'trophy', count: milestones.length },
 		{ key: 'appointments', label: 'Appointments', icon: 'calendar-outline', count: appointmentNotes.length },
 		{ key: 'gestalts', label: 'Gestalts', icon: 'list-outline', count: gestalts.length }
 	] as const;
@@ -871,7 +871,7 @@ export default function MemoriesScreen() {
 									marginBottom: tokens.spacing.gap.lg
 								}}
 							>
-								<Ionicons name="add-circle" size={20} color={tokens.color.brand.gradient.start} />
+								<Ionicons name="create-outline" size={20} color={tokens.color.brand.gradient.start} />
 								<Text style={{
 									marginLeft: tokens.spacing.gap.sm,
 									fontSize: tokens.font.size.body,
@@ -897,8 +897,8 @@ export default function MemoriesScreen() {
 										elevation: 1
 									}}>
 										<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: tokens.spacing.gap.sm }}>
-											<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-												<Ionicons name="journal-outline" size={16} color={tokens.color.brand.gradient.start} />
+																					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+											<Ionicons name="create-outline" size={16} color={tokens.color.brand.gradient.start} />
 												<Text style={{
 													fontSize: tokens.font.size.small,
 													color: tokens.color.text.secondary,
@@ -956,7 +956,7 @@ export default function MemoriesScreen() {
 									padding: tokens.spacing.gap.lg * 1.5,
 									alignItems: 'center'
 								}}>
-									<Ionicons name="journal-outline" size={48} color={tokens.color.text.secondary} />
+									<Ionicons name="create-outline" size={48} color={tokens.color.text.secondary} />
 									<Text style={{
 										fontSize: tokens.font.size.body,
 										color: tokens.color.text.secondary,
