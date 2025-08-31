@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Image, StyleSheet } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Image, StyleSheet, Platform } from 'react-native';
 import { Text } from '../theme';
 import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { ProfileSetupNotification } from '../components/ProfileSetupNotification';
 import { useAuth } from '../contexts/AuthContext';
+import { BlurView } from 'expo-blur';
 
 export default function DashboardScreen() {
 	// const { tokens } = useTheme();
@@ -18,53 +19,48 @@ export default function DashboardScreen() {
 	const profiles = useMemoriesStore((s) => s.profiles);
 	const journal = useMemoriesStore((s) => s.journal);
 	const milestones = useMemoriesStore((s) => s.milestones);
-	// const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
+	const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
 	
 	// Show notification if user has no child profiles
 	const shouldShowNotification = profiles.length === 0;
 	const screenWidth = Dimensions.get('window').width;
 	// const scrollX = useRef(new Animated.Value(0)).current;
-	const pulseAnim = useRef(new Animated.Value(1)).current;
+	
+	// State for expandable tiles
+	const [expandedGestalts, setExpandedGestalts] = useState(false);
+	const [expandedAppointments, setExpandedAppointments] = useState(false);
+	const gestaltExpandAnim = useRef(new Animated.Value(0)).current;
+	const appointmentExpandAnim = useRef(new Animated.Value(0)).current;
 
-	// Pulse animation for mic button
-	useEffect(() => {
-		Animated.loop(
-			Animated.sequence([
-				Animated.timing(pulseAnim, {
-					toValue: 1.05,
-					duration: 1500,
-					useNativeDriver: true,
-				}),
-				Animated.timing(pulseAnim, {
-					toValue: 1,
-					duration: 1500,
-					useNativeDriver: true,
-				}),
-			])
-		).start();
-	}, []);
 
-	// AI Coach modes - with subtle accent colors
+	// AI Coach modes
 	const coachModes = [
 		{
-			title: 'Language',
-			icon: 'chatbubbles',
-			accentColor: 'rgba(139, 92, 246, 0.3)',
+			title: 'Language Coach',
+			icon: 'mic',
 			mode: 'Language Coach'
 		},
 		{
-			title: 'Support',
+			title: 'Parent Support',
 			icon: 'heart',
-			accentColor: 'rgba(236, 72, 153, 0.3)',
 			mode: 'Parent Support'
 		},
 		{
-			title: 'Play',
-			icon: 'game-controller',
-			accentColor: 'rgba(34, 197, 94, 0.3)',
+			title: 'Child Mode',
+			icon: 'happy-outline',
 			mode: 'Child Mode'
 		}
 	];
+	
+	// Sample data for Gestalt Lists (would come from store in production)
+	const recentGestalts = [
+		{ id: '1', phrase: "To infinity and beyond!", source: "Toy Story", category: "Movies" },
+		{ id: '2', phrase: "Let's go on an adventure", source: "Daily routine", category: "Social" },
+		{ id: '3', phrase: "It's gonna be okay", source: "Parent comfort", category: "Comfort" }
+	];
+	
+	// Get open appointment notes
+	const openAppointmentNotes = appointmentNotes.filter(note => !note.isClosed).slice(0, 3);
 
 	const handleModeSelect = (mode: string) => {
 		(navigation as any).navigate('Coach', { initialMode: mode });
@@ -73,46 +69,57 @@ export default function DashboardScreen() {
 	const handleTilePress = (navigateTo: string) => {
 		(navigation as any).navigate(navigateTo);
 	};
+	
+	const toggleGestaltsExpand = () => {
+		const toValue = expandedGestalts ? 0 : 1;
+		Animated.spring(gestaltExpandAnim, {
+			toValue,
+			useNativeDriver: false,
+			tension: 50,
+			friction: 7
+		}).start();
+		setExpandedGestalts(!expandedGestalts);
+	};
+	
+	const toggleAppointmentsExpand = () => {
+		const toValue = expandedAppointments ? 0 : 1;
+		Animated.spring(appointmentExpandAnim, {
+			toValue,
+			useNativeDriver: false,
+			tension: 50,
+			friction: 7
+		}).start();
+		setExpandedAppointments(!expandedAppointments);
+	};
 
-	// Feature tiles with glass design
-	const mainFeatures = [
+	// Feature tiles reorganized as requested
+	const flagshipFeatures = [
 		{ 
-			icon: 'book', 
-			title: 'Journal',
-			navigateTo: 'Memories',
-			count: journal.length,
-			size: 'large'
-		},
-		{ 
-			icon: 'trophy', 
-			title: 'Milestones',
-			navigateTo: 'Memories',
-			count: milestones.length,
-			size: 'small'
-		},
-		{ 
-			icon: 'game-controller', 
-			title: 'Play',
+			icon: 'sync', 
+			title: 'Play Analyzer',
 			navigateTo: 'PlayAnalyzer',
-			size: 'small'
-		},
-		{ 
-			icon: 'bar-chart', 
-			title: 'Reports',
-			navigateTo: 'Report',
-			size: 'medium'
-		},
-		{ 
-			icon: 'list', 
-			title: 'Gestalts',
-			navigateTo: 'GestaltLists',
-			size: 'medium'
+			description: 'Analyze play'
 		},
 		{ 
 			icon: 'book-outline', 
 			title: 'Storybook',
 			navigateTo: 'Storybook',
-			size: 'medium'
+			description: 'Interactive stories'
+		}
+	];
+	
+	const memoryFeatures = [
+		{ 
+			icon: 'create-outline', 
+			title: 'Journal',
+			navigateTo: 'Memories',
+			count: journal.length
+		},
+		{ 
+			icon: 'trophy', 
+			title: 'Milestones',
+			navigateTo: 'Memories',
+			count: milestones.length
 		}
 	];
 
@@ -171,20 +178,22 @@ export default function DashboardScreen() {
 
 	return (
 		<View style={{ flex: 1 }}>
-			{/* Gestalt Brand Gradient Background */}
+			{/* Gestalts brand gradient background - organic flow */}
 			<LinearGradient
-				colors={['#7C3AED', '#EC4899', '#FB923C']}
-				start={{ x: 0, y: 0 }}
-				end={{ x: 1, y: 1 }}
+				colors={['#F3E8FF', '#FDF2FE', '#FFF0F8', '#FFF7ED', '#FAFAFA']}
+				start={{ x: 0.2, y: 0 }}
+				end={{ x: 0.8, y: 1 }}
 				style={StyleSheet.absoluteFillObject}
 			/>
-			
-			{/* Subtle overlay for depth */}
+			{/* Additional gradient overlay for more organic feel */}
 			<LinearGradient
-				colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.1)']}
-				start={{ x: 0, y: 0 }}
+				colors={['transparent', 'rgba(236, 72, 153, 0.03)', 'transparent', 'rgba(251, 146, 60, 0.02)', 'transparent']}
+				start={{ x: 1, y: 0 }}
 				end={{ x: 0, y: 1 }}
-				style={StyleSheet.absoluteFillObject}
+				style={{
+					...StyleSheet.absoluteFillObject,
+					opacity: 0.6
+				}}
 			/>
 
 			<View style={{ flex: 1, paddingTop: 60 }}>
@@ -206,9 +215,9 @@ export default function DashboardScreen() {
 							justifyContent: 'space-between',
 							marginBottom: 10
 						}}>
-							<TouchableOpacity onPress={openDrawer}>
-								<Ionicons name="menu" size={24} color="white" />
-							</TouchableOpacity>
+													<TouchableOpacity onPress={openDrawer}>
+							<Ionicons name="menu" size={24} color="#6B7280" />
+						</TouchableOpacity>
 							
 							{/* Centered Logo */}
 							<View style={{ flex: 1, alignItems: 'center' }}>
@@ -217,8 +226,7 @@ export default function DashboardScreen() {
 									style={{ 
 										width: 80, 
 										height: 80, 
-										resizeMode: 'contain',
-										tintColor: 'white'
+										resizeMode: 'contain'
 									}} 
 								/>
 							</View>
@@ -240,11 +248,8 @@ export default function DashboardScreen() {
 						<Text style={{ 
 							fontSize: 38,
 							fontWeight: '800',
-							color: 'white',
+							color: '#111827',
 							letterSpacing: -1,
-							textShadowColor: 'rgba(0,0,0,0.2)',
-							textShadowOffset: { width: 0, height: 2 },
-							textShadowRadius: 4,
 							lineHeight: 44
 						}}>
 							Hey {currentProfile?.parentName?.split(' ')[0] || 'there'}!
@@ -252,7 +257,7 @@ export default function DashboardScreen() {
 					</View>
 					<Text style={{
 						fontSize: 18,
-						color: 'rgba(255,255,255,0.95)',
+						color: '#4B5563',
 						fontWeight: '500',
 						lineHeight: 22
 					}}>
@@ -263,12 +268,27 @@ export default function DashboardScreen() {
 				{/* Profile Setup Notification */}
 				<ProfileSetupNotification show={shouldShowNotification} />
 
-				{/* AI Coach Cards - Liquid Glass Design */}
+				{/* Section Title - Ask Jessie */}
+				<View style={{ paddingHorizontal: 20, marginBottom: 15 }}>
+					<Text style={{
+						fontSize: 22,
+						fontWeight: '700',
+						color: '#111827',
+						letterSpacing: -0.5
+					}}>Ask Jessie</Text>
+					<Text style={{
+						fontSize: 14,
+						color: '#6B7280',
+						marginTop: 2
+					}}>Choose your AI coach mode</Text>
+				</View>
+				
+				{/* AI Coach Cards - Enhanced Liquid Glass */}
 				<View style={{ paddingBottom: 30 }}>
 					<ScrollView
 						horizontal
 						showsHorizontalScrollIndicator={false}
-						snapToInterval={screenWidth * 0.7}
+						snapToInterval={screenWidth * 0.65}
 						decelerationRate="fast"
 						contentContainerStyle={{
 							paddingHorizontal: 20
@@ -284,48 +304,81 @@ export default function DashboardScreen() {
 								}}
 							>
 								<View style={{
-									width: screenWidth * 0.7,
-									height: 160,
+									width: screenWidth * 0.65,
+									height: 140,
 									borderRadius: 24,
 									overflow: 'hidden',
-									backgroundColor: 'rgba(255,255,255,0.1)',
-									borderWidth: 1,
-									borderColor: 'rgba(255,255,255,0.2)'
+									shadowColor: '#7C3AED',
+									shadowOffset: { width: 0, height: 8 },
+									shadowOpacity: 0.4,
+									shadowRadius: 20,
+									elevation: 15
 								}}>
-									{/* Glass effect overlay */}
+									{/* Gestalts brand gradient background - same as mic button */}
+									<LinearGradient
+										colors={['#7C3AED', '#EC4899', '#FB923C']}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 1 }}
+										style={{
+											position: 'absolute',
+											top: 0,
+											left: 0,
+											right: 0,
+											bottom: 0
+										}}
+									/>
+									
+									{/* Liquid glass shine effect - same as mic button */}
 									<View style={{
 										position: 'absolute',
 										top: 0,
 										left: 0,
 										right: 0,
-										height: '50%',
-										backgroundColor: 'rgba(255,255,255,0.1)'
+										height: '45%',
+										backgroundColor: 'rgba(255, 255, 255, 0.3)',
+										borderTopLeftRadius: 24,
+										borderTopRightRadius: 24
+									}} />
+									
+									{/* Inner shadow for depth */}
+									<View style={{
+										position: 'absolute',
+										top: 2,
+										left: 2,
+										right: 2,
+										bottom: 2,
+										borderRadius: 22,
+										borderWidth: 1,
+										borderColor: 'rgba(255, 255, 255, 0.2)'
+									}} />
+									
+									{/* Outer border */}
+									<View style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										bottom: 0,
+										borderRadius: 24,
+										borderWidth: 2,
+										borderColor: 'rgba(255, 255, 255, 0.3)'
 									}} />
 									
 									<View style={{
 										flex: 1,
-										padding: 24,
+										padding: 20,
 										justifyContent: 'space-between'
 									}}>
 										<Ionicons 
 											name={mode.icon as any} 
-											size={40} 
-											color="white"
-											style={{
-												shadowColor: '#000',
-												shadowOffset: { width: 0, height: 2 },
-												shadowOpacity: 0.2,
-												shadowRadius: 4
-											}}
+											size={34} 
+											color="#FFFFFF"
 										/>
 										<Text style={{
-											fontSize: 24,
+											fontSize: 20,
 											fontWeight: '700',
-											color: 'white',
-											letterSpacing: -0.5,
-											textShadowColor: 'rgba(0,0,0,0.2)',
-											textShadowOffset: { width: 0, height: 1 },
-											textShadowRadius: 2
+											color: '#FFFFFF',
+											letterSpacing: -0.5
 										}}>
 											{mode.title}
 										</Text>
@@ -336,97 +389,33 @@ export default function DashboardScreen() {
 					</ScrollView>
 				</View>
 
-				{/* Feature Grid - Liquid Glass Tiles */}
-				<View style={{
-					paddingHorizontal: 20
+				{/* Section Divider */}
+				<View style={{ 
+					paddingHorizontal: 20, 
+					marginVertical: 20 
 				}}>
-					{/* Large Feature Tile */}
-					<TouchableOpacity
-						onPress={() => handleTilePress(mainFeatures[0].navigateTo)}
-						activeOpacity={0.9}
-						style={{ marginBottom: 15 }}
-					>
-						<View style={{
-							height: 140,
-							borderRadius: 24,
-							overflow: 'hidden',
-							backgroundColor: 'rgba(255,255,255,0.1)',
-							borderWidth: 1,
-							borderColor: 'rgba(255,255,255,0.2)'
-						}}>
-							{/* Glass shine effect */}
-							<LinearGradient
-								colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 0.5, y: 1 }}
-								style={{
-									position: 'absolute',
-									top: 0,
-									left: 0,
-									right: 0,
-									bottom: 0
-								}}
-							/>
-							
-							<View style={{
-								flex: 1,
-								padding: 24,
-								justifyContent: 'space-between'
-							}}>
-								<View style={{
-									flexDirection: 'row',
-									justifyContent: 'space-between',
-									alignItems: 'flex-start'
-								}}>
-									<Ionicons 
-										name={mainFeatures[0].icon as any} 
-										size={48} 
-										color="white"
-										style={{
-											shadowColor: '#000',
-											shadowOffset: { width: 0, height: 2 },
-											shadowOpacity: 0.2,
-											shadowRadius: 4
-										}}
-									/>
-									{mainFeatures[0].count !== undefined && mainFeatures[0].count > 0 && (
-										<View style={{
-											backgroundColor: 'rgba(255,255,255,0.2)',
-											paddingHorizontal: 12,
-											paddingVertical: 4,
-											borderRadius: 12,
-											borderWidth: 1,
-											borderColor: 'rgba(255,255,255,0.3)'
-										}}>
-											<Text style={{
-												color: 'white',
-												fontWeight: '700',
-												fontSize: 16
-											}}>
-												{mainFeatures[0].count}
-											</Text>
-										</View>
-									)}
-								</View>
-								
-								<Text style={{
-									fontSize: 18,
-									fontWeight: '600',
-									color: 'white',
-									letterSpacing: -0.3
-								}}>
-									{mainFeatures[0].title}
-								</Text>
-							</View>
-						</View>
-					</TouchableOpacity>
+					<View style={{
+						height: 1,
+						backgroundColor: 'rgba(0,0,0,0.05)',
+						marginHorizontal: 10
+					}} />
+				</View>
 
-					{/* Two Column Grid */}
+				{/* Interact Section */}
+				<View style={{ paddingHorizontal: 20, marginBottom: 30 }}>
+					<Text style={{
+						fontSize: 22,
+						fontWeight: '700',
+						color: '#111827',
+						letterSpacing: -0.5,
+						marginBottom: 15
+					}}>Interact</Text>
+					
 					<View style={{
 						flexDirection: 'row',
 						gap: 15
 					}}>
-						{mainFeatures.slice(1, 3).map((feature, index) => (
+						{flagshipFeatures.map((feature, index) => (
 							<TouchableOpacity
 								key={index}
 								onPress={() => handleTilePress(feature.navigateTo)}
@@ -434,30 +423,158 @@ export default function DashboardScreen() {
 								style={{ flex: 1 }}
 							>
 								<View style={{
-									height: 120,
+									height: 140,
 									borderRadius: 24,
 									overflow: 'hidden',
-									backgroundColor: 'rgba(255,255,255,0.1)',
-									borderWidth: 1,
-									borderColor: 'rgba(255,255,255,0.2)'
+									backgroundColor: 'rgba(255,255,255,0.75)',
+									shadowColor: '#7C3AED',
+									shadowOffset: { width: 0, height: 6 },
+									shadowOpacity: 0.15,
+									shadowRadius: 16,
+									elevation: 10
 								}}>
-									{/* Glass shine */}
-									<LinearGradient
-										colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0)']}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 0.5, y: 1 }}
-										style={{
-											position: 'absolute',
-											top: 0,
-											left: 0,
-											right: 0,
-											bottom: 0
-										}}
-									/>
+									{/* Liquid glass shine effect */}
+									<View style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										height: '45%',
+										backgroundColor: 'rgba(255, 255, 255, 0.3)',
+										borderTopLeftRadius: 24,
+										borderTopRightRadius: 24
+									}} />
+									
+									{/* Inner shadow for depth */}
+									<View style={{
+										position: 'absolute',
+										top: 2,
+										left: 2,
+										right: 2,
+										bottom: 2,
+										borderRadius: 22,
+										borderWidth: 1,
+										borderColor: 'rgba(255, 255, 255, 0.3)'
+									}} />
+									
+									{/* Outer border */}
+									<View style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										bottom: 0,
+										borderRadius: 24,
+										borderWidth: 1.5,
+										borderColor: 'rgba(255, 255, 255, 0.4)'
+									}} />
 									
 									<View style={{
 										flex: 1,
 										padding: 20,
+										justifyContent: 'space-between'
+									}}>
+										<Ionicons 
+											name={feature.icon as any} 
+											size={36} 
+											color="#4B5563"
+										/>
+										<View>
+											<Text style={{
+												fontSize: 18,
+												fontWeight: '700',
+												color: '#111827',
+												letterSpacing: -0.3
+											}}>
+												{feature.title}
+											</Text>
+											<Text style={{
+												fontSize: 13,
+												color: '#6B7280',
+												marginTop: 2
+											}}>
+												{feature.description}
+											</Text>
+										</View>
+									</View>
+								</View>
+							</TouchableOpacity>
+						))}
+					</View>
+				</View>
+
+				{/* Memory Features Section */}
+				<View style={{ paddingHorizontal: 20, marginBottom: 30 }}>
+					<Text style={{
+						fontSize: 22,
+						fontWeight: '700',
+						color: '#111827',
+						letterSpacing: -0.5,
+						marginBottom: 15
+					}}>Memories</Text>
+					
+					<View style={{
+						flexDirection: 'row',
+						gap: 15,
+						marginBottom: 15
+					}}>
+						{memoryFeatures.map((feature, index) => (
+							<TouchableOpacity
+								key={index}
+								onPress={() => handleTilePress(feature.navigateTo)}
+								activeOpacity={0.9}
+								style={{ flex: 1 }}
+							>
+																<View style={{
+									height: 110,
+									borderRadius: 20,
+									overflow: 'hidden',
+									backgroundColor: 'rgba(255,255,255,0.75)',
+									shadowColor: '#7C3AED',
+									shadowOffset: { width: 0, height: 4 },
+									shadowOpacity: 0.12,
+									shadowRadius: 12,
+									elevation: 8
+								}}>
+									{/* Liquid glass shine effect */}
+									<View style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										height: '45%',
+										backgroundColor: 'rgba(255, 255, 255, 0.3)',
+										borderTopLeftRadius: 20,
+										borderTopRightRadius: 20
+									}} />
+									
+									{/* Inner shadow for depth */}
+									<View style={{
+										position: 'absolute',
+										top: 2,
+										left: 2,
+										right: 2,
+										bottom: 2,
+										borderRadius: 18,
+										borderWidth: 1,
+										borderColor: 'rgba(255, 255, 255, 0.3)'
+									}} />
+									
+									{/* Outer border */}
+									<View style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										bottom: 0,
+										borderRadius: 20,
+										borderWidth: 1.5,
+										borderColor: 'rgba(255, 255, 255, 0.4)'
+									}} />
+									
+									<View style={{
+										flex: 1,
+										padding: 16,
 										justifyContent: 'space-between'
 									}}>
 										<View style={{
@@ -467,26 +584,20 @@ export default function DashboardScreen() {
 										}}>
 											<Ionicons 
 												name={feature.icon as any} 
-												size={36} 
-												color="white"
-												style={{
-													shadowColor: '#000',
-													shadowOffset: { width: 0, height: 2 },
-													shadowOpacity: 0.2,
-													shadowRadius: 4
-												}}
+												size={30} 
+												color="#4B5563"
 											/>
-											{'count' in feature && feature.count !== undefined && feature.count > 0 && (
+											{feature.count !== undefined && feature.count > 0 && (
 												<View style={{
-													backgroundColor: 'rgba(255,255,255,0.2)',
+													backgroundColor: 'rgba(124,58,237,0.1)',
 													paddingHorizontal: 8,
 													paddingVertical: 2,
 													borderRadius: 8,
-													borderWidth: 1,
-													borderColor: 'rgba(255,255,255,0.3)'
+													borderWidth: 0.5,
+													borderColor: 'rgba(124,58,237,0.2)'
 												}}>
 													<Text style={{
-														color: 'white',
+														color: '#7C3AED',
 														fontWeight: '700',
 														fontSize: 12
 													}}>
@@ -497,9 +608,9 @@ export default function DashboardScreen() {
 										</View>
 										
 										<Text style={{
-											fontSize: 18,
+											fontSize: 15,
 											fontWeight: '600',
-											color: 'white',
+											color: '#111827',
 											letterSpacing: -0.3
 										}}>
 											{feature.title}
@@ -510,142 +621,184 @@ export default function DashboardScreen() {
 						))}
 					</View>
 
-					{/* Wide Feature Tiles */}
-					<View style={{ marginTop: 15, gap: 15 }}>
-						{mainFeatures.slice(3).map((feature, index) => (
-							<TouchableOpacity
-								key={index}
-								onPress={() => handleTilePress(feature.navigateTo)}
-								activeOpacity={0.9}
-							>
+					{/* Expandable Gestalt Lists Tile */}
+					<TouchableOpacity
+						onPress={toggleGestaltsExpand}
+						activeOpacity={0.9}
+						style={{ marginBottom: 15 }}
+					>
+						<Animated.View style={{
+							borderRadius: 24,
+							overflow: 'hidden',
+							backgroundColor: 'rgba(255,255,255,0.75)',
+							shadowColor: '#7C3AED',
+							shadowOffset: { width: 0, height: 6 },
+							shadowOpacity: 0.15,
+							shadowRadius: 16,
+							elevation: 10,
+							height: gestaltExpandAnim.interpolate({
+								inputRange: [0, 1],
+								outputRange: [80, 280]
+							})
+						}}>
+							{/* Liquid glass shine effect */}
+							<View style={{
+								position: 'absolute',
+								top: 0,
+								left: 0,
+								right: 0,
+								height: expandedGestalts ? 60 : '45%',
+								backgroundColor: 'rgba(255, 255, 255, 0.3)',
+								borderTopLeftRadius: 24,
+								borderTopRightRadius: 24
+							}} />
+							
+							{/* Inner shadow for depth */}
+							<View style={{
+								position: 'absolute',
+								top: 2,
+								left: 2,
+								right: 2,
+								bottom: 2,
+								borderRadius: 22,
+								borderWidth: 1,
+								borderColor: 'rgba(255, 255, 255, 0.3)'
+							}} />
+							
+							{/* Outer border */}
+							<View style={{
+								position: 'absolute',
+								top: 0,
+								left: 0,
+								right: 0,
+								bottom: 0,
+								borderRadius: 24,
+								borderWidth: 1.5,
+								borderColor: 'rgba(255, 255, 255, 0.4)'
+							}} />
+							
+							<View style={{ flex: 1 }}>
+								{/* Header - centered when collapsed */}
 								<View style={{
-									height: 100,
-									borderRadius: 24,
-									overflow: 'hidden',
-									backgroundColor: 'rgba(255,255,255,0.1)',
-									borderWidth: 1,
-									borderColor: 'rgba(255,255,255,0.2)'
+									flexDirection: 'row',
+									alignItems: 'center',
+									justifyContent: 'space-between',
+									height: 80,
+									paddingHorizontal: 16
 								}}>
-									{/* Glass shine */}
-									<LinearGradient
-										colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0)']}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 1, y: 0.5 }}
-										style={{
-											position: 'absolute',
-											top: 0,
-											left: 0,
-											right: 0,
-											bottom: 0
-										}}
-									/>
-									
 									<View style={{
-										flex: 1,
 										flexDirection: 'row',
 										alignItems: 'center',
-										justifyContent: 'space-between',
-										padding: 20
+										gap: 12
 									}}>
-										<View style={{
-											flexDirection: 'row',
-											alignItems: 'center',
-											gap: 16
+										<Ionicons name="list" size={26} color="#4B5563" />
+										<Text style={{
+											fontSize: 16,
+											fontWeight: '600',
+											color: '#111827',
+											letterSpacing: -0.3
 										}}>
-											<Ionicons 
-												name={feature.icon as any} 
-												size={32} 
-												color="white"
-												style={{
-													shadowColor: '#000',
-													shadowOffset: { width: 0, height: 2 },
-													shadowOpacity: 0.2,
-													shadowRadius: 4
-												}}
-											/>
-											
+											Gestalt Lists
+										</Text>
+									</View>
+									<Ionicons 
+										name={expandedGestalts ? "chevron-up" : "chevron-down"} 
+										size={20} 
+										color="#6B7280"
+									/>
+								</View>
+								
+								{/* Expanded Content */}
+								<Animated.View style={{
+									opacity: gestaltExpandAnim,
+									paddingHorizontal: 16,
+									paddingBottom: 16
+								}}>
+									<Text style={{
+										fontSize: 13,
+										color: '#6B7280',
+										marginBottom: 15
+									}}>
+										Recent Gestalts
+									</Text>
+									
+									{recentGestalts.map((gestalt, index) => (
+										<View key={gestalt.id} style={{
+											paddingVertical: 10,
+											borderTopWidth: index > 0 ? 0.5 : 0,
+											borderTopColor: 'rgba(229,231,235,0.5)'
+										}}>
 											<Text style={{
-												fontSize: 18,
+												fontSize: 14,
 												fontWeight: '600',
-												color: 'white',
-												letterSpacing: -0.3
+												color: '#374151'
 											}}>
-												{feature.title}
+												{gestalt.phrase}
+											</Text>
+											<Text style={{
+												fontSize: 12,
+												color: '#9CA3AF',
+												marginTop: 2
+											}}>
+												{gestalt.source} • {gestalt.category}
 											</Text>
 										</View>
-									</View>
-								</View>
-							</TouchableOpacity>
-						))}
-					</View>
-				</View>
-
-				{/* Quick Add Section - Glass Button */}
-				<View style={{
-					paddingHorizontal: 20,
-					paddingTop: 30,
-					paddingBottom: 20
-				}}>
-					<View style={{
-						flexDirection: 'row',
-						gap: 12
-					}}>
-						<TouchableOpacity
-							onPress={() => handleTilePress('AddJournal')}
-							style={{ flex: 1 }}
-						>
-							<View style={{
-								height: 56,
-								borderRadius: 28,
-								backgroundColor: 'rgba(255,255,255,0.15)',
-								borderWidth: 1,
-								borderColor: 'rgba(255,255,255,0.3)',
-								flexDirection: 'row',
-								alignItems: 'center',
-								justifyContent: 'center',
-								gap: 8
-							}}>
-								<Ionicons name="add-circle" size={24} color="white" />
-								<Text style={{
-									fontSize: 16,
-									fontWeight: '600',
-									color: 'white'
-								}}>
-									Quick Add
-								</Text>
+									))}
+									
+									<TouchableOpacity
+										onPress={() => handleTilePress('GestaltLists')}
+										style={{
+											marginTop: 15,
+											paddingVertical: 10,
+											paddingHorizontal: 16,
+											backgroundColor: 'rgba(124,58,237,0.1)',
+											borderRadius: 12,
+											alignItems: 'center'
+										}}
+									>
+										<Text style={{
+											fontSize: 14,
+											fontWeight: '600',
+											color: '#7C3AED'
+										}}>
+											Add New Gestalt
+										</Text>
+									</TouchableOpacity>
+								</Animated.View>
 							</View>
-						</TouchableOpacity>
-					</View>
+						</Animated.View>
+					</TouchableOpacity>
 				</View>
-				</ScrollView>
-			</View>
 
-			{/* Floating Mic Button - Light Gray Liquid Glass with Purple Icon */}
-			<Animated.View style={{ 
-				position: 'absolute',
-				bottom: 42,
-				left: '50%',
-				marginLeft: -36,
-				zIndex: 1000,
-				transform: [{ scale: pulseAnim }]
-			}}>
-				<TouchableOpacity 
-					onPress={() => handleModeSelect('Language Coach')}
-					activeOpacity={0.9}
-				>
-					<View style={{
-						width: 72,
-						height: 72,
-						borderRadius: 36,
-						backgroundColor: 'rgba(241, 245, 249, 0.95)',
-						borderWidth: 2,
-						borderColor: 'rgba(255, 255, 255, 0.8)',
-						shadowColor: '#000',
-						shadowOffset: { width: 0, height: 8 },
-						shadowOpacity: 0.25,
-						shadowRadius: 20,
-						elevation: 15,
-						overflow: 'hidden'
+				{/* Specialist Interaction Section */}
+				<View style={{ paddingHorizontal: 20, marginBottom: 30 }}>
+					<Text style={{
+						fontSize: 22,
+						fontWeight: '700',
+						color: '#111827',
+						letterSpacing: -0.5,
+						marginBottom: 15
+					}}>Specialist Tools</Text>
+					
+					{/* Expandable Appointment Notes */}
+					<TouchableOpacity
+						onPress={toggleAppointmentsExpand}
+						activeOpacity={0.9}
+						style={{ marginBottom: 15 }}
+					>
+											<Animated.View style={{
+						borderRadius: 24,
+						overflow: 'hidden',
+						backgroundColor: 'rgba(255,255,255,0.75)',
+						shadowColor: '#7C3AED',
+						shadowOffset: { width: 0, height: 6 },
+						shadowOpacity: 0.15,
+						shadowRadius: 16,
+						elevation: 10,
+						height: appointmentExpandAnim.interpolate({
+							inputRange: [0, 1],
+							outputRange: [80, 320]
+						})
 					}}>
 						{/* Liquid glass shine effect */}
 						<View style={{
@@ -653,8 +806,10 @@ export default function DashboardScreen() {
 							top: 0,
 							left: 0,
 							right: 0,
-							height: '45%',
-							backgroundColor: 'rgba(255, 255, 255, 0.6)'
+							height: expandedAppointments ? 60 : '45%',
+							backgroundColor: 'rgba(255, 255, 255, 0.3)',
+							borderTopLeftRadius: 24,
+							borderTopRightRadius: 24
 						}} />
 						
 						{/* Inner shadow for depth */}
@@ -664,21 +819,314 @@ export default function DashboardScreen() {
 							left: 2,
 							right: 2,
 							bottom: 2,
-							borderRadius: 34,
+							borderRadius: 22,
 							borderWidth: 1,
-							borderColor: 'rgba(0, 0, 0, 0.05)'
+							borderColor: 'rgba(255, 255, 255, 0.3)'
 						}} />
 						
+						{/* Outer border */}
 						<View style={{
-							flex: 1,
-							alignItems: 'center',
-							justifyContent: 'center'
-						}}>
-							<Ionicons name="mic" size={32} color="#7C3AED" />
-						</View>
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0,
+							borderRadius: 24,
+							borderWidth: 1.5,
+							borderColor: 'rgba(255, 255, 255, 0.4)'
+						}} />
+							
+							<View style={{ flex: 1 }}>
+								{/* Header - centered when collapsed */}
+								<View style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									justifyContent: 'space-between',
+									height: 80,
+									paddingHorizontal: 16
+								}}>
+									<View style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										gap: 12
+									}}>
+										<Ionicons name="calendar-outline" size={26} color="#4B5563" />
+										<Text style={{
+											fontSize: 16,
+											fontWeight: '600',
+											color: '#111827',
+											letterSpacing: -0.3
+										}}>
+											Appointment Notes
+										</Text>
+										{openAppointmentNotes.length > 0 && (
+											<View style={{
+												backgroundColor: 'rgba(239,68,68,0.1)',
+												paddingHorizontal: 8,
+												paddingVertical: 2,
+												borderRadius: 8,
+												borderWidth: 0.5,
+												borderColor: 'rgba(239,68,68,0.2)'
+											}}>
+												<Text style={{
+													color: '#EF4444',
+													fontWeight: '700',
+													fontSize: 12
+												}}>
+													{openAppointmentNotes.length}
+												</Text>
+											</View>
+										)}
+									</View>
+									<Ionicons 
+										name={expandedAppointments ? "chevron-up" : "chevron-down"} 
+										size={20} 
+										color="#6B7280"
+									/>
+								</View>
+								
+								{/* Expanded Content */}
+								<Animated.View style={{
+									opacity: appointmentExpandAnim,
+									paddingHorizontal: 16,
+									paddingBottom: 16
+								}}>
+									<Text style={{
+										fontSize: 13,
+										color: '#6B7280',
+										marginBottom: 15
+									}}>
+										Open Notes
+									</Text>
+									
+									{openAppointmentNotes.length > 0 ? (
+										openAppointmentNotes.map((note, index) => (
+											<View key={note.id} style={{
+												paddingVertical: 10,
+												borderTopWidth: index > 0 ? 0.5 : 0,
+												borderTopColor: 'rgba(229,231,235,0.5)'
+											}}>
+												<View style={{
+													flexDirection: 'row',
+													justifyContent: 'space-between',
+													alignItems: 'flex-start'
+												}}>
+													<View style={{ flex: 1 }}>
+														<Text style={{
+															fontSize: 14,
+															fontWeight: '600',
+															color: '#374151'
+														}}>
+															{note.question}
+														</Text>
+														{note.specialist && (
+															<Text style={{
+																fontSize: 12,
+																color: '#9CA3AF',
+																marginTop: 2
+															}}>
+																{note.specialist}
+															</Text>
+														)}
+													</View>
+													<TouchableOpacity
+														onPress={() => {
+															// Mark as closed logic here
+														}}
+														style={{
+															padding: 4,
+															marginLeft: 8
+														}}
+													>
+														<Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
+													</TouchableOpacity>
+												</View>
+											</View>
+										))
+									) : (
+										<Text style={{
+											fontSize: 14,
+											color: '#9CA3AF',
+											fontStyle: 'italic'
+										}}>
+											No open appointment notes
+										</Text>
+									)}
+									
+									<TouchableOpacity
+										onPress={() => handleTilePress('AddAppointmentNote')}
+										style={{
+											marginTop: 15,
+											paddingVertical: 10,
+											paddingHorizontal: 16,
+											backgroundColor: 'rgba(124,58,237,0.1)',
+											borderRadius: 12,
+											alignItems: 'center'
+										}}
+									>
+										<Text style={{
+											fontSize: 14,
+											fontWeight: '600',
+											color: '#7C3AED'
+										}}>
+											Add Appointment Note
+										</Text>
+									</TouchableOpacity>
+								</Animated.View>
+							</View>
+						</Animated.View>
+					</TouchableOpacity>
+					
+					{/* Reports and Specialist Management */}
+					<View style={{
+						flexDirection: 'row',
+						gap: 15
+					}}>
+						<TouchableOpacity
+							onPress={() => handleTilePress('Report')}
+							activeOpacity={0.9}
+							style={{ flex: 1 }}
+						>
+							<View style={{
+								height: 110,
+								borderRadius: 20,
+								overflow: 'hidden',
+								backgroundColor: 'rgba(255,255,255,0.75)',
+								shadowColor: '#7C3AED',
+								shadowOffset: { width: 0, height: 4 },
+								shadowOpacity: 0.12,
+								shadowRadius: 12,
+								elevation: 8
+							}}>
+								{/* Liquid glass shine effect */}
+								<View style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									right: 0,
+									height: '45%',
+									backgroundColor: 'rgba(255, 255, 255, 0.3)',
+									borderTopLeftRadius: 20,
+									borderTopRightRadius: 20
+								}} />
+								
+								{/* Inner shadow for depth */}
+								<View style={{
+									position: 'absolute',
+									top: 2,
+									left: 2,
+									right: 2,
+									bottom: 2,
+									borderRadius: 18,
+									borderWidth: 1,
+									borderColor: 'rgba(255, 255, 255, 0.3)'
+								}} />
+								
+								{/* Outer border */}
+								<View style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									right: 0,
+									bottom: 0,
+									borderRadius: 20,
+									borderWidth: 1.5,
+									borderColor: 'rgba(255, 255, 255, 0.4)'
+								}} />
+								
+								<View style={{
+									flex: 1,
+									padding: 16,
+									justifyContent: 'space-between'
+								}}>
+									<Ionicons name="bar-chart" size={30} color="#4B5563" />
+									<Text style={{
+										fontSize: 15,
+										fontWeight: '600',
+										color: '#111827',
+										letterSpacing: -0.3
+									}}>
+										Reports
+									</Text>
+								</View>
+							</View>
+						</TouchableOpacity>
+						
+						<TouchableOpacity
+							onPress={() => handleTilePress('SpecialistProfiles')}
+							activeOpacity={0.9}
+							style={{ flex: 1 }}
+						>
+							<View style={{
+								height: 110,
+								borderRadius: 20,
+								overflow: 'hidden',
+								backgroundColor: 'rgba(255,255,255,0.75)',
+								shadowColor: '#7C3AED',
+								shadowOffset: { width: 0, height: 4 },
+								shadowOpacity: 0.12,
+								shadowRadius: 12,
+								elevation: 8
+							}}>
+								{/* Liquid glass shine effect */}
+								<View style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									right: 0,
+									height: '45%',
+									backgroundColor: 'rgba(255, 255, 255, 0.3)',
+									borderTopLeftRadius: 20,
+									borderTopRightRadius: 20
+								}} />
+								
+								{/* Inner shadow for depth */}
+								<View style={{
+									position: 'absolute',
+									top: 2,
+									left: 2,
+									right: 2,
+									bottom: 2,
+									borderRadius: 18,
+									borderWidth: 1,
+									borderColor: 'rgba(255, 255, 255, 0.3)'
+								}} />
+								
+								{/* Outer border */}
+								<View style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									right: 0,
+									bottom: 0,
+									borderRadius: 20,
+									borderWidth: 1.5,
+									borderColor: 'rgba(255, 255, 255, 0.4)'
+								}} />
+								
+								<View style={{
+									flex: 1,
+									padding: 16,
+									justifyContent: 'space-between'
+								}}>
+									<Ionicons name="medical-outline" size={30} color="#4B5563" />
+									<Text style={{
+										fontSize: 15,
+										fontWeight: '600',
+										color: '#111827',
+										letterSpacing: -0.3
+									}}>
+										Specialists
+									</Text>
+								</View>
+							</View>
+						</TouchableOpacity>
 					</View>
-				</TouchableOpacity>
-			</Animated.View>
+				</View>
+				</ScrollView>
+			</View>
+
+
 
 			<BottomNavigation
 				onAddPress={toggleAddMenu}
@@ -762,7 +1210,7 @@ export default function DashboardScreen() {
 											<Ionicons 
 												name={option.icon as any} 
 												size={28} 
-												color="#7C3AED"
+												color="#4B5563"
 											/>
 										</View>
 										<Text style={{

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, TouchableOpacity, Animated } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +36,29 @@ export function BottomNavigation({
 }: BottomNavigationProps) {
   const { tokens } = useTheme();
   const navigation = useNavigation();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Pulse animation for mic button
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const handleMicPress = () => {
+    (navigation as any).navigate('Coach', { initialMode: 'Language Coach' });
+  };
 
   return (
     <>
@@ -368,6 +391,79 @@ export function BottomNavigation({
           ))}
         </Animated.View>
       )}
+
+      {/* Floating Mic Button - Gestalts Brand */}
+      <Animated.View style={{ 
+        position: 'absolute',
+        bottom: 42,
+        left: '50%',
+        marginLeft: -36,
+        zIndex: 1001,
+        transform: [{ scale: pulseAnim }]
+      }}>
+        <TouchableOpacity 
+          onPress={handleMicPress}
+          activeOpacity={0.9}
+        >
+          <View style={{
+            width: 72,
+            height: 72,
+            borderRadius: 36,
+            overflow: 'hidden',
+            shadowColor: 'rgba(124,58,237,0.4)',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.4,
+            shadowRadius: 20,
+            elevation: 15
+          }}>
+            {/* Gestalts brand gradient background */}
+            <LinearGradient
+              colors={['#7C3AED', '#EC4899', '#FB923C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                borderWidth: 2,
+                borderColor: 'rgba(255, 255, 255, 0.3)'
+              }}
+            >
+              {/* Liquid glass shine effect */}
+              <View style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '45%',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderTopLeftRadius: 36,
+                borderTopRightRadius: 36
+              }} />
+              
+              {/* Inner shadow for depth */}
+              <View style={{
+                position: 'absolute',
+                top: 2,
+                left: 2,
+                right: 2,
+                bottom: 2,
+                borderRadius: 34,
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.2)'
+              }} />
+              
+              <View style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Ionicons name="mic" size={32} color="white" />
+              </View>
+            </LinearGradient>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     </>
   );
 }
