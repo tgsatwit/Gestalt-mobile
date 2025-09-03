@@ -2,7 +2,7 @@ require('dotenv/config');
 
 export default ({config}) => ({
   "expo": {
-    "name": "gestalts",
+    "name": "Gestalts",
     "slug": "gestalts",
     "owner": "tgsatwit",
     "version": "1.0.0",
@@ -34,7 +34,7 @@ export default ({config}) => ({
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tg.gestalts",
+      "bundleIdentifier": "com.tgsatwit.gestalts",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for AI voice interactions."
       }
@@ -61,7 +61,8 @@ export default ({config}) => ({
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "@livekit/react-native-expo-plugin"
     ]
   }
 });
