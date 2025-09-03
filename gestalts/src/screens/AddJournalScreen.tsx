@@ -8,7 +8,7 @@ import { useMemoriesStore } from '../state/useStore';
 import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
 import { getAuth } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 
 export default function AddJournalScreen() {
 	const { tokens } = useTheme();

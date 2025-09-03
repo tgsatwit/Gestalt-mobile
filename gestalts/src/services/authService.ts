@@ -4,7 +4,9 @@ import {
   signOut,
   updateProfile,
   User,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signInWithCredential,
+  OAuthProvider
 } from 'firebase/auth';
 import {
   doc,
@@ -91,8 +93,23 @@ class AuthService {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Get user profile from Firestore
-      const userProfile = await this.getUserProfile(user.uid);
+      // Get user profile from Firestore, create if missing
+      let userProfile = await this.getUserProfile(user.uid);
+      if (!userProfile) {
+        const displayName = user.displayName || (user.email?.split('@')[0] || 'User');
+        const [firstName, ...rest] = displayName.split(' ');
+        const lastName = rest.join(' ');
+        userProfile = {
+          id: user.uid,
+          email: user.email || '',
+          firstName: firstName || '',
+          lastName: lastName || '',
+          displayName,
+          signUpDate: new Date(),
+          provider: 'email'
+        };
+        await this.createUserProfile(userProfile);
+      }
       return userProfile;
     } catch (error) {
       console.error('Sign in error:', error);
@@ -120,14 +137,18 @@ class AuthService {
         nonce: hashedNonce,
       });
 
-      // Create Firebase credential and sign in
-      const appleCredentialForFirebase = auth.AppleAuthProvider.credential(
-        appleCredential.identityToken!,
+      // Create Firebase credential and sign in using Web SDK
+      const { auth } = getFirebaseServices();
+      if (!auth) throw new Error('Firebase not initialized');
+
+      const provider = new OAuthProvider('apple.com');
+      const credential = provider.credential({
+        idToken: appleCredential.identityToken!,
         rawNonce
-      );
+      });
 
       // Sign in to Firebase
-      const userCredential = await auth().signInWithCredential(appleCredentialForFirebase);
+      const userCredential = await signInWithCredential(auth, credential);
       const user = userCredential.user;
 
       // Check if user profile exists
@@ -155,10 +176,11 @@ class AuthService {
       return userProfile;
     } catch (error) {
       console.error('Apple sign in error:', error);
-      if (error.code === 'ERR_REQUEST_CANCELED') {
+      const err: any = error as any;
+      if (err?.code === 'ERR_REQUEST_CANCELED') {
         throw new Error('Apple sign-in was cancelled');
       }
-      throw this.handleAuthError(error);
+      throw this.handleAuthError(err);
     }
   }
 

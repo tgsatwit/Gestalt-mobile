@@ -4,6 +4,7 @@ export interface Character {
   id: string;
   name: string;
   avatarUrl: string;
+  type: 'user' | 'gestalts'; // Distinguish between user-created and Gestalts characters
   originalPhotoUrl?: string; // Optional, for privacy we may not store this
   createdAt: Date;
   updatedAt: Date;

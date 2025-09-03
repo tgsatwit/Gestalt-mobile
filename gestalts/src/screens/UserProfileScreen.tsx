@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { GradientButton } from '../components/GradientButton';
 import { useNavigation } from '@react-navigation/native';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
 import userProfileService from '../services/userProfileService';
 import { UserProfile, CreateUserProfileData, UpdateUserProfileData } from '../types/userProfile';

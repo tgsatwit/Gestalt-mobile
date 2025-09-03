@@ -46,13 +46,7 @@ service cloud.firestore {
                      request.auth.uid == request.resource.data.userId;
     }
     
-    // Users can read and write their own stories
-    match /stories/{storyId} {
-      allow read, write: if isAuthenticated() && 
-                           request.auth.uid == resource.data.userId;
-      allow create: if isAuthenticated() && 
-                     request.auth.uid == request.resource.data.userId;
-    }
+
     
     // Users can read and write their own memories
     match /memories/{memoryId} {
@@ -128,10 +122,36 @@ service cloud.firestore {
                      request.resource.data.keys().hasAll(['userId', 'activity', 'createdAtISO']);
     }
     
-    // Users can read and write their own characters (for storybook)
+    // Users can read and write their own characters (for storybook) - nested under users
+    match /users/{userId}/characters/{characterId} {
+      allow read, write, delete: if isOwner(userId);
+      allow create: if isOwner(userId);
+    }
+    
+    // Users can read and write their own stories (for storybook) - nested under users
+    match /users/{userId}/stories/{storyId} {
+      allow read, write, delete: if isOwner(userId);
+      allow create: if isOwner(userId);
+    }
+    
+    // Gestalts built-in characters collection (read-only for all authenticated users)
+    match /gestaltsCharacters/{characterId} {
+      allow read: if isAuthenticated();
+      allow write, create, delete: if false; // Only admins can modify these
+    }
+    
+    // Legacy top-level characters collection (for backward compatibility)
     match /characters/{characterId} {
-      allow read, write: if isAuthenticated() && 
-                           request.auth.uid == resource.data.userId;
+      allow read, write, delete: if isAuthenticated() && 
+                                  (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isAuthenticated() && 
+                     request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Legacy top-level stories collection (for backward compatibility)
+    match /stories/{storyId} {
+      allow read, write, delete: if isAuthenticated() && 
+                                  (resource == null || request.auth.uid == resource.data.userId);
       allow create: if isAuthenticated() && 
                      request.auth.uid == request.resource.data.userId;
     }

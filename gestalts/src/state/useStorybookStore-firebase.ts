@@ -10,16 +10,37 @@ import {
   AvatarGenerationRequest
 } from '../types/storybook';
 import { getFirebaseServices } from '../services/firebaseConfig';
+import {
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query as fsQuery,
+  orderBy as fsOrderBy,
+  serverTimestamp
+} from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 // import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 // import storage from '@react-native-firebase/storage';
 import geminiService from '../services/geminiService';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import { useMemoriesStore } from './useStore';
+import authService from '../services/authService';
+import {
+  buildCharacterProfiles,
+  buildSceneContext,
+  buildNarrativeContext,
+  buildStoryContextDescription,
+  generatePageVisualContext
+} from '../utils/storyImageUtils';
 
 interface StorybookState {
   // Data
   characters: Character[];
+  gestaltsCharacters: Character[];
   stories: Story[];
   
   // UI State
@@ -29,6 +50,7 @@ interface StorybookState {
   
   // Actions - Characters
   loadCharacters: () => Promise<void>;
+  loadGestaltsCharacters: () => void;
   createCharacterFromPhoto: (photoUri: string, name: string) => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
   
@@ -55,48 +77,90 @@ const initialProgress: GenerationProgress = {
   progress: 0
 };
 
-// Helper to get user ID from profile
-const getUserId = () => {
-  const profile = useMemoriesStore.getState().profile;
-  // Use a more consistent user ID format for Firebase paths
-  const userId = profile?.id || 'default-user';
-  // Ensure the user ID is safe for Firebase paths (no special characters)
-  return userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+// Helper to get user ID from Firebase Auth
+const getUserId = (): string => {
+  const currentUser = authService.getCurrentUser();
+  if (!currentUser) {
+    throw new Error('User not authenticated. Please sign in to use the storybook.');
+  }
+  // Return the actual Firebase Auth user ID
+  return currentUser.uid;
+};
+
+// Helper to generate character avatar URLs with fallback
+const getCharacterAvatarUrl = (characterId: string, fallbackUrl: string): string => {
+  // Use the updated Firebase Storage URLs for specific characters with proper access tokens
+  if (characterId === 'gestalts-boy') {
+    return 'https://firebasestorage.googleapis.com/v0/b/gestalts-mobile.firebasestorage.app/o/avatars%2FAlex-Avatar.jpeg?alt=media&token=5ec35a3b-1ee4-45a1-a193-53f2c60300a0';
+  }
+  if (characterId === 'gestalts-girl') {
+    return 'https://firebasestorage.googleapis.com/v0/b/gestalts-mobile.firebasestorage.app/o/avatars%2FEmma-Avatar.jpeg?alt=media&token=1721fb1c-5fa6-4cf0-9f09-08c8bb890d35';
+  }
+  
+  // For other characters, try the old Firebase Storage URL format
+  const firebaseUrl = `https://storage.googleapis.com/gestalts-mobile.appspot.com/public/gestalts-characters/${characterId}.svg`;
+  
+  // In a real app, you might want to test if the Firebase URL exists
+  // For now, we'll use the Firebase URL if available, fallback to DiceBear
+  return firebaseUrl; // Change this to fallbackUrl if you want to use DiceBear as primary
 };
 
 // Helper to upload image to Firebase Storage
 const uploadImageToStorage = async (imageUri: string, path: string): Promise<string> => {
-  const { initialized } = getFirebaseServices();
-  if (!initialized) {
-    throw new Error('Firebase Storage not initialized');
+  const { initialized, storage } = getFirebaseServices();
+  if (!initialized || !storage) {
+    console.warn('Firebase Storage not initialized, using original URI');
+    return imageUri;
   }
 
-  // TODO: Implement with React Native Firebase Storage when needed
-  // const storage = require('@react-native-firebase/storage').default;
-  // const storageRef = storage().ref(path);
-  // const snapshot = await storageRef.putFile(imageUri);
-  // const downloadURL = await storageRef.getDownloadURL();
-  
-  console.log('Firebase Storage upload not implemented yet:', path);
-  return imageUri; // Return original URI as placeholder
+  try {
+    // Read the image as blob/buffer
+    let response: Response;
+    if (imageUri.startsWith('data:')) {
+      // Handle base64 data URLs
+      response = await fetch(imageUri);
+    } else if (imageUri.startsWith('file://')) {
+      // Handle local file URIs
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      response = await fetch(`data:image/jpeg;base64,${base64}`);
+    } else {
+      // Handle HTTP URLs
+      response = await fetch(imageUri);
+    }
+    
+    const blob = await response.blob();
+    
+    // Create storage reference and upload
+    const imageRef = storageRef(storage, path);
+    const snapshot = await uploadBytes(imageRef, blob);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    console.log('Successfully uploaded to Firebase Storage:', downloadURL);
+    return downloadURL;
+  } catch (error) {
+    console.warn('Firebase Storage upload failed, using original URI:', error);
+    return imageUri; // Fallback to original URI
+  }
 };
 
 // Helper to delete image from Firebase Storage
 const deleteImageFromStorage = async (imageUrl: string) => {
-  const { initialized } = getFirebaseServices();
-  if (!initialized) return;
+  const { initialized, storage } = getFirebaseServices();
+  if (!initialized || !storage) return;
 
   try {
-    // TODO: Implement with React Native Firebase Storage when needed
-    // const storage = require('@react-native-firebase/storage').default;
-    // const pathMatch = imageUrl.match(/\/o\/(.+?)\?/);
-    // if (pathMatch) {
-    //   const path = decodeURIComponent(pathMatch[1]);
-    //   const storageRef = storage().ref(path);
-    //   await storageRef.delete();
-    // }
-    
-    console.log('Firebase Storage delete not implemented yet:', imageUrl);
+    // Extract the path from Firebase Storage URL
+    const pathMatch = imageUrl.match(/\/o\/(.+?)\?/);
+    if (pathMatch) {
+      const path = decodeURIComponent(pathMatch[1]);
+      const imageRef = storageRef(storage, path);
+      await deleteObject(imageRef);
+      console.log('Successfully deleted from Firebase Storage:', path);
+    }
   } catch (error) {
     console.warn('Failed to delete image from storage:', error);
   }
@@ -107,6 +171,7 @@ export const useStorybookStore = create<StorybookState>()(
     (set, get) => ({
       // Initial state
       characters: [],
+      gestaltsCharacters: [],
       stories: [],
       currentStory: null,
       generationProgress: initialProgress,
@@ -115,47 +180,36 @@ export const useStorybookStore = create<StorybookState>()(
       // Load characters from Firebase
       loadCharacters: async () => {
         try {
-          const { initialized } = getFirebaseServices();
+          const { initialized, db } = getFirebaseServices();
           if (!initialized) {
             console.log('Firebase not initialized, skipping character load');
             return;
           }
 
           const userId = getUserId();
-          // TODO: Replace with Firebase Web SDK
-          // const query = firestore().collection('users').doc(userId).collection('characters').orderBy('createdAt', 'desc');
-          // const snapshot = await query.get();
-          const snapshot = { docs: [] };
-          
-          const characters: Character[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            
-            // Ensure dates are properly converted
-            let createdAt: Date;
-            let updatedAt: Date;
-            
-            try {
-              createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-            } catch {
-              createdAt = new Date();
-            }
-            
-            try {
-              updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
-            } catch {
-              updatedAt = new Date();
-            }
-            
-            characters.push({
-              id: doc.id,
+          if (!db) throw new Error('Firestore not initialized');
+
+          const q = fsQuery(
+            collection(db, 'users', userId, 'characters'),
+            fsOrderBy('createdAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
+
+          const characters: Character[] = snapshot.docs.map((d) => {
+            const data: any = d.data();
+            const createdAt = (data.createdAt?.toDate ? data.createdAt.toDate() : new Date());
+            const updatedAt = (data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date());
+            return {
+              id: d.id,
               name: data.name,
+              type: data.type || 'user', // Default to 'user' for existing characters
               avatarUrl: data.avatarUrl,
               createdAt,
-              updatedAt
-            });
+              updatedAt,
+              visualProfile: data.visualProfile
+            } as Character;
           });
-          
+
           set({ characters });
         } catch (error) {
           console.error('Failed to load characters:', error);
@@ -168,6 +222,54 @@ export const useStorybookStore = create<StorybookState>()(
             }
           });
         }
+      },
+
+      // Load Gestalts characters (predefined characters)
+      loadGestaltsCharacters: () => {
+        // Define fallback URLs (now using updated Firebase Storage URLs with tokens)
+        const alexFallbackUrl = 'https://firebasestorage.googleapis.com/v0/b/gestalts-mobile.firebasestorage.app/o/avatars%2FAlex-Avatar.jpeg?alt=media&token=5ec35a3b-1ee4-45a1-a193-53f2c60300a0';
+        const emmaFallbackUrl = 'https://firebasestorage.googleapis.com/v0/b/gestalts-mobile.firebasestorage.app/o/avatars%2FEmma-Avatar.jpeg?alt=media&token=1721fb1c-5fa6-4cf0-9f09-08c8bb890d35';
+        
+        // Get the actual URLs that will be used
+        const alexAvatarUrl = getCharacterAvatarUrl('gestalts-boy', alexFallbackUrl);
+        const emmaAvatarUrl = getCharacterAvatarUrl('gestalts-girl', emmaFallbackUrl);
+        
+        console.log('Loading Gestalts Characters with URLs:');
+        console.log('Alex (gestalts-boy):', alexAvatarUrl);
+        console.log('Emma (gestalts-girl):', emmaAvatarUrl);
+        
+        const gestaltsCharacters: Character[] = [
+          {
+            id: 'gestalts-boy',
+            name: 'Alex',
+            type: 'gestalts',
+            avatarUrl: alexAvatarUrl,
+            createdAt: new Date('2024-01-01'),
+            updatedAt: new Date('2024-01-01'),
+            visualProfile: {
+              appearance: 'Alex is a friendly young boy with warm brown hair and bright, curious eyes. He has a cheerful face with a gentle smile that makes everyone feel welcome. His build is average for his age, with an energetic posture that shows he loves adventure.',
+              style: 'Alex wears casual, comfortable clothes in earth tones - usually a navy blue t-shirt and dark pants. His style is practical and kid-friendly, perfect for outdoor adventures and learning new things.',
+              personality: 'Alex is curious, brave, and kind-hearted. He approaches new situations with enthusiasm and always tries to help his friends. He loves exploring, asking questions, and sharing what he learns with others.',
+              keyFeatures: ['Warm brown hair', 'Bright curious eyes', 'Friendly smile', 'Energetic posture', 'Navy blue clothing']
+            }
+          },
+          {
+            id: 'gestalts-girl',
+            name: 'Emma',
+            type: 'gestalts',
+            avatarUrl: emmaAvatarUrl,
+            createdAt: new Date('2024-01-01'),
+            updatedAt: new Date('2024-01-01'),
+            visualProfile: {
+              appearance: 'Emma is a spirited young girl with beautiful curly blonde hair that bounces when she moves. She has bright green eyes full of wonder and a warm, infectious smile. Her posture shows confidence and readiness for any adventure.',
+              style: 'Emma loves wearing bright, cheerful colors - often a sky blue top with fun patterns. Her style is vibrant and expressive, reflecting her joyful personality and love for creativity.',
+              personality: 'Emma is creative, empathetic, and full of joy. She loves making new friends, solving problems with creative solutions, and spreading happiness wherever she goes. She\'s always ready to lend a helping hand.',
+              keyFeatures: ['Curly blonde hair', 'Bright green eyes', 'Infectious smile', 'Confident posture', 'Sky blue clothing with patterns']
+            }
+          }
+        ];
+
+        set({ gestaltsCharacters });
       },
 
       // Create a character from a photo
@@ -189,7 +291,7 @@ export const useStorybookStore = create<StorybookState>()(
           set({ 
             generationProgress: {
               status: 'generating',
-              message: 'Creating avatar...',
+              message: `Creating Pixar-style avatar for ${name}...`,
               progress: 30
             }
           });
@@ -218,26 +320,43 @@ export const useStorybookStore = create<StorybookState>()(
             }
           }
 
-          // Create character object with visual profile
+          // Create character object with enhanced visual profile for story consistency
+          const visualProfile = typeof avatarResult === 'string' ? undefined : avatarResult.visualProfile;
           const character: Character = {
             id: `char_${Date.now()}`,
             name,
+            type: 'user',
             avatarUrl: finalAvatarUrl,
             createdAt: new Date(),
             updatedAt: new Date(),
-            visualProfile: typeof avatarResult === 'string' ? undefined : avatarResult.visualProfile
+            visualProfile: visualProfile ? {
+              ...visualProfile,
+              // Ensure all required fields are present for story generation
+              appearance: visualProfile.appearance || `${name} has warm, expressive Pixar-style features perfect for storytelling`,
+              style: visualProfile.style || 'Consistent, child-friendly design with memorable visual elements',
+              personality: visualProfile.personality || 'Engaging, approachable personality that connects with children',
+              keyFeatures: visualProfile.keyFeatures || ['Distinctive appearance', 'Expressive features', 'Consistent design', 'Child-friendly appeal']
+            } : {
+              appearance: `${name} has warm, expressive Pixar-style features perfect for storytelling`,
+              style: 'Consistent, child-friendly design with memorable visual elements',
+              personality: 'Engaging, approachable personality that connects with children',
+              keyFeatures: ['Distinctive appearance', 'Expressive features', 'Consistent design', 'Child-friendly appeal']
+            }
           };
+          
+          console.log(`Created character ${name} with visual profile for story consistency:`, character.visualProfile);
 
           // Save to Firebase Firestore
-          const firebaseDb = getFirebaseServices();
-          if (firebaseDb.initialized) {
+          const { db } = getFirebaseServices();
+          if (initialized && db) {
             const userId = getUserId();
-            const charactersRef = firestore().collection('users').doc(userId).collection('characters');
-            await charactersRef.add({
+            await setDoc(doc(db, 'users', userId, 'characters', character.id), {
               name: character.name,
+              type: character.type,
               avatarUrl: character.avatarUrl,
-              createdAt: firestore.FieldValue.serverTimestamp(),
-              updatedAt: firestore.FieldValue.serverTimestamp()
+              visualProfile: character.visualProfile,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
             });
           }
 
@@ -246,7 +365,7 @@ export const useStorybookStore = create<StorybookState>()(
             characters: [...state.characters, character],
             generationProgress: {
               status: 'complete',
-              message: 'Avatar created successfully!',
+              message: `${name} is ready for storytelling!`,
               progress: 100
             }
           }));
@@ -273,7 +392,7 @@ export const useStorybookStore = create<StorybookState>()(
       // Delete a character
       deleteCharacter: async (characterId: string) => {
         try {
-          const { initialized } = getFirebaseServices();
+          const { initialized, db } = getFirebaseServices();
           if (initialized) {
             // Get character to find avatar URL for deletion
             const character = get().characters.find(c => c.id === characterId);
@@ -282,9 +401,9 @@ export const useStorybookStore = create<StorybookState>()(
             }
             
             // Delete from Firestore
+            if (!db) throw new Error('Firestore not initialized');
             const userId = getUserId();
-            const characterDoc = firestore().collection('users').doc(userId).collection('characters').doc(characterId);
-            await characterDoc.delete();
+            await deleteDoc(doc(db, 'users', userId, 'characters', characterId));
           }
           
           set(state => ({
@@ -299,37 +418,27 @@ export const useStorybookStore = create<StorybookState>()(
       // Load stories from Firebase
       loadStories: async () => {
         try {
-          const { initialized } = getFirebaseServices();
+          const { initialized, db } = getFirebaseServices();
           if (!initialized) {
             console.log('Firebase not initialized, skipping stories load');
             return;
           }
 
           const userId = getUserId();
-          const query = firestore().collection('users').doc(userId).collection('stories').orderBy('createdAt', 'desc');
-          const snapshot = await query.get();
-          
-          const stories: Story[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            // Ensure dates are properly converted
-            let createdAt: Date;
-            let updatedAt: Date;
-            
-            try {
-              createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-            } catch {
-              createdAt = new Date();
-            }
-            
-            try {
-              updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
-            } catch {
-              updatedAt = new Date();
-            }
-            
-            stories.push({
-              id: doc.id,
+          if (!db) throw new Error('Firestore not initialized');
+
+          const q = fsQuery(
+            collection(db, 'users', userId, 'stories'),
+            fsOrderBy('createdAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
+
+          const stories: Story[] = snapshot.docs.map((d) => {
+            const data: any = d.data();
+            const createdAt = (data.createdAt?.toDate ? data.createdAt.toDate() : new Date());
+            const updatedAt = (data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date());
+            return {
+              id: d.id,
               title: data.title,
               description: data.description,
               coverUrl: data.coverUrl,
@@ -340,10 +449,14 @@ export const useStorybookStore = create<StorybookState>()(
               createdAt,
               updatedAt,
               theme: data.theme,
-              ageGroup: data.ageGroup
-            });
+              ageGroup: data.ageGroup,
+              concept: data.concept,
+              childProfileId: data.childProfileId,
+              mode: data.mode,
+              goal: data.goal
+            } as Story;
           });
-          
+
           set({ stories });
         } catch (error) {
           console.error('Failed to load stories:', error);
@@ -360,6 +473,14 @@ export const useStorybookStore = create<StorybookState>()(
 
       // Create a new story
       createStory: async (request: StoryGenerationRequest) => {
+        console.log('Starting story creation with:', {
+          title: request.title,
+          concept: request.concept,
+          characterIds: request.characterIds,
+          pageCount: request.pageCount,
+          childProfile: request.childProfile
+        });
+        
         set({ 
           generationProgress: {
             status: 'generating',
@@ -371,11 +492,18 @@ export const useStorybookStore = create<StorybookState>()(
         });
 
         try {
-          // Get character names
-          const characters = get().characters.filter(c => 
+          // Get all available characters (both user and Gestalts)
+          const allAvailableCharacters = [...get().characters, ...get().gestaltsCharacters];
+          console.log('All available characters:', allAvailableCharacters.map(c => ({ id: c.id, name: c.name })));
+          console.log('Requested character IDs:', request.characterIds);
+          
+          // Filter selected characters
+          const selectedCharacters = allAvailableCharacters.filter(c => 
             request.characterIds.includes(c.id)
           );
-          const characterNames = characters.map(c => c.name);
+          console.log('Selected characters:', selectedCharacters.map(c => ({ id: c.id, name: c.name })));
+          
+          const characterNames = selectedCharacters.map(c => c.name);
           
           // Include child as character if selected
           const allCharacterNames = [...characterNames];
@@ -429,48 +557,62 @@ export const useStorybookStore = create<StorybookState>()(
           // Generate images for each page
           const pages = [];
           for (let i = 0; i < storyTexts.length; i++) {
+            // Generate page-specific visual context first
+            const pageContext = generatePageVisualContext(
+              i + 1,
+              storyTexts.length,
+              storyTexts[i],
+              request.concept || 'learning'
+            );
+            
+            const pageProgress = Math.round(20 + (i * 60 / storyTexts.length));
             set({ 
               generationProgress: {
                 status: 'generating',
-                message: `Illustrating page ${i + 1}...`,
-                progress: 20 + (i * 60 / storyTexts.length),
+                message: `Creating Pixar-style illustration for page ${i + 1}... (${pageContext.pageRole})`,
+                progress: pageProgress,
                 currentPage: i + 1,
                 totalPages: storyTexts.length
               }
             });
+            
+            console.log(`Starting image generation: Page ${i + 1}/${storyTexts.length} (${pageProgress}%)`);
+            console.log(`- Characters: ${allCharacterNames.join(', ')}`);
+            console.log(`- Concept: ${request.concept}`);
+            console.log(`- Scene: ${pageContext.visualEmphasis}`);
 
             // Get character avatar URLs as references
-            const referenceImages = characters.map(c => c.avatarUrl);
+            const referenceImages = selectedCharacters.map(c => c.avatarUrl).filter(url => url && url.length > 0);
+            console.log(`Page ${i + 1} - Reference images:`, referenceImages.length);
             
-            // Build character profiles for visual consistency
-            const characterProfiles = characters.map(char => ({
-              name: char.name,
-              appearance: char.visualProfile?.appearance || `${char.name} has distinctive Pixar-style features`,
-              style: char.visualProfile?.style || 'Child-friendly design with consistent visual identity',
-              keyFeatures: char.visualProfile?.keyFeatures || ['Memorable appearance', 'Consistent design']
-            }));
-            
-            // Add child profile if included as character
-            if (request.childProfile?.includeAsCharacter) {
-              characterProfiles.push({
-                name: request.childProfile.name,
-                appearance: `${request.childProfile.name} has warm, child-friendly Pixar-style features`,
-                style: 'Age-appropriate design that appeals to children',
-                keyFeatures: ['Friendly demeanor', 'Expressive eyes', 'Engaging personality']
-              });
-            }
+            // Build optimized character profiles using utility functions
+            const characterProfiles = buildCharacterProfiles(
+              allAvailableCharacters,
+              request.characterIds,
+              request.childProfile
+            );
+            console.log(`Page ${i + 1} - Character profiles:`, characterProfiles.map(cp => cp.name));
             
             // Build scene context for visual continuity
-            const sceneContext = {
-              setting: i === 0 ? 'Establishing the story world' : `Continuing from previous scene`,
-              mood: request.advanced?.tone || 'gentle',
-              colorPalette: ['warm', 'bright', 'friendly', 'inviting'],
-              visualStyle: 'Professional Pixar 3D animation style'
-            };
+            const sceneContext = buildSceneContext(
+              i + 1,
+              request.concept || 'learning',
+              request.advanced?.tone
+            );
+            
+            // Generate narrative context for better scene understanding
+            const narrativeContext = buildNarrativeContext(
+              storyTexts,
+              i,
+              request.title,
+              request.concept || 'learning'
+            );
+            
+            // Page context already generated above
 
-            // Generate illustration with enhanced character and scene context
+            // Generate illustration with comprehensive context and narrative understanding
             const imageUrl = await geminiService.generateStoryImage({
-              prompt: storyTexts[i],
+              prompt: `${narrativeContext.currentPageText} [Page Context: ${pageContext.pageRole} - ${pageContext.visualEmphasis}]`,
               style: 'pixar',
               referenceImages,
               context: {
@@ -479,24 +621,48 @@ export const useStorybookStore = create<StorybookState>()(
                 childName: request.childProfile?.includeAsCharacter ? request.childProfile.name : undefined,
                 pageNumber: i + 1,
                 totalPages: storyTexts.length,
-                previousPageContext: i > 0 ? `Previous page showed: ${storyTexts[i - 1].substring(0, 100)}...` : undefined,
+                previousPageContext: narrativeContext.previousPage ? `Previous page: "${narrativeContext.previousPage}"` : undefined,
                 sceneContext,
                 characterProfiles,
-                storyContext: `This is part of a learning story about ${request.concept} featuring ${allCharacterNames.join(', ')}`,
-                advanced: request.advanced
+                storyContext: buildStoryContextDescription(
+                  request.title,
+                  request.concept || 'learning',
+                  allCharacterNames
+                ),
+                advanced: request.advanced,
+                allStoryPages: storyTexts // Provide complete story context for narrative consistency
               }
             });
+            
+            console.log(`Generated image for ${pageContext.pageRole}:`);
+            console.log(`  - Text: "${narrativeContext.currentPageText.substring(0, 50)}..."`);
+            console.log(`  - Characters: ${allCharacterNames.join(', ')}`);
+            console.log(`  - Concept: ${request.concept}`);
+            console.log(`  - Image URL: ${imageUrl}`);
+            console.log(`  - Character profiles count: ${characterProfiles.length}`);
+            console.log(`  - Reference images count: ${referenceImages.length}`);
 
             // Upload to Firebase Storage if configured, otherwise use generated URL
             let finalImageUrl = imageUrl;
             const { initialized } = getFirebaseServices();
             if (initialized) {
               try {
+                set({ 
+                  generationProgress: {
+                    status: 'generating',
+                    message: `Saving page ${i + 1} illustration...`,
+                    progress: Math.round(20 + (i * 60 / storyTexts.length) + (10 / storyTexts.length)),
+                    currentPage: i + 1,
+                    totalPages: storyTexts.length
+                  }
+                });
+                
                 const userId = getUserId();
-                const path = `users/${userId}/stories/${story.id}/page_${i + 1}.jpg`;
+                const path = `users/${userId}/stories/${story.id}/page_${String(i + 1).padStart(2, '0')}.jpg`;
                 finalImageUrl = await uploadImageToStorage(imageUrl, path);
+                console.log(`Successfully uploaded page ${i + 1} image to Firebase Storage`);
               } catch (error) {
-                console.warn('Failed to upload to Firebase Storage, using generated URL:', error);
+                console.warn(`Failed to upload page ${i + 1} to Firebase Storage, using generated URL:`, error);
                 finalImageUrl = imageUrl;
               }
             }
@@ -515,11 +681,9 @@ export const useStorybookStore = create<StorybookState>()(
           story.generationProgress = 100;
 
           // Save to Firebase Firestore
-          const firebaseStoryDb = getFirebaseServices();
-          if (firebaseStoryDb.initialized) {
+          const { initialized, db } = getFirebaseServices();
+          if (initialized && db) {
             const userId = getUserId();
-            const storiesRef = firestore().collection('users').doc(userId).collection('stories');
-            // Filter out undefined values for Firestore
             const storyData: any = {
               title: story.title,
               description: story.description,
@@ -528,19 +692,17 @@ export const useStorybookStore = create<StorybookState>()(
               pages: story.pages,
               status: story.status,
               generationProgress: story.generationProgress,
-              createdAt: firestore.FieldValue.serverTimestamp(),
-              updatedAt: firestore.FieldValue.serverTimestamp()
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
             };
-            
-            // Only add optional fields if they have values
             if (story.theme) storyData.theme = story.theme;
             if (story.ageGroup) storyData.ageGroup = story.ageGroup;
             if (story.concept) storyData.concept = story.concept;
             if (story.childProfileId) storyData.childProfileId = story.childProfileId;
             if (story.mode) storyData.mode = story.mode;
             if (story.goal) storyData.goal = story.goal;
-            
-            await storiesRef.add(storyData);
+
+            await setDoc(doc(db, 'users', userId, 'stories', story.id), storyData);
           }
 
           // Update local state
@@ -578,7 +740,7 @@ export const useStorybookStore = create<StorybookState>()(
       // Delete a story
       deleteStory: async (storyId: string) => {
         try {
-          const { initialized } = getFirebaseServices();
+          const { initialized, db } = getFirebaseServices();
           if (initialized) {
             // Get story to find image URLs for deletion
             const story = get().stories.find(s => s.id === storyId);
@@ -596,9 +758,9 @@ export const useStorybookStore = create<StorybookState>()(
             }
             
             // Delete from Firestore
+            if (!db) throw new Error('Firestore not initialized');
             const userId = getUserId();
-            const storyDoc = firestore().collection('users').doc(userId).collection('stories').doc(storyId);
-            await storyDoc.delete();
+            await deleteDoc(doc(db, 'users', userId, 'stories', storyId));
           }
           
           set(state => ({
@@ -661,13 +823,12 @@ export const useStorybookStore = create<StorybookState>()(
           };
 
           // Save to Firebase Firestore
-          const firebaseRefineDb = getFirebaseServices();
-          if (firebaseRefineDb.initialized) {
+          const { initialized, db } = getFirebaseServices();
+          if (initialized && db) {
             const userId = getUserId();
-            const storyDoc = firestore().collection('users').doc(userId).collection('stories').doc(storyId);
-            await storyDoc.update({
+            await updateDoc(doc(db, 'users', userId, 'stories', storyId), {
               pages: updatedStory.pages,
-              updatedAt: firestore.FieldValue.serverTimestamp()
+              updatedAt: serverTimestamp()
             });
           }
 

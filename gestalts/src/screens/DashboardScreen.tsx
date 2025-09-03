@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 import { ProfileSetupNotification } from '../components/ProfileSetupNotification';
 import { useAuth } from '../contexts/AuthContext';
 import { BlurView } from 'expo-blur';

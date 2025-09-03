@@ -62,73 +62,45 @@ export function BottomNavigation({
 
   return (
     <>
-      {/* Enhanced Shadow Base for Strong Elevation */}
+      {/* White Gradient Fade - Creates fade effect for content scrolling behind */}
       <View style={{
         position: 'absolute',
-        bottom: 0,
+        bottom: 85, // Positioned right above the navigation bar
         left: 0,
         right: 0,
-        height: 120,
-        backgroundColor: 'transparent',
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: -20 },
-        shadowOpacity: 0.4,
-        shadowRadius: 40,
-        elevation: 50
-      }} />
+        height: 100, // Extended height to blend with shadow
+        pointerEvents: 'none', // Allows touch events to pass through
+        zIndex: 998 // Below navigation but above content
+      }}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,1)']}
+          locations={[0, 0.4, 0.75, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={{
+            flex: 1
+          }}
+        />
+      </View>
 
-
-
-      {/* Bottom Navigation with Enhanced Elevation */}
+      {/* Bottom Navigation with Clean Shadow */}
       <View style={{
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
         backgroundColor: 'white',
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.08)',
         paddingTop: tokens.spacing.gap.sm,
         paddingHorizontal: tokens.spacing.gap.md,
         paddingBottom: tokens.spacing.gap.sm + 10,
         height: 85,
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 25,
-        overflow: 'visible'
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 20,
+        zIndex: 1000
       }}>
-        {/* Strong separation border */}
-        <View style={{
-          position: 'absolute',
-          top: -2,
-          left: 0,
-          right: 0,
-          height: 2,
-          backgroundColor: 'rgba(0,0,0,0.1)',
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 10
-        }} />
-        
-        {/* Enhanced white background with subtle gradient */}
-        <LinearGradient
-          colors={['rgba(248,250,252,1)', 'rgba(255,255,255,1)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '100%',
-            borderTopLeftRadius: 12,
-            borderTopRightRadius: 12
-          }}
-        />
         
         <View style={{ 
           flexDirection: 'row', 
@@ -398,7 +370,7 @@ export function BottomNavigation({
         bottom: 42,
         left: '50%',
         marginLeft: -36,
-        zIndex: 1001,
+        zIndex: 1002, // Ensure it's above everything
         transform: [{ scale: pulseAnim }]
       }}>
         <TouchableOpacity 
