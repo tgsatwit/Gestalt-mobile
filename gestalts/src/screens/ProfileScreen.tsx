@@ -7,7 +7,7 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
 
 type ProfileTab = 'details' | 'notifications' | 'account';

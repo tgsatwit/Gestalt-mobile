@@ -7,7 +7,7 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ChildProfile as FirebaseChildProfile } from '../types/profile';
 import childProfileService from '../services/childProfileService';

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 
 export default function KnowledgeScreen() {
 	const { tokens } = useTheme();

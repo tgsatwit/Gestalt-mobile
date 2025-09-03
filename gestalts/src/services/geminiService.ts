@@ -48,7 +48,9 @@ const getGeminiApiKey = (): string => {
 
 class GeminiService {
   private genAI: GoogleGenerativeAI | null = null;
-  private model: any = null;
+  private textModel: any = null;
+  private imageModel: any = null; // For image generation
+  private visionModel: any = null; // For image analysis
   private initialized: boolean = false;
 
   constructor() {
@@ -62,10 +64,14 @@ class GeminiService {
       console.log('🔑 API key retrieved, initializing GoogleGenerativeAI...');
       
       this.genAI = new GoogleGenerativeAI(apiKey);
-      // Using gemini-2.5-flash-image-preview for image generation capabilities
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' });
+      // Initialize different models for different tasks
+      this.textModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      this.imageModel = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' });
+      this.visionModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
       this.initialized = true;
-      console.log('✅ Gemini service initialized successfully with model: gemini-2.5-flash-image-preview');
+      console.log('✅ Gemini service initialized successfully');
+      console.log('🎨 Image generation model: gemini-2.5-flash-image-preview');
+      console.log('💬 Text generation model: gemini-1.5-pro');
     } catch (error) {
       console.error('❌ Failed to initialize Gemini service:', error);
       console.error('Initialization error details:', (error as Error).message || error);
@@ -75,7 +81,7 @@ class GeminiService {
   }
 
   private checkInitialized() {
-    if (!this.initialized || !this.genAI || !this.model) {
+    if (!this.initialized || !this.genAI || !this.textModel || !this.imageModel || !this.visionModel) {
       console.log('🔄 Service not initialized, attempting to reinitialize...');
       // Try to reinitialize
       this.initialize();
@@ -141,28 +147,191 @@ class GeminiService {
       };
 
       // Generate avatar with Gemini 2.5 Flash Image Preview
-      console.log('Avatar generation requested for:', request.characterName);
+      console.log('🎨 Avatar generation requested for:', request.characterName);
       
       try {
-        const result = await this.model.generateContent([prompt, imagePart]);
+        const result = await this.imageModel.generateContent([prompt, imagePart]);
         const response = await result.response;
         
-        // Check if the response contains generated image data
+        // Check if the response contains generated image data or text analysis
         if (response.candidates && response.candidates[0]) {
           const candidate = response.candidates[0];
-          // For now, return placeholder until we can extract actual image data
-          console.log('Gemini 2.5 image generation response received');
-          return this.generatePlaceholderImage(style, request.characterName || 'avatar');
+          console.log('✅ Gemini 2.5 response received for avatar generation');
+          
+          // Try to extract character analysis from the response
+          let characterProfile;
+          if (candidate.content && candidate.content.parts) {
+            const textResponse = candidate.content.parts
+              .filter((part: any) => part.text)
+              .map((part: any) => part.text)
+              .join(' ');
+            
+            if (textResponse && textResponse.length > 50) {
+              console.log('📝 Character analysis received from Gemini');
+              characterProfile = this.extractCharacterProfile(textResponse, request.characterName || 'Character');
+            }
+          }
+          
+          // Generate enhanced placeholder with character analysis
+          const avatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
+          
+          if (characterProfile) {
+            return {
+              imageUrl: avatarUrl,
+              visualProfile: characterProfile
+            };
+          }
+          
+          return avatarUrl;
         }
       } catch (error) {
-        console.warn('Gemini image generation failed, using placeholder:', error);
+        console.warn('⚠️ Gemini image generation failed, trying vision analysis fallback:', error);
+        console.log('Error details:', (error as Error).message || error);
+        
+        // Try fallback with vision model for character analysis
+        try {
+          const analysisResult = await this.analyzePhotoForCharacter(request);
+          if (analysisResult) {
+            const avatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
+            return {
+              imageUrl: avatarUrl,
+              visualProfile: analysisResult
+            };
+          }
+        } catch (visionError) {
+          console.warn('⚠️ Vision analysis also failed:', visionError);
+        }
       }
       
-      return this.generatePlaceholderImage(style, request.characterName || 'avatar');
+      // Return enhanced placeholder with basic character profile
+      const avatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
+      const basicProfile = this.generateBasicCharacterProfile(request.characterName || 'Character');
+      
+      return {
+        imageUrl: avatarUrl,
+        visualProfile: basicProfile
+      };
     } catch (error) {
       console.error('Avatar generation failed:', error);
       throw this.handleError(error as Error);
     }
+  }
+
+  /**
+   * Analyze photo for character traits using vision model
+   */
+  private async analyzePhotoForCharacter(request: AvatarGenerationRequest): Promise<{
+    appearance: string;
+    style: string;
+    personality: string;
+    keyFeatures: string[];
+  } | null> {
+    try {
+      const analysisPrompt = `Analyze this photo to create a detailed character profile for a Pixar-style children's storybook character named "${request.characterName || 'Character'}".
+
+Provide a detailed analysis focusing on:
+
+PHYSICAL APPEARANCE:
+- Facial features (eyes, nose, mouth, face shape)
+- Hair color, style, and texture
+- Skin tone and complexion
+- Overall build and posture
+- Age appearance
+
+STYLE ELEMENTS:
+- Clothing style and colors
+- Accessories or distinctive items
+- Overall aesthetic preferences
+- Color palette that suits them
+
+PERSONALITY TRAITS (inferred from photo):
+- Facial expression and what it suggests
+- Body language and posture
+- Energy level (calm, energetic, thoughtful, etc.)
+- Approachability and demeanor
+
+KEY DISTINCTIVE FEATURES:
+- Most memorable physical characteristics
+- Unique traits that would make them recognizable
+- Features that should be preserved in Pixar adaptation
+
+Format your response as:
+APPEARANCE: [detailed physical description]
+STYLE: [clothing and aesthetic description] 
+PERSONALITY: [personality traits inferred from photo]
+KEY_FEATURES: [list 3-5 distinctive features]`;
+
+      const imagePart = {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: request.photoData.replace(/^data:image\/\w+;base64,/, '')
+        }
+      };
+
+      console.log('🔍 Analyzing photo for character traits...');
+      const result = await this.visionModel.generateContent([analysisPrompt, imagePart]);
+      const response = await result.response;
+      const analysisText = response.text();
+
+      if (analysisText && analysisText.length > 100) {
+        console.log('✅ Photo analysis completed');
+        return this.parseCharacterAnalysis(analysisText, request.characterName || 'Character');
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Photo analysis failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse character analysis text into structured format
+   */
+  private parseCharacterAnalysis(analysisText: string, characterName: string): {
+    appearance: string;
+    style: string;
+    personality: string;
+    keyFeatures: string[];
+  } {
+    const appearance = this.extractSection(analysisText, 'APPEARANCE') || 
+      `${characterName} has distinctive features suitable for Pixar-style animation with warm, expressive characteristics`;
+    
+    const style = this.extractSection(analysisText, 'STYLE') || 
+      `Colorful, child-friendly clothing with a consistent design aesthetic that maintains visual identity`;
+    
+    const personality = this.extractSection(analysisText, 'PERSONALITY') || 
+      `Warm, engaging, and child-friendly personality that comes through in expressions and poses`;
+
+    // Extract key features
+    const keyFeaturesText = this.extractSection(analysisText, 'KEY_FEATURES');
+    let keyFeatures: string[] = [];
+    
+    if (keyFeaturesText) {
+      // Try to parse numbered or bulleted list
+      keyFeatures = keyFeaturesText
+        .split(/[\n\r]+/)
+        .map(line => line.replace(/^[-•*\d.)\s]+/, '').trim())
+        .filter(line => line.length > 0)
+        .slice(0, 5);
+    }
+    
+    if (keyFeatures.length === 0) {
+      keyFeatures = [
+        'Distinctive facial features',
+        'Memorable color scheme', 
+        'Expressive eyes',
+        'Friendly demeanor',
+        'Recognizable silhouette'
+      ];
+    }
+
+    return {
+      appearance,
+      style,
+      personality,
+      keyFeatures
+    };
   }
 
   /**
@@ -174,10 +343,10 @@ class GeminiService {
       concept?: string;
       characterNames?: string[];
       childName?: string;
-      storyContext?: string; // Full story context for consistency
+      storyContext?: string;
       pageNumber?: number;
       totalPages?: number;
-      previousPageContext?: string; // Visual continuity from previous page
+      previousPageContext?: string;
       sceneContext?: {
         setting: string;
         mood: string;
@@ -189,6 +358,7 @@ class GeminiService {
         appearance: string;
         style: string;
         keyFeatures: string[];
+        avatarUrl?: string;
       }>;
       advanced?: {
         density: 'one-word' | 'one-sentence' | 'multiple-sentences';
@@ -198,6 +368,7 @@ class GeminiService {
         tone: 'playful' | 'gentle' | 'encouraging' | 'educational';
         goal: string;
       };
+      allStoryPages?: string[];
     };
   }): Promise<string> {
     try {
@@ -209,6 +380,8 @@ class GeminiService {
         
         SCENE TO ILLUSTRATE: ${request.prompt}
         
+        STORY CONTEXT: This is ${request.context?.pageNumber ? `page ${request.context.pageNumber} of ${request.context.totalPages}` : 'a page'} in the story "${request.context?.concept ? `about learning ${request.context.concept}` : 'adventure'}".
+        
         PIXAR STYLE REQUIREMENTS (Hyper-Specific for Consistency):
         - Professional Pixar 3D animation aesthetic matching Toy Story, Finding Nemo, and Coco visual quality
         - Vibrant, saturated color palette with soft, warm directional lighting from upper left
@@ -217,13 +390,15 @@ class GeminiService {
         - Dynamic composition following rule of thirds with clear focal hierarchy
         - Expressive character emotions through eyebrow position, mouth shape, and body posture
         - Rich environmental details with atmospheric perspective and depth cues
+        - Background should complement the story narrative and support character actions
         
         CRITICAL CHARACTER CONSISTENCY GUIDELINES:
         - MAINTAIN IDENTICAL character appearance across ALL illustrations in this story sequence
         - Each character MUST have the same facial structure, hair color/style, eye color, and body proportions
         - Clothing styles and colors MUST remain consistent throughout the story
         - Character expressions should vary naturally while preserving core facial features
-        - Use step-by-step character description approach for precision`;
+        - Use step-by-step character description approach for precision
+        - Characters should be positioned and posed to naturally illustrate the story text`;
       
       // Add detailed character profiles for consistency (following Gemini 2.5 best practices)
       if (request.context) {
@@ -269,6 +444,22 @@ class GeminiService {
         - Style: ${profile.style}
         - Key Features: ${profile.keyFeatures.join(', ')}`;
           });
+        }
+        
+        // Add narrative story context for better scene understanding
+        if (request.context.allStoryPages && request.context.pageNumber) {
+          const currentPageIndex = request.context.pageNumber - 1;
+          const previousPage = currentPageIndex > 0 ? request.context.allStoryPages[currentPageIndex - 1] : null;
+          const nextPage = currentPageIndex < request.context.allStoryPages.length - 1 ? request.context.allStoryPages[currentPageIndex + 1] : null;
+          
+          enhancedPrompt += `
+        
+        NARRATIVE CONTEXT FOR VISUAL CONSISTENCY:
+        - CURRENT PAGE TEXT: "${request.context.allStoryPages[currentPageIndex] || request.prompt}"
+        ${previousPage ? `- PREVIOUS PAGE: "${previousPage}"` : ''}
+        ${nextPage ? `- NEXT PAGE PREVIEW: "${nextPage}"` : ''}
+        - VISUAL FLOW: This illustration should naturally connect the story progression
+        - SCENE TRANSITION: Show appropriate continuation from previous events while setting up what comes next`;
         }
         
         // Add visual continuity context (critical for sequential consistency)
@@ -350,30 +541,97 @@ class GeminiService {
         - Inclusive and diverse representation when possible
         - Educational value embedded naturally in the visual storytelling`;
 
-      // Enhanced reference image handling for character consistency (Gemini 2.5 best practice)
+      // Enhanced character avatar integration for consistency
       const parts: any[] = [enhancedPrompt];
+      const characterAvatars: any[] = [];
       
-      if (request.referenceImages && request.referenceImages.length > 0) {
+      console.log('🎭 Processing character profiles for image generation:');
+      console.log('  - Character profiles available:', request.context?.characterProfiles?.length || 0);
+      
+      // Process character avatars for visual consistency
+      if (request.context?.characterProfiles && request.context.characterProfiles.length > 0) {
+        console.log('  - Character profiles:', request.context.characterProfiles.map(cp => ({ name: cp.name, hasAvatar: !!cp.avatarUrl })));
+        
         enhancedPrompt += `
         
-        CHARACTER REFERENCE IMAGES PROVIDED (CRITICAL FOR CONSISTENCY):
-        INSTRUCTION: Use these reference images as EXACT templates for character appearance
-        - MATCHING REQUIREMENT: Character features, proportions, and style must match references precisely
-        - ADAPTATION APPROACH: Naturally integrate reference characters into this new scene
-        - CONSISTENCY CHECK: Every character detail should be verifiable against the provided references
-        - NO CREATIVE LIBERTIES: Do not add, remove, or modify character design elements`;
+        CHARACTER AVATAR REFERENCES PROVIDED (CRITICAL FOR CONSISTENCY):
+        INSTRUCTION: Use these avatar references as EXACT templates for character appearance in the story scene
+        - MATCHING REQUIREMENT: Character features, proportions, and style must match avatar references precisely
+        - SCENE INTEGRATION: Naturally pose and position characters within the story scene
+        - EXPRESSION ADAPTATION: Maintain character identity while showing appropriate emotions for the scene
+        - CONSISTENCY CHECK: Every character detail should match their established avatar design`;
         
-        // Process reference images with specific instructions
-        for (let i = 0; i < Math.min(request.referenceImages.length, 3); i++) { // Limit to 3 as per Gemini 2.5 best practices
+        // Process up to 3 character avatars for Gemini 2.5 best practices
+        for (let i = 0; i < Math.min(request.context.characterProfiles.length, 3); i++) {
+          const character = request.context.characterProfiles[i];
+          console.log(`  - Processing character ${i + 1}: ${character.name}, avatar: ${character.avatarUrl ? 'available' : 'none'}`);
+          
+          if (character.avatarUrl && character.avatarUrl.length > 0) {
+            try {
+              console.log(`    - Attempting to download avatar: ${character.avatarUrl}`);
+              // Download and convert avatar to base64 for reference
+              const avatarData = await this.downloadImageAsBase64(character.avatarUrl);
+              console.log(`    - Successfully converted avatar to base64 (${avatarData.length} chars)`);
+              
+              parts.push({
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: avatarData
+                }
+              });
+              
+              enhancedPrompt += `
+        
+        CHARACTER AVATAR REFERENCE ${i + 1}: ${character.name}
+        - VISUAL TEMPLATE: Use this avatar as the exact visual reference for ${character.name}
+        - APPEARANCE: ${character.appearance}
+        - STYLE NOTES: ${character.style}
+        - KEY FEATURES TO PRESERVE: ${character.keyFeatures.join(', ')}
+        - SCENE ROLE: Position ${character.name} naturally within the scene while maintaining avatar consistency`;
+              
+              characterAvatars.push(character);
+              console.log(`    - Added ${character.name} avatar reference to generation context`);
+            } catch (error) {
+              console.warn(`    - Failed to load avatar for ${character.name}:`, (error as Error).message);
+              console.warn(`    - Avatar URL was: ${character.avatarUrl}`);
+              // Continue without this avatar reference but still include character description
+              enhancedPrompt += `
+        
+        CHARACTER DESCRIPTION ${i + 1}: ${character.name} (Avatar load failed)
+        - APPEARANCE: ${character.appearance}
+        - STYLE NOTES: ${character.style}
+        - KEY FEATURES: ${character.keyFeatures.join(', ')}
+        - NOTE: Generate appearance based on description (avatar reference failed to load)`;
+            }
+          } else {
+            console.log(`    - No avatar URL for ${character.name}, using description-based generation`);
+            // No avatar URL available, use description-based character generation
+            enhancedPrompt += `
+        
+        CHARACTER DESCRIPTION ${i + 1}: ${character.name}
+        - APPEARANCE: ${character.appearance}
+        - STYLE NOTES: ${character.style}
+        - KEY FEATURES: ${character.keyFeatures.join(', ')}
+        - NOTE: Generate appearance based on description (ideal for child characters)`;
+          }
+        }
+      }
+      
+      // Handle legacy reference images if provided
+      if (request.referenceImages && request.referenceImages.length > 0 && characterAvatars.length === 0) {
+        enhancedPrompt += `
+        
+        CHARACTER REFERENCE IMAGES PROVIDED (FALLBACK METHOD):
+        INSTRUCTION: Use these reference images as templates for character appearance`;
+        
+        for (let i = 0; i < Math.min(request.referenceImages.length, 3 - characterAvatars.length); i++) {
           const refImage = request.referenceImages[i];
           
-          // Convert reference image (handle both base64 and URL)
           let imageData: string;
           if (refImage.startsWith('data:')) {
             imageData = refImage.replace(/^data:image\/\w+;base64,/, '');
           } else {
-            // For URL-based images, we'd need to download first (placeholder for now)
-            console.warn('URL-based reference images not yet supported, using placeholder');
+            console.warn('URL-based reference images not yet supported');
             continue;
           }
           
@@ -384,62 +642,118 @@ class GeminiService {
             }
           });
           
-          // Add specific character reference instructions
           const characterName = request.context?.characterNames?.[i] || `Character ${i + 1}`;
           enhancedPrompt += `
         
         REFERENCE IMAGE ${i + 1}: ${characterName}
-        - Use this as the EXACT visual template for ${characterName}
-        - Match facial features, hair style, clothing, and proportions precisely
-        - Adapt pose and expression naturally while maintaining character identity`;
+        - Use this as the visual template for ${characterName}
+        - Match key features while adapting to the scene naturally`;
         }
-        
-        // Update the parts array with the enhanced prompt
-        parts[0] = enhancedPrompt;
       }
+      
+      // Update the parts array with the enhanced prompt
+      parts[0] = enhancedPrompt;
 
       try {
-        console.log('Generating sequential Pixar-style story illustration with Gemini 2.5 Flash Image Preview...');
-        console.log(`Page ${request.context?.pageNumber || 1} of ${request.context?.totalPages || 1}`);
+        console.log('🎨 Generating enhanced story illustration description with Gemini...');
+        console.log(`📖 Page ${request.context?.pageNumber || 1} of ${request.context?.totalPages || 1}`);
+        console.log(`🎭 Characters: ${request.context?.characterNames?.join(', ') || 'none'}`);
+        console.log(`📝 Scene: ${request.prompt.substring(0, 100)}...`);
         
-        const result = await this.model.generateContent(parts);
+        // Try to generate actual image using Gemini image generation model
+        console.log('🎨 Attempting real image generation with gemini-2.5-flash-image-preview...');
+        
+        const result = await this.imageModel.generateContent(parts);
         const response = await result.response;
         
-        // Enhanced response handling for Gemini 2.5 Flash Image Preview
+        console.log('📥 Gemini API Response received:');
+        console.log('  - Candidates:', response.candidates?.length || 0);
+        
+        // Process the image generation response from Gemini
         if (response.candidates && response.candidates[0]) {
           const candidate = response.candidates[0];
-          console.log('Gemini 2.5 Flash Image Preview response received');
+          console.log('✅ Gemini image generation response received successfully');
           
-          // TODO: Extract actual image data when Gemini 2.5 Flash Image Preview API is fully available
-          // For now, return enhanced placeholder with sequential context
-          const sequentialSeed = `page-${request.context?.pageNumber || 1}-${request.prompt}-${mainCharacter}-${request.context?.concept || 'story'}`;
-          console.log(`Using sequential seed for consistency: ${sequentialSeed}`);
+          // Check for actual image data in the response
+          if (candidate.content?.parts) {
+            for (const part of candidate.content.parts) {
+              if (part.inlineData) {
+                console.log('🖼️ Found generated image data!');
+                console.log(`   MIME type: ${part.inlineData.mimeType}`);
+                console.log(`   Data size: ${part.inlineData.data?.length || 0} chars`);
+                
+                // Save the generated image and return its URL
+                const imageUrl = await this.saveGeneratedImage(part.inlineData.data, part.inlineData.mimeType, request);
+                console.log('✅ Image generation completed successfully!');
+                return imageUrl;
+              }
+            }
+          }
           
-          return this.generatePlaceholderImage('pixar-sequential', sequentialSeed);
+          // If we get here, no image data was found in the response
+          console.log('⚠️ No image data found in Gemini response, falling back to placeholder');
+          
+          // Try to extract any text description that might be useful
+          let textContent = '';
+          if (candidate.content?.parts) {
+            textContent = candidate.content.parts
+              .filter((part: any) => part.text)
+              .map((part: any) => part.text)
+              .join(' ');
+          }
+          
+          if (textContent) {
+            console.log(`📝 Generated description (${textContent.length} chars): "${textContent.substring(0, 100)}..."`);
+          }
+          
+          // Create fallback placeholder with enhanced context
+          const sequentialSeed = `story-${request.context?.concept || 'learning'}-page${String(request.context?.pageNumber || 1).padStart(2, '0')}-${mainCharacter.replace(/\s+/g, '')}-fallback`;
+          console.log(`🎨 Creating fallback placeholder with seed: ${sequentialSeed}`);
+          
+          return this.generatePlaceholderImage('pixar-sequential', sequentialSeed, textContent || request.prompt);
+        } else {
+          console.log('❌ No candidates found in Gemini response');
+          throw new Error('No candidates in Gemini response');
         }
       } catch (error) {
-        console.error('❌ GEMINI API ERROR - Image Generation Failed:', error);
-        console.error('Error details:', (error as Error).message || error);
-        console.error('Error type:', typeof error);
+        const errorMessage = (error as Error).message || String(error);
+        console.error('❌ GEMINI API ERROR - Image Generation Failed:');
+        console.error('   📄 Page:', request.context?.pageNumber || 1);
+        console.error('   🎭 Characters:', request.context?.characterNames?.join(', ') || 'none');
+        console.error('   💬 Error:', errorMessage);
+        console.error('   🔍 Error Type:', typeof error);
         
-        // Enhanced error handling with context preservation
-        if ((error as Error).message?.includes('not supported') || (error as Error).message?.includes('quota')) {
-          console.log('📝 API quota or feature not supported - using placeholder');
-        } else if ((error as Error).message?.includes('API key')) {
-          console.log('🔑 API key issue detected - using placeholder');
+        // Enhanced error classification and handling
+        let fallbackReason = 'generic-error';
+        if (errorMessage.includes('not supported') || errorMessage.includes('feature')) {
+          fallbackReason = 'feature-not-supported';
+          console.log('📝 Gemini image generation feature not yet available - using enhanced placeholder');
+        } else if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+          fallbackReason = 'quota-exceeded';
+          console.log('⏰ API quota exceeded - using placeholder with retry suggestion');
+        } else if (errorMessage.includes('API key') || errorMessage.includes('auth')) {
+          fallbackReason = 'auth-error';
+          console.log('🔑 Authentication issue - using placeholder');
+        } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+          fallbackReason = 'network-error';
+          console.log('🌐 Network connectivity issue - using placeholder');
         } else {
-          console.log('🔧 Generic API error - using placeholder');
+          console.log('🔧 Generic API error - using placeholder with error context');
         }
         
-        // Return fallback image immediately on API error
-        const errorFallbackSeed = `page-${request.context?.pageNumber || 1}-${request.prompt}-${mainCharacter}-error-fallback`;
-        console.log('🎨 Generating fallback placeholder image with seed:', errorFallbackSeed);
-        return this.generatePlaceholderImage('pixar-sequential', errorFallbackSeed);
+        // Return contextual fallback image with error information
+        const errorFallbackSeed = `story-${request.context?.concept || 'learning'}-page${String(request.context?.pageNumber || 1).padStart(2, '0')}-${mainCharacter.replace(/\s+/g, '')}-${fallbackReason}`;
+        console.log('🎨 Generating contextual fallback image with seed:', errorFallbackSeed);
+        
+        // Create fallback description based on the prompt
+        const fallbackDescription = `Pixar-style scene showing ${mainCharacter} in a ${request.context?.concept || 'learning'} story. ${request.prompt.substring(0, 100)}`;
+        return this.generatePlaceholderImage('pixar-sequential', errorFallbackSeed, fallbackDescription);
       }
       
       // Enhanced fallback with sequential context
-      const sequentialSeed = `page-${request.context?.pageNumber || 1}-${request.prompt}-${mainCharacter}-${request.context?.sceneContext?.setting || 'scene'}`;
-      return this.generatePlaceholderImage('pixar-sequential', sequentialSeed);
+      const sequentialSeed = `story-${request.context?.concept || 'learning'}-page${String(request.context?.pageNumber || 1).padStart(2, '0')}-${mainCharacter.replace(/\s+/g, '')}-fallback`;
+      const fallbackDescription = `Pixar-style illustration of ${mainCharacter} in ${request.context?.concept || 'learning'} story: ${request.prompt.substring(0, 100)}`;
+      return this.generatePlaceholderImage('pixar-sequential', sequentialSeed, fallbackDescription);
     } catch (error) {
       console.error('❌ OUTER CATCH - Story image generation failed completely:', error);
       console.error('Full error object:', JSON.stringify(error, null, 2));
@@ -466,7 +780,7 @@ class GeminiService {
         }
       };
 
-      const result = await this.model.generateContent([prompt, imagePart]);
+      const result = await this.visionModel.generateContent([prompt, imagePart]);
       const response = await result.response;
       
       // Temporary placeholder
@@ -567,7 +881,7 @@ class GeminiService {
         And so on...`;
 
       console.log('Generating personalized story text with character names...');
-      const result = await this.model!.generateContent(prompt);
+      const result = await this.textModel!.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -646,7 +960,7 @@ class GeminiService {
           const continuePrompt = `Continue the story of "${title}" featuring ${allCharacters.join(', ')}. Write page ${pageNum} of ${pageCount}. This should be a complete scene that continues naturally from the previous pages. Make sure to use character names (especially ${mainCharacter}) and not generic terms. Write only the story text for this page:`;
           
           try {
-            const continueResult = await this.model!.generateContent(continuePrompt);
+            const continueResult = await this.textModel!.generateContent(continuePrompt);
             const continueResponse = await continueResult.response;
             let pageText = continueResponse.text().trim();
             
@@ -722,7 +1036,7 @@ Main character: ${mainCharacter}`;
       
       prompt += `\n\nWrite only the story text for page ${pageNumber}. Use the character names (especially ${mainCharacter}) and make it engaging for children. Do not include "Page ${pageNumber}:" in your response.`;
       
-      const result = await this.model!.generateContent(prompt);
+      const result = await this.textModel!.generateContent(prompt);
       const response = await result.response;
       let pageText = response.text().trim();
       
@@ -776,6 +1090,47 @@ Main character: ${mainCharacter}`;
   }
 
   /**
+   * Save generated image data to filesystem and return URL
+   */
+  private async saveGeneratedImage(
+    imageData: string, 
+    mimeType: string, 
+    request: ImageGenerationRequest & { context?: any }
+  ): Promise<string> {
+    try {
+      console.log('💾 Saving generated image to filesystem...');
+      
+      // Create a unique filename based on request context
+      const timestamp = Date.now();
+      const pageId = request.context?.pageNumber ? `page${request.context.pageNumber}` : 'img';
+      const storyId = request.context?.concept?.substring(0, 10).replace(/[^a-zA-Z0-9]/g, '') || 'story';
+      const filename = `${storyId}_${pageId}_${timestamp}.png`;
+      const filePath = `${FileSystem.documentDirectory}storybook_images/${filename}`;
+      
+      // Ensure the directory exists
+      const dirPath = `${FileSystem.documentDirectory}storybook_images/`;
+      const dirInfo = await FileSystem.getInfoAsync(dirPath);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
+        console.log('📁 Created storybook_images directory');
+      }
+      
+      // Write the base64 image data to file
+      await FileSystem.writeAsStringAsync(filePath, imageData, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      console.log('✅ Image saved successfully:', filePath);
+      return filePath;
+    } catch (error) {
+      console.error('❌ Failed to save generated image:', error);
+      // Return a fallback placeholder instead of throwing
+      const fallbackSeed = `error-${Date.now()}`;
+      return this.generatePlaceholderImage('pixar-sequential', fallbackSeed, 'Image save failed');
+    }
+  }
+
+  /**
    * Helper to download an image and convert to base64
    */
   private async downloadImageAsBase64(url: string): Promise<string> {
@@ -800,47 +1155,83 @@ Main character: ${mainCharacter}`;
   }
 
   /**
-   * Generate enhanced placeholder images with sequential consistency context
+   * Generate enhanced placeholder images with sequential consistency and narrative context
    */
-  private generatePlaceholderImage(style: string, seed: string): string {
-    // Enhanced hash generation for better distribution
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-      const char = seed.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
+  private generatePlaceholderImage(style: string, seed: string, sceneDescription?: string): string {
+    console.log(`🖼️  Generating placeholder image: style="${style}", seed="${seed}"`);
+    if (sceneDescription) {
+      console.log(`   Scene context: "${sceneDescription.substring(0, 100)}..."`);
     }
     
-    const hashAbs = Math.abs(hash);
-    
-    // Enhanced color palettes for better visual consistency
-    const colorPalettes = {
-      'pixar': ['87CEEB', 'F0E68C', 'FFB6C1', 'DDA0DD', 'F5DEB3'],          // Pixar-inspired soft colors
-      'pixar-sequential': ['4169E1', 'FF6347', 'FFD700', '32CD32', 'FF69B4'], // Bright, distinct colors for sequence
-      'story': ['E6E6FA', 'B0E0E6', 'FFFFE0', 'FFF0F5', 'F0FFF0']           // Gentle story colors
-    };
-    
-    const palette = colorPalettes[style as keyof typeof colorPalettes] || colorPalettes['story'];
-    const bgColor = palette[hashAbs % palette.length];
-    const textColor = '333333';
-    
-    // Enhanced placeholder text based on style and context
-    let placeholderText = 'Story\nImage';
-    if (style === 'pixar' || style === 'pixar-sequential') {
-      placeholderText = 'Pixar\nStyle';
+    // For avatar generation, use avatar-specific placeholders
+    if (style === 'pixar' && !seed.includes('page') && !seed.includes('story')) {
+      const avatarSeed = seed.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}&backgroundColor=b6e3f4,c0aede,d1d4f9&clothingColor=262e33,65c9ff,5199e4&eyeColor=26332b,2dc653,17b978&hairColor=724133,d2c4ac,cc9966,a55728,2c1b18&skinColor=9e5622,f8d25c,fd9841,ae5d29,614335`;
+      console.log(`👤 Generated avatar placeholder: ${avatarUrl}`);
+      return avatarUrl;
     }
     
-    // Add page context for sequential placeholders
-    if (style === 'pixar-sequential' && seed.includes('page-')) {
-      const pageMatch = seed.match(/page-(\d+)/);
-      if (pageMatch) {
-        placeholderText = `Page\n${pageMatch[1]}`;
+    // For story images, create contextual placeholders
+    let label = 'Pixar Story';
+    let backgroundColor = '7C3AED'; // Primary purple
+    let textColor = 'FFFFFF';
+    
+    // Extract information from seed
+    const pageMatch = seed.match(/page(\d+)/);
+    const conceptMatch = seed.match(/story-([^-]+)/);
+    const characterMatch = seed.match(/-([a-zA-Z]+)-/);
+    
+    if (pageMatch) {
+      const pageNum = pageMatch[1];
+      label = `Story Page ${pageNum}`;
+      
+      // Use different colors for different pages to show progression
+      const pageColors = {
+        '01': '7C3AED', // Purple - Introduction
+        '02': '3B82F6', // Blue - Development  
+        '03': '10B981', // Green - Action
+        '04': 'F59E0B', // Yellow - Climax
+        '05': 'EF4444'  // Red - Resolution
+      };
+      
+      backgroundColor = pageColors[pageNum as keyof typeof pageColors] || '7C3AED';
+    }
+    
+    if (conceptMatch) {
+      const concept = conceptMatch[1];
+      label += `\n${concept.charAt(0).toUpperCase() + concept.slice(1)} Story`;
+    }
+    
+    if (characterMatch) {
+      const character = characterMatch[1];
+      label += `\nwith ${character.charAt(0).toUpperCase() + character.slice(1)}`;
+    }
+    
+    // Add scene context if available
+    if (sceneDescription && sceneDescription.length > 20) {
+      // Extract key words from scene description
+      const keywords = sceneDescription
+        .toLowerCase()
+        .match(/\b(happy|sad|excited|learning|playing|sharing|helping|exploring|discovering|smiling|laughing|colorful|bright|magical|adventure|friendship|kind|gentle|brave|curious)\b/g);
+      
+      if (keywords && keywords.length > 0) {
+        const mood = keywords[0];
+        label += `\n(${mood} scene)`;
       }
     }
     
-    // Use picsum.photos for more varied placeholder images with consistent seeding
-    const seedNumber = Math.abs(hash) % 1000;
-    return `https://picsum.photos/seed/${seedNumber}/1024/1024`;
+    // Handle different error states with visual indicators
+    if (seed.includes('error')) {
+      backgroundColor = '6B7280'; // Gray for errors
+      label = 'Image Generation\nTemporarily Unavailable';
+    } else if (seed.includes('quota')) {
+      backgroundColor = 'F97316'; // Orange for quota issues
+      label += '\n(Processing...)';
+    }
+    
+    const placeholderUrl = `https://placehold.co/1024x1024/${backgroundColor}/${textColor}/png?text=${encodeURIComponent(label)}&font=raleway`;
+    console.log(`🎨 Generated contextual story placeholder: ${placeholderUrl}`);
+    return placeholderUrl;
   }
 
   /**
@@ -906,11 +1297,16 @@ Main character: ${mainCharacter}`;
    * Extract specific sections from AI response text
    */
   private extractSection(text: string, sectionName: string): string | null {
-    // Basic text parsing - in real implementation would use more sophisticated NLP
+    // Enhanced text parsing for structured responses
     const patterns = {
-      'appearance': /appearance[:\s]*(.*?)(?:\n|$)/i,
-      'style': /style[:\s]*(.*?)(?:\n|$)/i,
-      'personality': /personality[:\s]*(.*?)(?:\n|$)/i
+      'appearance': /APPEARANCE[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'APPEARANCE': /APPEARANCE[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'style': /STYLE[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'STYLE': /STYLE[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'personality': /PERSONALITY[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'PERSONALITY': /PERSONALITY[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'KEY_FEATURES': /KEY_FEATURES[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i,
+      'key_features': /KEY_FEATURES[:\s]*(.*?)(?=\n[A-Z_]+:|$)/i
     };
     
     const pattern = patterns[sectionName as keyof typeof patterns];

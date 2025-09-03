@@ -34,11 +34,13 @@ export default function StorybookScreen() {
 	// --- Zustand Store ---
 	const {
 		characters,
+		gestaltsCharacters,
 		stories,
 		currentStory,
 		generationProgress,
 		error,
 		loadCharacters,
+		loadGestaltsCharacters,
 		loadStories,
 		createCharacterFromPhoto,
 		createStory,
@@ -90,6 +92,7 @@ export default function StorybookScreen() {
 	const [characterName, setCharacterName] = useState('');
 	const [refinementPrompt, setRefinementPrompt] = useState('');
 	const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+	const [generatedAvatar, setGeneratedAvatar] = useState<string | null>(null);
 	
 	// Regeneration states
 	const [regenerationPrompt, setRegenerationPrompt] = useState('');
@@ -225,10 +228,53 @@ export default function StorybookScreen() {
 		{ id: '8', concept: 'Animals', description: 'Different animals and their sounds or behaviors', message: 'Teach about different animals and their unique characteristics' }
 	]);
 
+	// Generate avatar from photo using Gemini
+	const generateAvatarFromPhoto = async () => {
+		if (!selectedPhoto) return;
+		
+		try {
+			// Convert photo to base64 for Gemini
+			const base64Photo = await convertImageToBase64(selectedPhoto);
+			
+			// Import geminiService
+			const geminiService = require('../services/geminiService').default;
+			
+			// Generate avatar using Gemini 2.5
+			const avatarResult = await geminiService.generateAvatar({
+				photoData: base64Photo,
+				characterName: characterName || 'Character',
+				style: 'pixar'
+			});
+			
+			// Handle the result (could be string URL or object with imageUrl)
+			const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+			setGeneratedAvatar(avatarUrl);
+			setAvatarStep('review');
+		} catch (error) {
+			console.error('Avatar generation failed:', error);
+			Alert.alert('Error', 'Failed to generate avatar. Please try again.');
+			setAvatarStep('upload');
+		}
+	};
+	
+	// Convert image URI to base64
+	const convertImageToBase64 = async (imageUri: string): Promise<string> => {
+		try {
+			const base64 = await require('expo-file-system').readAsStringAsync(imageUri, {
+				encoding: require('expo-file-system').EncodingType.Base64,
+			});
+			return `data:image/jpeg;base64,${base64}`;
+		} catch (error) {
+			console.error('Failed to convert image to base64:', error);
+			throw error;
+		}
+	};
+
 	// --- Effects ---
 	useEffect(() => {
 		// Load data when component mounts
 		loadCharacters();
+		loadGestaltsCharacters();
 		loadStories();
 	}, []);
 
@@ -237,8 +283,9 @@ export default function StorybookScreen() {
 		try {
 			setIsRegenerating(true);
 			
-			// Get character names for story generation
-			const selectedCharacters = characters.filter(char => 
+			// Get character names for story generation (from both user and Gestalts characters)
+			const allAvailableCharacters = [...characters, ...gestaltsCharacters];
+			const selectedCharacters = allAvailableCharacters.filter(char => 
 				conceptLearning.characterIds.includes(char.id)
 			);
 			const characterNames = selectedCharacters.map(char => char.name);
@@ -366,8 +413,9 @@ export default function StorybookScreen() {
 	// Real story generation function
 	const generateStoryContent = async () => {
 		try {
-			// Get character names for story generation
-			const selectedCharacters = characters.filter(char => 
+			// Get character names for story generation (from both user and Gestalts characters)
+			const allAvailableCharacters = [...characters, ...gestaltsCharacters];
+			const selectedCharacters = allAvailableCharacters.filter(char => 
 				conceptLearning.characterIds.includes(char.id)
 			);
 			const characterNames = selectedCharacters.map(char => char.name);
@@ -753,11 +801,12 @@ export default function StorybookScreen() {
 	const renderCharactersTab = () => (
 		<View style={{ flex: 1 }}>
 			<ScrollView contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 100 }}>
-				<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.sm }}>Character Library</Text>
+				{/* My Characters Section */}
+				<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.sm }}>My Characters</Text>
 				<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
 					Create and manage personalized avatars for your stories.
 				</Text>
-				<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md }}>
+				<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg * 2 }}>
 					{characters.map((char: Character) => (
 						<View key={char.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
 							<Image source={{ uri: char.avatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
@@ -768,6 +817,7 @@ export default function StorybookScreen() {
 						resetProgress();
 						setCharacterName('');
 						setSelectedPhoto(null);
+						setGeneratedAvatar(null);
 						setAvatarStep('upload');
 						setAvatarModalVisible(true);
 					}} style={{
@@ -783,6 +833,48 @@ export default function StorybookScreen() {
 					}}>
 						<Ionicons name="add" size={32} color={tokens.color.text.secondary} />
 					</TouchableOpacity>
+				</View>
+
+				{/* Gestalts Characters Section */}
+				<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.sm }}>Gestalts Characters</Text>
+				<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
+					Ready-to-use characters for your stories.
+				</Text>
+				<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md }}>
+					{gestaltsCharacters.map((char: Character) => (
+						<View key={char.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+							<View style={{ position: 'relative' }}>
+								<Image 
+									source={{ uri: char.avatarUrl }} 
+									style={{ width: 100, height: 100, borderRadius: 50 }} 
+									onError={(error) => {
+										console.log('Gestalts character image load error:', error);
+										console.log('Failed character image URL:', char.avatarUrl);
+										console.log('Character:', char.name, 'ID:', char.id);
+									}}
+									onLoad={() => {
+										console.log('Gestalts character image loaded successfully:', char.name, char.avatarUrl);
+									}}
+								/>
+								<View style={{ 
+									position: 'absolute', 
+									bottom: -2, 
+									right: -2, 
+									backgroundColor: tokens.color.primary.default, 
+									borderRadius: 10, 
+									width: 20, 
+									height: 20, 
+									alignItems: 'center', 
+									justifyContent: 'center',
+									borderWidth: 2,
+									borderColor: 'white'
+								}}>
+									<Ionicons name="star" size={12} color="white" />
+								</View>
+							</View>
+							<Text weight="medium">{char.name}</Text>
+						</View>
+					))}
 				</View>
 			</ScrollView>
 		</View>
@@ -801,45 +893,184 @@ export default function StorybookScreen() {
 					
 					{avatarStep === 'upload' && (
 						<>
-							<RNText style={{ color: tokens.color.text.secondary, textAlign: 'center', marginBottom: tokens.spacing.gap.lg }}>Upload a clear, front-facing photo to generate a Pixar-style avatar.</RNText>
-							<TouchableOpacity style={{
-								height: 150,
-								borderWidth: 2,
-								borderColor: tokens.color.border.default,
-								borderStyle: 'dashed',
-								borderRadius: tokens.radius.lg,
-								alignItems: 'center',
-								justifyContent: 'center',
-								backgroundColor: tokens.color.surface,
-								marginBottom: tokens.spacing.gap.lg
-							}}>
-								<Ionicons name="cloud-upload-outline" size={40} color={tokens.color.text.secondary} />
-								<Text color="secondary">Tap to upload photo</Text>
-							</TouchableOpacity>
-							<GradientButton title="Generate Avatar" onPress={() => setAvatarStep('generating')} />
+							<RNText style={{ color: tokens.color.text.secondary, textAlign: 'center', marginBottom: tokens.spacing.gap.lg }}>Take a photo or select from your gallery to generate a Pixar-style avatar.</RNText>
+							
+							{/* Photo Selection Options */}
+							<View style={{ flexDirection: 'row', gap: 12, marginBottom: tokens.spacing.gap.lg }}>
+								<TouchableOpacity
+									onPress={async () => {
+										try {
+											const photoUri = await takePhoto();
+											if (photoUri) {
+												setSelectedPhoto(photoUri);
+											}
+										} catch (error) {
+											console.error('Failed to take photo:', error);
+										}
+									}}
+									style={{
+										flex: 1,
+										height: 100,
+										borderWidth: 2,
+										borderColor: tokens.color.border.default,
+										borderStyle: 'dashed',
+										borderRadius: tokens.radius.lg,
+										alignItems: 'center',
+										justifyContent: 'center',
+										backgroundColor: tokens.color.surface
+									}}
+								>
+									<Ionicons name="camera-outline" size={32} color={tokens.color.text.secondary} />
+									<Text color="secondary" size="sm" style={{ textAlign: 'center', marginTop: 4 }}>Take Photo</Text>
+								</TouchableOpacity>
+								
+								<TouchableOpacity
+									onPress={async () => {
+										try {
+											const photoUri = await pickImageFromGallery();
+											if (photoUri) {
+												setSelectedPhoto(photoUri);
+											}
+										} catch (error) {
+											console.error('Failed to pick image:', error);
+										}
+									}}
+									style={{
+										flex: 1,
+										height: 100,
+										borderWidth: 2,
+										borderColor: tokens.color.border.default,
+										borderStyle: 'dashed',
+										borderRadius: tokens.radius.lg,
+										alignItems: 'center',
+										justifyContent: 'center',
+										backgroundColor: tokens.color.surface
+									}}
+								>
+									<Ionicons name="images-outline" size={32} color={tokens.color.text.secondary} />
+									<Text color="secondary" size="sm" style={{ textAlign: 'center', marginTop: 4 }}>Choose from Gallery</Text>
+								</TouchableOpacity>
+							</View>
+							
+							{/* Selected Photo Preview */}
+							{selectedPhoto && (
+								<View style={{ alignItems: 'center', marginBottom: tokens.spacing.gap.lg }}>
+									<Image 
+										source={{ uri: selectedPhoto }} 
+										style={{ 
+											width: 120, 
+											height: 120, 
+											borderRadius: 60, 
+											marginBottom: 8,
+											borderWidth: 2,
+											borderColor: tokens.color.primary.default
+										}} 
+									/>
+									<Text color="secondary" size="sm">Photo selected</Text>
+								</View>
+							)}
+							
+							<GradientButton 
+								title="Generate Avatar" 
+								disabled={!selectedPhoto}
+								onPress={async () => {
+									if (selectedPhoto) {
+										setAvatarStep('generating');
+										try {
+											await generateAvatarFromPhoto();
+										} catch (error) {
+											console.error('Avatar generation failed:', error);
+											setAvatarStep('upload');
+										}
+									}
+								}} 
+							/>
 						</>
 					)}
 
 					{avatarStep === 'generating' && (
 						<View style={{ alignItems: 'center', paddingVertical: 40 }}>
-							<Image source={{ uri: 'https://picsum.photos/seed/logo1/100' }} style={{ width: 80, height: 80, marginBottom: 20 }} />
-							<Text weight="semibold">Creating your avatar...</Text>
-							<Text color="secondary">This may take a moment.</Text>
+							{selectedPhoto && (
+								<Image 
+									source={{ uri: selectedPhoto }} 
+									style={{ 
+										width: 100, 
+										height: 100, 
+										borderRadius: 50, 
+										marginBottom: 20,
+										opacity: 0.7
+									}} 
+								/>
+							)}
+							<ActivityIndicator size="large" color={tokens.color.primary.default} style={{ marginBottom: 20 }} />
+							<Text weight="semibold">Creating your Pixar avatar...</Text>
+							<Text color="secondary" style={{ textAlign: 'center', marginTop: 8 }}>
+								Using Gemini 2.5 to transform your photo into a magical character
+							</Text>
 						</View>
 					)}
 
 					{avatarStep === 'review' && (
 						<>
-							<Image source={{ uri: 'https://picsum.photos/seed/new-avatar/300' }} style={{ width: 150, height: 150, borderRadius: 75, alignSelf: 'center', marginBottom: tokens.spacing.gap.lg }} />
-							<TextInput placeholder="Enter character name" style={{ borderWidth: 1, borderColor: tokens.color.border.default, borderRadius: tokens.radius.md, padding: 12, marginBottom: tokens.spacing.gap.sm }} />
-							<GradientButton title="Save Character" onPress={() => { 
-								if (isMounted.current) {
-									setAvatarModalVisible(false); 
-									setAvatarStep('upload');
-								}
-							}} />
-							<TouchableOpacity onPress={() => setAvatarStep('generating')} style={{ marginTop: 12 }}>
-								<Text style={{ textAlign: 'center', color: tokens.color.primary.default }}>Regenerate</Text>
+							{generatedAvatar && (
+								<Image 
+									source={{ uri: generatedAvatar }} 
+									style={{ 
+										width: 150, 
+										height: 150, 
+										borderRadius: 75, 
+										alignSelf: 'center', 
+										marginBottom: tokens.spacing.gap.lg,
+										borderWidth: 3,
+										borderColor: tokens.color.primary.default
+									}} 
+								/>
+							)}
+							<TextInput 
+								placeholder="Enter character name" 
+								value={characterName}
+								onChangeText={setCharacterName}
+								style={{ 
+									borderWidth: 1, 
+									borderColor: tokens.color.border.default, 
+									borderRadius: tokens.radius.md, 
+									padding: 12, 
+									marginBottom: tokens.spacing.gap.sm 
+								}} 
+							/>
+							<GradientButton 
+								title="Save Character" 
+								disabled={!characterName.trim() || !generatedAvatar}
+								onPress={async () => { 
+									if (isMounted.current && characterName.trim() && generatedAvatar) {
+										try {
+											// Create character using the generated avatar
+											await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+											
+											// Reset state and close modal
+											setAvatarModalVisible(false); 
+											setAvatarStep('upload');
+											setCharacterName('');
+											setSelectedPhoto(null);
+											setGeneratedAvatar(null);
+											
+											// Reload characters to show the new one
+											loadCharacters();
+										} catch (error) {
+											console.error('Failed to save character:', error);
+											Alert.alert('Error', 'Failed to save character. Please try again.');
+										}
+									}
+								}} 
+							/>
+							<TouchableOpacity 
+								onPress={() => {
+									setAvatarStep('generating');
+									generateAvatarFromPhoto();
+								}} 
+								style={{ marginTop: 12 }}
+							>
+								<Text style={{ textAlign: 'center', color: tokens.color.primary.default }}>Regenerate Avatar</Text>
 							</TouchableOpacity>
 						</>
 					)}
@@ -916,6 +1147,7 @@ export default function StorybookScreen() {
 	const getStepTitle = (step: StoryWizardStep): string => {
 		const titles: Record<StoryWizardStep, string> = {
 			'child-concept': 'Choose Child & Concept',
+			'concept-selection': 'Choose Learning Message',
 			'mode-selection': 'Select Mode',
 			'advanced-options': 'Customize Options',
 			'character-selection': 'Add Characters',
@@ -1080,7 +1312,7 @@ export default function StorybookScreen() {
 												backgroundColor: conceptLearning.concept === item.message ? "#F3E8FF" : tokens.color.surface
 											}}
 										>
-											<Text weight="bold" size="md" style={{ textAlign: 'center', marginBottom: 8 }}>{item.concept}</Text>
+											<Text weight="bold" size="lg" style={{ textAlign: 'center', marginBottom: 8 }}>{item.concept}</Text>
 											<Text size="sm" color="secondary" style={{ textAlign: 'center', lineHeight: 18 }}>{item.description}</Text>
 										</TouchableOpacity>
 									)}
@@ -1462,8 +1694,8 @@ export default function StorybookScreen() {
 									</>
 								)}
 								
-								{/* Other Characters Section */}
-								<Text weight="semibold" style={{ marginBottom: 12 }}>Other Characters</Text>
+								{/* My Characters Section */}
+								<Text weight="semibold" style={{ marginBottom: 12 }}>My Characters</Text>
 								<Text color="secondary" size="sm" style={{ marginBottom: 16 }}>Add family members or friends to make the story more personal</Text>
 								
 								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 30 }}>
@@ -1502,6 +1734,7 @@ export default function StorybookScreen() {
 											setAvatarStep('upload');
 											setCharacterName('');
 											setSelectedPhoto(null);
+											setGeneratedAvatar(null);
 											setAvatarModalVisible(true);
 										}}
 										style={{
@@ -1518,6 +1751,67 @@ export default function StorybookScreen() {
 									>
 										<Ionicons name="add" size={32} color={tokens.color.text.secondary} />
 									</TouchableOpacity>
+								</View>
+
+								{/* Gestalts Characters Section */}
+								<Text weight="semibold" style={{ marginBottom: 12 }}>Gestalts Characters</Text>
+								<Text color="secondary" size="sm" style={{ marginBottom: 16 }}>Ready-to-use characters for your stories</Text>
+								
+								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 30 }}>
+									{gestaltsCharacters.map((char: Character) => {
+										const isSelected = conceptLearning.characterIds.includes(char.id);
+										return (
+											<TouchableOpacity 
+												key={char.id} 
+												onPress={() => {
+													if (isSelected) {
+														setConceptLearning({...conceptLearning, characterIds: conceptLearning.characterIds.filter(id => id !== char.id)});
+													} else {
+														setConceptLearning({...conceptLearning, characterIds: [...conceptLearning.characterIds, char.id]});
+													}
+												}}
+											>
+												<View style={{ alignItems: 'center', gap: 8 }}>
+													<View style={{ position: 'relative' }}>
+														<Image 
+															source={{ uri: char.avatarUrl }} 
+															style={{ 
+																width: 80, 
+																height: 80, 
+																borderRadius: 40, 
+																borderWidth: 3, 
+																borderColor: isSelected ? tokens.color.primary.default : 'transparent' 
+															}} 
+															onError={(error) => {
+																console.log('Wizard Gestalts character image load error:', error);
+																console.log('Failed wizard character image URL:', char.avatarUrl);
+																console.log('Wizard Character:', char.name, 'ID:', char.id);
+															}}
+															onLoad={() => {
+																console.log('Wizard Gestalts character image loaded successfully:', char.name, char.avatarUrl);
+															}}
+														/>
+														<View style={{ 
+															position: 'absolute', 
+															bottom: -2, 
+															right: -2, 
+															backgroundColor: tokens.color.primary.default, 
+															borderRadius: 8, 
+															width: 16, 
+															height: 16, 
+															alignItems: 'center', 
+															justifyContent: 'center',
+															borderWidth: 1,
+															borderColor: 'white'
+														}}>
+															<Ionicons name="star" size={10} color="white" />
+														</View>
+													</View>
+													<Text weight="medium">{char.name}</Text>
+												</View>
+											</TouchableOpacity>
+										);
+									})}
 								</View>
 								
 								{/* Option to skip characters */}
@@ -1705,7 +1999,8 @@ export default function StorybookScreen() {
 											setStoryWizardStep('review');
 											
 											// Create the actual story using edited content from wizard
-											const selectedCharacterNames = characters
+											const allAvailableCharacters = [...characters, ...gestaltsCharacters];
+											const selectedCharacterNames = allAvailableCharacters
 												.filter(char => conceptLearning.characterIds.includes(char.id))
 												.map(char => char.name);
 											
@@ -1772,7 +2067,7 @@ export default function StorybookScreen() {
 									
 									<Text weight="semibold" style={{ marginBottom: 8 }}>Characters</Text>
 									<Text color="secondary">
-										{characters
+										{[...characters, ...gestaltsCharacters]
 											.filter(char => conceptLearning.characterIds.includes(char.id))
 											.map(char => char.name)
 											.join(', ')}
@@ -1783,17 +2078,24 @@ export default function StorybookScreen() {
 									<TouchableOpacity 
 										onPress={() => {
 											console.log('Close Wizard button pressed');
-											if (isMounted.current) {
-												setStoryModalVisible(false);
-												// Reset wizard state for next time
-												setStoryWizardStep('character-selection');
-												setConceptLearning({
-													concept: '',
-													includeChildAsCharacter: false,
-													mode: 'simple',
-													characterIds: []
-												});
-											}
+											setStoryModalVisible(false);
+											// Reset wizard state for next time
+											setStoryWizardStep('character-selection');
+											setConceptLearning({
+												concept: '',
+												includeChildAsCharacter: false,
+												mode: 'simple',
+												characterIds: [],
+												advanced: {
+													density: 'one-sentence',
+													narrative: 'third-person',
+													pageCount: 5,
+													complexity: 'simple',
+													communicationStyle: 'balanced',
+													tone: 'gentle',
+													goal: ''
+												}
+											});
 										}}
 										style={{ 
 											flex: 1, 
@@ -1810,19 +2112,26 @@ export default function StorybookScreen() {
 										title="Go to Library"
 										onPress={() => {
 											console.log('Go to Library button pressed');
-											if (isMounted.current) {
-												setStoryModalVisible(false);
-												// Switch to stories tab to see the generating story
-												setActiveTab('stories');
-												// Reset wizard state for next time
-												setStoryWizardStep('character-selection');
-												setConceptLearning({
-													concept: '',
-													includeChildAsCharacter: false,
-													mode: 'simple',
-													characterIds: []
-												});
-											}
+											setStoryModalVisible(false);
+											// Switch to stories tab to see the generating story
+											setActiveTab('stories');
+											// Reset wizard state for next time
+											setStoryWizardStep('character-selection');
+											setConceptLearning({
+												concept: '',
+												includeChildAsCharacter: false,
+												mode: 'simple',
+												characterIds: [],
+												advanced: {
+													density: 'one-sentence',
+													narrative: 'third-person',
+													pageCount: 5,
+													complexity: 'simple',
+													communicationStyle: 'balanced',
+													tone: 'gentle',
+													goal: ''
+												}
+											});
 										}}
 										style={{ flex: 2 }}
 									/>

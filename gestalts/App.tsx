@@ -20,6 +20,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { ElevenLabsProvider } from '@elevenlabs/react-native';
 import { initializeFirebase } from './src/services/firebaseConfig';
 import { testFirebaseIntegration } from './src/utils/firebaseTest';
+import Constants from 'expo-constants';
 
 export default function App() {
   const [pjLoaded] = usePlusJakarta({
@@ -35,6 +36,16 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        const extra = Constants.expoConfig?.extra as any;
+        console.log('Config presence check:', {
+          elevenLabsApiKey: !!extra?.elevenLabsApiKey,
+          languageCoachAgentId: !!extra?.languageCoachAgentId,
+          parentSupportAgentId: !!extra?.parentSupportAgentId,
+          childModeAgentId: !!extra?.childModeAgentId,
+          firebaseConfigured: !!extra?.firebase && !!extra?.firebase?.apiKey && !!extra?.firebase?.projectId,
+          bundleIdentifier: Constants.expoConfig?.ios?.bundleIdentifier,
+        });
+
         const firebaseServices = initializeFirebase();
         if (!firebaseServices.initialized) {
           console.warn('Firebase initialization failed');

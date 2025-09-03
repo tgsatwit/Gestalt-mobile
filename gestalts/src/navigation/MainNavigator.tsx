@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DrawerProvider } from './SimpleDrawer';
 import DashboardScreen from '../screens/DashboardScreen';
 import CoachScreen from '../screens/CoachScreen';
-import MemoriesScreenFirebase from '../screens/MemoriesScreenFirebase';
+import MemoriesScreen from '../screens/MemoriesScreen';
 import PlayScreen from '../screens/PlayScreen';
 import ReportScreen from '../screens/ReportScreen';
 import StorybookScreen from '../screens/StorybookScreen';
@@ -38,7 +38,7 @@ const CoachWithDrawer = () => (
 
 const MemoriesWithDrawer = () => (
   <DrawerProvider>
-    <MemoriesScreenFirebase />
+    <MemoriesScreen />
   </DrawerProvider>
 );
 

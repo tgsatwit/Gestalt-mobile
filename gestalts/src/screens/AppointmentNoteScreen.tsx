@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore, type AppointmentNote } from '../state/useStore';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { BottomNavigation } from '../components/BottomNavigation';
+import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAudioRecorder, useAudioPlayer, RecordingPresets, AudioModule, setAudioModeAsync } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 
