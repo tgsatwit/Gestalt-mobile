@@ -8,6 +8,7 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import { useConversation } from '@elevenlabs/react-native';
+import Constants from 'expo-constants';
 import { AGENT_CONFIGS, ElevenLabsConversationalAI } from '../services/elevenLabsHTTPService';
 
 interface ConversationMessage {
@@ -218,9 +219,22 @@ export default function CoachScreen() {
 		if (isConnecting || conversationSdk.status === 'connecting' || conversationSdk.status === 'connected') {
 			return;
 		}
+		// Config guard: ensure agent ids exist
+		const extra: any = Constants.expoConfig?.extra;
+		const agentConfig = AGENT_CONFIGS[mode];
+		if (!extra?.elevenLabsApiKey || !agentConfig?.agentId || agentConfig.agentId.includes('agent-id')) {
+			console.warn('ElevenLabs config missing for mode', mode, {
+				apiKey: !!extra?.elevenLabsApiKey,
+				agentId: agentConfig?.agentId,
+			});
+			Alert.alert(
+				'AI setup incomplete',
+				"Ask Jessie can't connect yet. Please update ElevenLabs keys and agent IDs."
+			);
+			return;
+		}
 		setIsConnecting(true);
 		try {
-			const agentConfig = AGENT_CONFIGS[mode];
 			console.log('Starting SDK session with agent:', agentConfig.agentId);
 			await conversationSdk.startSession({
 				agentId: agentConfig.agentId,

@@ -4,14 +4,17 @@ import { getFirestore, initializeFirestore, connectFirestoreEmulator } from 'fir
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-// Firebase config
+// Firebase config from Expo extra with fallback to defaults
+const extra: any = Constants.expoConfig?.extra || {};
+const extraFirebase: any = extra.firebase || {};
+
 const firebaseConfig = {
-  apiKey: "AIzaSyACgFoLyTsEcxlE8odn36LjdhtdEW1ht34",
-  authDomain: "gestalts-mobile.firebaseapp.com",
-  projectId: "gestalts-mobile",
-  storageBucket: "gestalts-mobile.firebasestorage.app",
-  messagingSenderId: "630723947096",
-  appId: "1:630723947096:web:6c564c1d9213c07375b82d"
+  apiKey: extraFirebase.apiKey || "AIzaSyACgFoLyTsEcxlE8odn36LjdhtdEW1ht34",
+  authDomain: extraFirebase.authDomain || "gestalts-mobile.firebaseapp.com",
+  projectId: extraFirebase.projectId || "gestalts-mobile",
+  storageBucket: extraFirebase.storageBucket || "gestalts-mobile.firebasestorage.app",
+  messagingSenderId: extraFirebase.messagingSenderId || "630723947096",
+  appId: extraFirebase.appId || "1:630723947096:web:6c564c1d9213c07375b82d"
 };
 
 // Initialize Firebase
