@@ -228,31 +228,43 @@ export default function StorybookScreen() {
 		{ id: '8', concept: 'Animals', description: 'Different animals and their sounds or behaviors', message: 'Teach about different animals and their unique characteristics' }
 	]);
 
-	// Generate avatar from photo using Gemini
+	// Generate avatar from photo using Gemini 2.5 Flash
 	const generateAvatarFromPhoto = async () => {
 		if (!selectedPhoto) return;
 		
 		try {
+			console.log('🎨 Starting avatar generation with Gemini 2.5 Flash...');
+			
 			// Convert photo to base64 for Gemini
 			const base64Photo = await convertImageToBase64(selectedPhoto);
+			console.log('📸 Photo converted to base64 successfully');
 			
 			// Import geminiService
 			const geminiService = require('../services/geminiService').default;
 			
-			// Generate avatar using Gemini 2.5
+			// Generate avatar using Gemini 2.5 Flash with enhanced prompt
+			console.log('🤖 Calling Gemini 2.5 Flash for Pixar avatar generation...');
 			const avatarResult = await geminiService.generateAvatar({
 				photoData: base64Photo,
 				characterName: characterName || 'Character',
 				style: 'pixar'
 			});
 			
+			console.log('✅ Avatar generation completed:', typeof avatarResult);
+			
 			// Handle the result (could be string URL or object with imageUrl)
 			const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+			console.log('🖼️ Avatar URL generated:', avatarUrl);
+			
 			setGeneratedAvatar(avatarUrl);
 			setAvatarStep('review');
 		} catch (error) {
-			console.error('Avatar generation failed:', error);
-			Alert.alert('Error', 'Failed to generate avatar. Please try again.');
+			console.error('❌ Avatar generation failed:', error);
+			Alert.alert(
+				'Avatar Generation Failed', 
+				'Unable to create Pixar avatar at this time. This could be due to API limits or temporary service issues. The avatar feature is in development.',
+				[{ text: 'OK' }]
+			);
 			setAvatarStep('upload');
 		}
 	};
@@ -1044,8 +1056,15 @@ export default function StorybookScreen() {
 								onPress={async () => { 
 									if (isMounted.current && characterName.trim() && generatedAvatar) {
 										try {
-											// Create character using the generated avatar
-											await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+											console.log('💾 Saving character to store:', characterName.trim());
+											console.log('🖼️ Using avatar URL:', generatedAvatar);
+											
+											// Create character using the generated avatar URL directly
+											// The createCharacterFromPhoto function expects a photo URI, but we already have the generated avatar
+											// So we'll pass the generated avatar URL as the photo URI - the store will handle it appropriately
+											const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+											
+											console.log('✅ Character created successfully:', newCharacter.name);
 											
 											// Reset state and close modal
 											setAvatarModalVisible(false); 
@@ -1055,10 +1074,21 @@ export default function StorybookScreen() {
 											setGeneratedAvatar(null);
 											
 											// Reload characters to show the new one
-											loadCharacters();
+											await loadCharacters();
+											
+											// Show success message
+											Alert.alert(
+												'Character Created!', 
+												`${newCharacter.name} is now ready to appear in your stories!`,
+												[{ text: 'Great!' }]
+											);
 										} catch (error) {
-											console.error('Failed to save character:', error);
-											Alert.alert('Error', 'Failed to save character. Please try again.');
+											console.error('❌ Failed to save character:', error);
+											Alert.alert(
+												'Save Failed', 
+												'Unable to save your character. Please try again.',
+												[{ text: 'OK' }]
+											);
 										}
 									}
 								}} 
