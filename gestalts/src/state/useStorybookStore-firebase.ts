@@ -272,8 +272,8 @@ export const useStorybookStore = create<StorybookState>()(
         set({ gestaltsCharacters });
       },
 
-      // Create a character from a photo
-      createCharacterFromPhoto: async (photoUri: string, name: string) => {
+      // Create a character from a photo or existing avatar URL
+      createCharacterFromPhoto: async (photoUriOrAvatarUrl: string, name: string) => {
         set({ 
           generationProgress: {
             status: 'uploading',
@@ -283,37 +283,60 @@ export const useStorybookStore = create<StorybookState>()(
         });
 
         try {
-          // Read photo as base64
-          const photoData = await FileSystem.readAsStringAsync(photoUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          let avatarResult: any;
+          let avatarUrl: string;
 
-          set({ 
-            generationProgress: {
-              status: 'generating',
-              message: `Creating Pixar-style avatar for ${name}...`,
-              progress: 30
-            }
-          });
+          // Check if this is already a generated avatar URL (starts with http or https) or a file URI
+          if (photoUriOrAvatarUrl.startsWith('http') || photoUriOrAvatarUrl.startsWith('https')) {
+            // This is already a generated avatar URL, skip generation
+            console.log('🖼️ Using existing avatar URL:', photoUriOrAvatarUrl);
+            avatarUrl = photoUriOrAvatarUrl;
+            
+            // Skip the generation step and go straight to processing
+            set({ 
+              generationProgress: {
+                status: 'processing',
+                message: `Saving ${name} to your characters...`,
+                progress: 60
+              }
+            });
+          } else {
+            // This is a photo file URI, need to generate avatar
+            console.log('📸 Processing photo file for avatar generation:', photoUriOrAvatarUrl);
+            
+            // Read photo as base64
+            const photoData = await FileSystem.readAsStringAsync(photoUriOrAvatarUrl, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
 
-          // Generate avatar using Gemini with visual profile extraction
-          const avatarResult = await geminiService.generateAvatar({
-            photoData: `data:image/jpeg;base64,${photoData}`,
-            style: 'pixar',
-            characterName: name
-          });
-          
-          const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+            set({ 
+              generationProgress: {
+                status: 'generating',
+                message: `Creating Pixar-style avatar for ${name}...`,
+                progress: 30
+              }
+            });
+
+            // Generate avatar using Gemini with visual profile extraction
+            avatarResult = await geminiService.generateAvatar({
+              photoData: `data:image/jpeg;base64,${photoData}`,
+              style: 'pixar',
+              characterName: name
+            });
+            
+            avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+          }
 
           // Upload to Firebase Storage if configured, otherwise use generated URL
           let finalAvatarUrl = avatarUrl;
           const { initialized } = getFirebaseServices();
-          if (initialized) {
+          if (initialized && avatarUrl) {
             try {
               const userId = getUserId();
               const timestamp = Date.now();
               const path = `users/${userId}/avatars/${timestamp}_${name.replace(/\s+/g, '_')}.jpg`;
               finalAvatarUrl = await uploadImageToStorage(avatarUrl, path);
+              console.log('☁️ Avatar uploaded to Firebase Storage:', finalAvatarUrl);
             } catch (error) {
               console.warn('Failed to upload avatar to Firebase Storage, using generated URL:', error);
               finalAvatarUrl = avatarUrl;

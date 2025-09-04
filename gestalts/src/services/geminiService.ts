@@ -66,12 +66,13 @@ class GeminiService {
       this.genAI = new GoogleGenerativeAI(apiKey);
       // Initialize different models for different tasks
       this.textModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-      this.imageModel = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' });
-      this.visionModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      this.imageModel = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }); // Updated to use Gemini 2.0 Flash Experimental for image generation
+      this.visionModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro-vision-latest' });
       this.initialized = true;
       console.log('✅ Gemini service initialized successfully');
-      console.log('🎨 Image generation model: gemini-2.5-flash-image-preview');
+      console.log('🎨 Image generation model: gemini-2.0-flash-exp');
       console.log('💬 Text generation model: gemini-1.5-pro');
+      console.log('👁️ Vision model: gemini-1.5-pro-vision-latest');
     } catch (error) {
       console.error('❌ Failed to initialize Gemini service:', error);
       console.error('Initialization error details:', (error as Error).message || error);
@@ -146,8 +147,9 @@ class GeminiService {
         }
       };
 
-      // Generate avatar with Gemini 2.5 Flash Image Preview
+      // Generate avatar with Gemini 2.0 Flash Experimental  
       console.log('🎨 Avatar generation requested for:', request.characterName);
+      console.log('📋 Using comprehensive Pixar character generation prompt...');
       
       try {
         const result = await this.imageModel.generateContent([prompt, imagePart]);
@@ -660,8 +662,8 @@ KEY_FEATURES: [list 3-5 distinctive features]`;
         console.log(`🎭 Characters: ${request.context?.characterNames?.join(', ') || 'none'}`);
         console.log(`📝 Scene: ${request.prompt.substring(0, 100)}...`);
         
-        // Try to generate actual image using Gemini image generation model
-        console.log('🎨 Attempting real image generation with gemini-2.5-flash-image-preview...');
+        // Try to generate actual image using Gemini 2.0 Flash Experimental
+        console.log('🎨 Attempting real image generation with gemini-2.0-flash-exp...');
         
         const result = await this.imageModel.generateContent(parts);
         const response = await result.response;
