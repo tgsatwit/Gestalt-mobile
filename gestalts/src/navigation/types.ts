@@ -9,6 +9,7 @@ export type MainStackParamList = {
   Knowledge: undefined;
   AddJournal: undefined;
   AddMilestone: undefined;
+  AddGestalt: undefined;
   AppointmentNote: { id?: string } | undefined;
   GestaltLists: undefined;
   Profile: undefined;

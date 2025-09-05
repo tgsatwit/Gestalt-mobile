@@ -75,8 +75,15 @@ export interface Gestalt {
   childProfileId?: string;
   phrase: string;
   source: string;
+  sourceType?: string;
   stage: string;
   contexts?: string[];
+  dateStartedISO?: string;
+  audioData?: {
+    uri: string;
+    recordedAt: string;
+  };
+  createdAtISO?: string;
   childName?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

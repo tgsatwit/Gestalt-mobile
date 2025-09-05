@@ -30,7 +30,7 @@ export default function AddMilestoneScreen() {
 	const [showChildrenDropdown, setShowChildrenDropdown] = useState(false);
 	
 	// Get available children from current profile
-	const availableChildren = currentProfile ? [currentProfile.name] : [];
+	const availableChildren = currentProfile ? [currentProfile.childName] : [];
 
 	const milestoneCategories = [
 		{ name: 'First Words', icon: 'chatbubble', color: '#7C3AED' },
