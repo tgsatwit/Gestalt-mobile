@@ -32,7 +32,7 @@ export default function AddJournalScreen() {
 	const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date>(new Date());
 	
 	// Get available children from current profile
-	const availableChildren = currentProfile ? [currentProfile.name] : [];
+	const availableChildren = currentProfile ? [currentProfile.childName] : [];
 
 	const moods = [
 		{ type: 'good' as const, icon: 'happy', color: '#10B981', label: 'Good Day' },

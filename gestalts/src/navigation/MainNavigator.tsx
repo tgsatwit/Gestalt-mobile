@@ -11,6 +11,7 @@ import StorybookScreen from '../screens/StorybookScreen';
 import KnowledgeScreen from '../screens/KnowledgeScreen';
 import AddJournalScreen from '../screens/AddJournalScreen';
 import AddMilestoneScreen from '../screens/AddMilestoneScreen';
+import AddGestaltScreen from '../screens/AddGestaltScreen';
 import AppointmentNoteScreen from '../screens/AppointmentNoteScreen';
 import GestaltListsScreen from '../screens/GestaltListsScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
@@ -69,6 +70,12 @@ const AddJournalWithDrawer = () => (
 const AddMilestoneWithDrawer = () => (
   <DrawerProvider>
     <AddMilestoneScreen />
+  </DrawerProvider>
+);
+
+const AddGestaltWithDrawer = () => (
+  <DrawerProvider>
+    <AddGestaltScreen />
   </DrawerProvider>
 );
 
@@ -162,6 +169,7 @@ export default function MainNavigator() {
       {/* Record & Track Screens */}
       <Stack.Screen name="AddJournal" component={AddJournalWithDrawer} />
       <Stack.Screen name="AddMilestone" component={AddMilestoneWithDrawer} />
+      <Stack.Screen name="AddGestalt" component={AddGestaltWithDrawer} />
       <Stack.Screen name="AppointmentNote" component={AppointmentNoteWithDrawer} />
       <Stack.Screen name="GestaltLists" component={GestaltListsWithDrawer} />
       

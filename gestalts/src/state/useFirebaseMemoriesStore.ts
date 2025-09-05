@@ -43,8 +43,15 @@ export interface FirebaseGestalt {
   id: string;
   phrase: string;
   source: string;
+  sourceType?: string;
   stage: string;
   contexts?: string[];
+  dateStartedISO?: string;
+  audioData?: {
+    uri: string;
+    recordedAt: string;
+  };
+  createdAtISO: string;
   childName?: string;
   childProfileId?: string;
 }
@@ -89,7 +96,7 @@ interface FirebaseMemoriesState {
   
   // Gestalt operations
   loadGestalts: (childProfileId?: string) => Promise<void>;
-  addGestalt: (phrase: string, source: string, stage: string, contexts?: string[], childName?: string, childProfileId?: string) => Promise<void>;
+  addGestalt: (phrase: string, source: string, sourceType: string, stage: string, contexts?: string[], dateStartedISO?: string, childName?: string, childProfileId?: string, audioData?: { uri: string; recordedAt: string }) => Promise<void>;
   updateGestalt: (id: string, updates: Partial<FirebaseGestalt>) => Promise<void>;
   deleteGestalt: (id: string) => Promise<void>;
   
@@ -493,8 +500,12 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
           id: gestalt.id,
           phrase: gestalt.phrase,
           source: gestalt.source,
+          sourceType: gestalt.sourceType,
           stage: gestalt.stage,
           contexts: gestalt.contexts,
+          dateStartedISO: gestalt.dateStartedISO,
+          audioData: gestalt.audioData,
+          createdAtISO: gestalt.createdAtISO || dayjs().toISOString(),
           childName: gestalt.childName,
           childProfileId: gestalt.childProfileId
         })),
@@ -507,7 +518,7 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
   },
   
-  addGestalt: async (phrase, source, stage, contexts, childName, childProfileId) => {
+  addGestalt: async (phrase, source, sourceType, stage, contexts, dateStartedISO, childName, childProfileId, audioData) => {
     const userId = getCurrentUserId();
     if (!userId) {
       set({ gestaltsError: 'User not authenticated' });
@@ -515,23 +526,24 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      const gestaltId = await memoriesService.createGestalt(userId, {
+      const gestaltData = {
         phrase,
         source,
+        sourceType,
         stage,
         contexts,
+        dateStartedISO,
+        audioData,
+        createdAtISO: dayjs().toISOString(),
         childName,
         childProfileId
-      });
+      };
+
+      const gestaltId = await memoriesService.createGestalt(userId, gestaltData);
       
       const newGestalt: FirebaseGestalt = {
         id: gestaltId,
-        phrase,
-        source,
-        stage,
-        contexts,
-        childName,
-        childProfileId
+        ...gestaltData
       };
       
       set(state => ({ 
