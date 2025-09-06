@@ -199,7 +199,7 @@ export default function DashboardScreen() {
 			<View style={{ flex: 1, paddingTop: 60 }}>
 				<ScrollView 
 					style={{ flex: 1 }}
-					contentContainerStyle={{ paddingBottom: 100 }}
+					contentContainerStyle={{ paddingBottom: 130 }}
 					showsVerticalScrollIndicator={false}
 				>
 					{/* Header with Logo and Menu */}

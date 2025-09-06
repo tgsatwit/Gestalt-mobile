@@ -118,6 +118,7 @@ export const useStorybookStore = create<StorybookState>()(
             id: `char_${Date.now()}`,
             name,
             avatarUrl: avatarUrl,
+            type: 'user', // User-created character
             visualProfile: visualProfile,
             createdAt: new Date(),
             updatedAt: new Date()

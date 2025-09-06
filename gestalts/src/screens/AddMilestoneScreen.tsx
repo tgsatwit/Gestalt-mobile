@@ -163,7 +163,7 @@ export default function AddMilestoneScreen() {
 				borderTopRightRadius: 24
 			}}>
 				<ScrollView 
-					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 120 }}
+					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 150 }}
 					onScrollBeginDrag={() => {
 						setShowDatePicker(false);
 						setShowChildrenDropdown(false);
@@ -276,7 +276,7 @@ export default function AddMilestoneScreen() {
 								shadowOpacity: 0.08,
 								shadowRadius: 12,
 								elevation: 6,
-								zIndex: 1000,
+								zIndex: 9999,
 								maxHeight: 150
 							}}>
 								<ScrollView style={{ maxHeight: 150 }}>
@@ -451,7 +451,7 @@ export default function AddMilestoneScreen() {
 							shadowOpacity: 0.08,
 							shadowRadius: 12,
 							elevation: 6,
-							zIndex: 1000,
+							zIndex: 9999,
 							padding: tokens.spacing.gap.md
 						}}>
 							{/* Calendar Header */}

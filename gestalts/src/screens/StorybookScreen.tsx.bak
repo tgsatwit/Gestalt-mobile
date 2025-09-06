@@ -77,13 +77,13 @@ export default function StorybookScreen() {
 		mode: 'simple',
 		characterIds: [],
 		advanced: {
-			density: 'multiple-sentences',
+			density: 'one-sentence',
 			narrative: 'third-person',
-			pageCount: 6,
+			pageCount: 5,
 			complexity: 'simple',
-			communicationStyle: 'simple-and-clear',
+			communicationStyle: 'balanced',
 			tone: 'playful',
-			goal: 'Keep sentences to 10-12 words maximum, use simple vocabulary suitable for young children'
+			goal: ''
 		}
 	});
 	
@@ -1468,26 +1468,7 @@ export default function StorybookScreen() {
 									</TouchableOpacity>
 									<GradientButton 
 										title={conceptLearning.mode === 'advanced' ? 'Next: Options' : 'Create Story'}
-										onPress={() => {
-											if (conceptLearning.mode === 'simple') {
-												// Set simple mode defaults - full sentences but simple language
-												setConceptLearning({
-													...conceptLearning,
-													advanced: {
-														density: 'multiple-sentences',
-														narrative: 'third-person',
-														pageCount: 6,
-														complexity: 'simple',
-														communicationStyle: 'simple-and-clear',
-														tone: 'playful',
-														goal: 'Keep sentences to 10-12 words maximum, use simple vocabulary suitable for young children'
-													}
-												});
-												setStoryWizardStep('text-generation');
-											} else {
-												setStoryWizardStep('advanced-options');
-											}
-										}}
+										onPress={() => {\n\t\t\t\t\t\t\t\t\t\tif (conceptLearning.mode === 'simple') {\n\t\t\t\t\t\t\t\t\t\t\t// Set simple mode defaults - full sentences but simple language\n\t\t\t\t\t\t\t\t\t\t\tsetConceptLearning({\n\t\t\t\t\t\t\t\t\t\t\t\t...conceptLearning,\n\t\t\t\t\t\t\t\t\t\t\t\tadvanced: {\n\t\t\t\t\t\t\t\t\t\t\t\t\tdensity: 'multiple-sentences',\n\t\t\t\t\t\t\t\t\t\t\t\t\tnarrative: 'third-person',\n\t\t\t\t\t\t\t\t\t\t\t\t\tpageCount: 6,\n\t\t\t\t\t\t\t\t\t\t\t\t\tcomplexity: 'simple',\n\t\t\t\t\t\t\t\t\t\t\t\t\tcommunicationStyle: 'simple-and-clear',\n\t\t\t\t\t\t\t\t\t\t\t\t\ttone: 'playful',\n\t\t\t\t\t\t\t\t\t\t\t\t\tgoal: 'Keep sentences to 10-12 words maximum, use simple vocabulary suitable for young children'\n\t\t\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\t\t\t\tsetStoryWizardStep('text-generation');\n\t\t\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\t\t\tsetStoryWizardStep('advanced-options');\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t}}
 										style={{ flex: 2 }}
 									/>
 								</View>
@@ -1727,7 +1708,7 @@ export default function StorybookScreen() {
 									</TouchableOpacity>
 									<GradientButton 
 										title="Create Story"
-										onPress={() => setStoryWizardStep('text-generation')}
+										onPress={() => setStoryWizardStep('character-selection')}
 										style={{ flex: 2 }}
 									/>
 								</View>
