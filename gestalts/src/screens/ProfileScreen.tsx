@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ScrollView, TextInput, View, TouchableOpacity, Alert } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
+import { useMemoriesStore } from '../state/useStore';
 
 type ProfileTab = 'details' | 'notifications' | 'account';
 
@@ -19,10 +20,31 @@ export default function ProfileScreen() {
 	const { openDrawer } = useDrawer();
 	const { user, signOut } = useAuth();
 	const navigation = useNavigation<NavigationProp>();
+	const { userProfile, updateUserProfile } = useMemoriesStore();
 	const [activeTab, setActiveTab] = useState<ProfileTab>('details');
 	const [showLeftArrow, setShowLeftArrow] = useState(false);
 	const [showRightArrow, setShowRightArrow] = useState(true);
 	const scrollViewRef = useRef<any>(null);
+	
+	// Form state
+	const [displayName, setDisplayName] = useState(userProfile?.displayName || '');
+	const [firstName, setFirstName] = useState(userProfile?.firstName || '');
+	const [lastName, setLastName] = useState(userProfile?.lastName || '');
+	const [email, setEmail] = useState(userProfile?.email || user?.email || '');
+	
+	// Load user profile data on mount
+	useEffect(() => {
+		if (userProfile) {
+			setDisplayName(userProfile.displayName || '');
+			setFirstName(userProfile.firstName || '');
+			setLastName(userProfile.lastName || '');
+			setEmail(userProfile.email || user?.email || '');
+		} else if (user) {
+			// Initialize from auth user if no profile exists
+			setDisplayName(user.displayName || '');
+			setEmail(user.email || '');
+		}
+	}, [userProfile, user]);
 
 	const handleSignOut = () => {
 		Alert.alert(
@@ -47,6 +69,22 @@ export default function ProfileScreen() {
 				}
 			]
 		);
+	};
+	
+	const handleSaveChanges = () => {
+		try {
+			updateUserProfile({
+				displayName: displayName.trim() || undefined,
+				firstName: firstName.trim() || undefined,
+				lastName: lastName.trim() || undefined,
+				email: email.trim() || undefined
+			});
+			
+			Alert.alert('Success', 'Profile updated successfully!');
+		} catch (error) {
+			console.error('Failed to update profile:', error);
+			Alert.alert('Error', 'Failed to update profile. Please try again.');
+		}
 	};
 
 	const tabs = [
@@ -296,6 +334,8 @@ export default function ProfileScreen() {
 								</Text>
 								<TextInput
 									placeholder="Enter your display name"
+									value={displayName}
+									onChangeText={setDisplayName}
 									style={{
 										borderColor: tokens.color.border.default,
 										borderWidth: 1,
@@ -318,6 +358,8 @@ export default function ProfileScreen() {
 									</Text>
 									<TextInput
 										placeholder="First name"
+										value={firstName}
+										onChangeText={setFirstName}
 										style={{
 											borderColor: tokens.color.border.default,
 											borderWidth: 1,
@@ -337,6 +379,8 @@ export default function ProfileScreen() {
 									</Text>
 									<TextInput
 										placeholder="Last name"
+										value={lastName}
+										onChangeText={setLastName}
 										style={{
 											borderColor: tokens.color.border.default,
 											borderWidth: 1,
@@ -361,6 +405,8 @@ export default function ProfileScreen() {
 									placeholder="your.email@example.com"
 									keyboardType="email-address"
 									autoCapitalize="none"
+									value={email}
+									onChangeText={setEmail}
 									style={{
 										borderColor: tokens.color.border.default,
 										borderWidth: 1,
@@ -373,6 +419,7 @@ export default function ProfileScreen() {
 
 							{/* Save Button */}
 							<TouchableOpacity
+								onPress={handleSaveChanges}
 								style={{
 									backgroundColor: tokens.color.brand.gradient.start,
 									paddingVertical: tokens.spacing.gap.md,

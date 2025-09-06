@@ -22,6 +22,7 @@ export type AppointmentNote = {
 };
 export type PlaySession = { id: string; activity: string; notes?: string; createdAtISO: string };
 export type ChildProfile = { id: string; childName: string; parentName?: string; birthDateISO?: string; stage?: string };
+export type UserProfile = { displayName?: string; firstName?: string; lastName?: string; email?: string; };
 
 // Firebase-backed profile state
 export type ProfileState = {
@@ -37,6 +38,7 @@ export type MemoriesState = {
 	appointmentNotes: AppointmentNote[];
 	playSessions: PlaySession[];
 	profile: ChildProfile | null; // Legacy - will be deprecated
+	userProfile: UserProfile | null;
 	addJournal: (content: string, mood?: JournalEntry['mood'], type?: JournalEntry['type'], childName?: string, customDate?: string) => void;
 	addMilestone: (title: string, dateISO?: string, notes?: string) => void;
 	addAppointmentNote: (question: string, specialist?: string) => void;
@@ -44,6 +46,8 @@ export type MemoriesState = {
 	updateAppointmentNote: (id: string, updates: Partial<AppointmentNote>) => void;
 	addPlaySession: (activity: string, notes?: string) => void;
 	setProfile: (profile: ChildProfile) => void; // Legacy - will be deprecated
+	updateUserProfile: (updates: Partial<UserProfile>) => void;
+	getUserProfile: () => UserProfile | null;
 } & ProfileState & {
 	// Firebase profile operations
 	loadUserProfiles: (userId: string) => Promise<void>;
@@ -64,6 +68,7 @@ export const useMemoriesStore = create<MemoriesState>()(
 			appointmentNotes: [],
 			playSessions: [],
 			profile: null,
+			userProfile: null,
 			// Firebase profile state
 			profiles: [],
 			currentProfile: null,
@@ -101,6 +106,9 @@ export const useMemoriesStore = create<MemoriesState>()(
 			addPlaySession: (activity, notes) =>
 				set((state) => ({ playSessions: [{ id: generateId(), activity, notes, createdAtISO: dayjs().toISOString() }, ...state.playSessions] })),
 			setProfile: (profile) => set(() => ({ profile })),
+			updateUserProfile: (updates) =>
+				set((state) => ({ userProfile: { ...state.userProfile, ...updates } })),
+			getUserProfile: () => get().userProfile,
 			
 			// Firebase profile operations
 			loadUserProfiles: async (userId: string) => {
@@ -201,7 +209,8 @@ export const useMemoriesStore = create<MemoriesState>()(
 				milestones: state.milestones,
 				appointmentNotes: state.appointmentNotes,
 				playSessions: state.playSessions,
-				profile: state.profile // Keep legacy profile for migration
+				profile: state.profile, // Keep legacy profile for migration
+				userProfile: state.userProfile
 			}),
 			storage: createJSONStorage(() => AsyncStorage),
 		}

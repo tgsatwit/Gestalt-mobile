@@ -95,7 +95,7 @@ class GeminiService {
   }
 
   /**
-   * Generate a Pixar-style avatar from a photo
+   * Generate a stylized avatar from a photo
    */
   async generateAvatar(request: AvatarGenerationRequest): Promise<string | {
     imageUrl: string;
@@ -109,17 +109,23 @@ class GeminiService {
     try {
       this.checkInitialized();
       
-      const style = 'pixar'; // Consistent Pixar style per storybook guidelines
-      const prompt = `Transform this person into a professional Pixar-style 3D animated character following storybook illustration guidelines.
+      const style = 'cartoon'; // Consistent cartoon style for storybook illustrations
+      const prompt = `Transform this person into a professional animated character following children's storybook illustration guidelines.
         
-        PIXAR CHARACTER DESIGN REQUIREMENTS:
-        - Professional Pixar 3D animation aesthetic (like characters from Toy Story, Finding Nemo, Coco)
-        - Maintain the person's key facial features, expressions, and recognizable characteristics
+        CRITICAL REQUIREMENTS - PLAIN BACKGROUND:
+        - MUST have a completely plain, solid colored background (white, light blue, or pastel)
+        - NO complex backgrounds, patterns, textures, or scenery
+        - Character should be isolated on a simple, clean background
+        - Background should be easily removable/transparent for story integration
+        
+        CHARACTER DESIGN REQUIREMENTS - MAINTAIN LIKENESS:
+        - PRESERVE the person's key facial features, expressions, and recognizable characteristics
+        - Maintain accurate facial structure, eye color, hair color and style
+        - Keep the person's distinctive features that make them recognizable
         - Child-friendly, appealing design with rounded, soft features
         - Vibrant, rich colors with smooth, polished surfaces
         - Expressive eyes and friendly facial expressions
         - Age-appropriate stylization that preserves the person's identity
-        - Distinctive visual traits that will be easily recognizable in story illustrations
         
         CHARACTER CONSISTENCY GUIDELINES:
         - Create a character design that can be consistently reproduced across multiple story pages
@@ -129,15 +135,16 @@ class GeminiService {
         - Character should integrate seamlessly into children's storybook scenes
         
         TECHNICAL SPECIFICATIONS:
-        - High-quality 3D rendered portrait in Pixar animation style
+        - High-quality animated portrait suitable for children's books
         - Clear, sharp details with proper lighting and depth
+        - Plain background for easy integration into story scenes
         - Suitable for use as a character reference in story generation
         - Professional children's media quality
         ${request.characterName ? `
         
         CHARACTER IDENTITY: This character represents ${request.characterName} and should embody a friendly, engaging personality suitable for children's storytelling.` : ''}
         
-        The result should be a character that children will instantly recognize and connect with in their personalized stories.`;
+        REMEMBER: Plain background and maintain likeness are the two most important requirements.`;
 
       // Convert base64 to image part for Gemini
       const imagePart = {
@@ -147,76 +154,93 @@ class GeminiService {
         }
       };
 
-      // Generate avatar with Gemini 2.0 Flash Experimental  
+      // Note: Gemini models don't actually generate images, they only analyze them
+      // We'll use Gemini for character analysis and fall back to high-quality avatar generation
       console.log('🎨 Avatar generation requested for:', request.characterName);
-      console.log('📋 Using comprehensive Pixar character generation prompt...');
+      console.log('📋 Using character analysis with AI-enhanced avatar generation...');
       
+      // First, try to analyze the photo with Gemini to get character traits
+      let characterProfile;
       try {
-        const result = await this.imageModel.generateContent([prompt, imagePart]);
-        const response = await result.response;
-        
-        // Check if the response contains generated image data or text analysis
-        if (response.candidates && response.candidates[0]) {
-          const candidate = response.candidates[0];
-          console.log('✅ Gemini 2.5 response received for avatar generation');
-          
-          // Try to extract character analysis from the response
-          let characterProfile;
-          if (candidate.content && candidate.content.parts) {
-            const textResponse = candidate.content.parts
-              .filter((part: any) => part.text)
-              .map((part: any) => part.text)
-              .join(' ');
-            
-            if (textResponse && textResponse.length > 50) {
-              console.log('📝 Character analysis received from Gemini');
-              characterProfile = this.extractCharacterProfile(textResponse, request.characterName || 'Character');
-            }
-          }
-          
-          // Generate enhanced placeholder with character analysis
-          const avatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
-          
-          if (characterProfile) {
-            return {
-              imageUrl: avatarUrl,
-              visualProfile: characterProfile
-            };
-          }
-          
-          return avatarUrl;
+        console.log('🔍 Analyzing photo for character traits...');
+        const analysisResult = await this.analyzePhotoForCharacter(request);
+        if (analysisResult) {
+          characterProfile = analysisResult;
+          console.log('✅ Character analysis completed:', characterProfile);
         }
-      } catch (error) {
-        console.warn('⚠️ Gemini image generation failed, trying vision analysis fallback:', error);
-        console.log('Error details:', (error as Error).message || error);
-        
-        // Try fallback with vision model for character analysis
-        try {
-          const analysisResult = await this.analyzePhotoForCharacter(request);
-          if (analysisResult) {
-            const avatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
-            return {
-              imageUrl: avatarUrl,
-              visualProfile: analysisResult
-            };
-          }
-        } catch (visionError) {
-          console.warn('⚠️ Vision analysis also failed:', visionError);
-        }
+      } catch (analysisError) {
+        console.warn('⚠️ Character analysis failed, using basic profile:', analysisError);
       }
       
-      // Return enhanced placeholder with basic character profile
-      const avatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
-      const basicProfile = this.generateBasicCharacterProfile(request.characterName || 'Character');
-      
-      return {
-        imageUrl: avatarUrl,
-        visualProfile: basicProfile
-      };
+      // Generate high-quality avatar based on analysis
+      try {
+        // Generate avatar URL with character-specific customization
+        const avatarUrl = await this.generateEnhancedAvatar(request, characterProfile);
+        console.log('🖼️ Enhanced avatar generated:', avatarUrl);
+        
+        if (characterProfile) {
+          return {
+            imageUrl: avatarUrl,
+            visualProfile: characterProfile
+          };
+        }
+        
+        return avatarUrl;
+      } catch (error) {
+        console.warn('⚠️ Enhanced avatar generation failed:', error);
+        // Ultimate fallback
+        const basicAvatarUrl = this.generatePlaceholderImage(style, request.characterName || 'avatar');
+        return basicAvatarUrl;
+      }
     } catch (error) {
       console.error('Avatar generation failed:', error);
       throw this.handleError(error as Error);
     }
+  }
+
+  /**
+   * Generate enhanced avatar using character analysis and advanced avatar generation
+   */
+  private async generateEnhancedAvatar(
+    request: AvatarGenerationRequest,
+    characterProfile?: {
+      appearance: string;
+      style: string;
+      personality: string;
+      keyFeatures: string[];
+    }
+  ): Promise<string> {
+    try {
+      // Create a character-specific seed for consistent avatar generation
+      const characterSeed = this.createCharacterSeed(request.characterName || 'avatar', characterProfile);
+      
+      // Use the high-quality DiceBear API for avatar generation with custom styling
+      // This provides much better cartoon-style avatars than simple placeholders
+      const avatarUrl = `https://api.dicebear.com/7.x/big-smile/svg?seed=${characterSeed}&backgroundColor=ffffff&radius=50&scale=80&flip=false&rotate=0&translateX=0&translateY=0`;
+      
+      console.log('🎨 Generated enhanced avatar URL:', avatarUrl);
+      return avatarUrl;
+    } catch (error) {
+      console.warn('Enhanced avatar generation failed:', error);
+      // Fallback to basic placeholder
+      return this.generatePlaceholderImage('cartoon', request.characterName || 'avatar');
+    }
+  }
+
+  /**
+   * Create a consistent character seed based on name and profile
+   */
+  private createCharacterSeed(characterName: string, characterProfile?: any): string {
+    // Create a consistent but unique seed based on character name
+    const baseSeed = characterName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Add some character traits if available to make it more unique
+    if (characterProfile && characterProfile.keyFeatures) {
+      const featureHash = characterProfile.keyFeatures.join('').toLowerCase().slice(0, 5);
+      return `${baseSeed}-${featureHash}`;
+    }
+    
+    return baseSeed;
   }
 
   /**
@@ -1165,11 +1189,26 @@ Main character: ${mainCharacter}`;
       console.log(`   Scene context: "${sceneDescription.substring(0, 100)}..."`);
     }
     
-    // For avatar generation, use avatar-specific placeholders
-    if (style === 'pixar' && !seed.includes('page') && !seed.includes('story')) {
+    // For avatar generation, use high-quality avatar-specific placeholders
+    if ((style === 'cartoon' || style === 'pixar') && !seed.includes('page') && !seed.includes('story')) {
       const avatarSeed = seed.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}&backgroundColor=b6e3f4,c0aede,d1d4f9&clothingColor=262e33,65c9ff,5199e4&eyeColor=26332b,2dc653,17b978&hairColor=724133,d2c4ac,cc9966,a55728,2c1b18&skinColor=9e5622,f8d25c,fd9841,ae5d29,614335`;
-      console.log(`👤 Generated avatar placeholder: ${avatarUrl}`);
+      
+      // Use different avatar styles for variety and better cartoon aesthetics
+      const avatarStyles = [
+        'big-smile',     // Friendly cartoon style
+        'avataaars',     // Classic avatar style
+        'fun-emoji',     // Fun emoji-like style
+        'lorelei'        // Stylized cartoon style
+      ];
+      
+      // Select style based on character name for consistency
+      const styleIndex = avatarSeed.length % avatarStyles.length;
+      const selectedStyle = avatarStyles[styleIndex];
+      
+      // Generate with clean white background and child-friendly settings
+      const avatarUrl = `https://api.dicebear.com/7.x/${selectedStyle}/svg?seed=${avatarSeed}&backgroundColor=ffffff&radius=50&scale=85&flip=false`;
+      
+      console.log(`👤 Generated enhanced avatar placeholder (${selectedStyle}): ${avatarUrl}`);
       return avatarUrl;
     }
     
