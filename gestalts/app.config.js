@@ -1,6 +1,6 @@
 require('dotenv/config');
 
-export default ({config}) => ({
+export default () => ({
   "expo": {
     "name": "Gestalts",
     "slug": "gestalts",
@@ -34,7 +34,7 @@ export default ({config}) => ({
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tgsatwit.gestalts",
+      "bundleIdentifier": "com.tg.gestalts",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for AI voice interactions."
       }
@@ -45,7 +45,7 @@ export default ({config}) => ({
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.tgsatwit.gestalts",
+      "package": "com.tg.gestalts",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_NETWORK_STATE",

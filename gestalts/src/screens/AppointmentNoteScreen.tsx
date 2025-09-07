@@ -11,7 +11,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
-import { SpecialistService } from '../services/specialistService';
+import SpecialistService from '../services/specialistService';
 import { Specialist } from '../types/specialist';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -54,7 +54,7 @@ export default function AppointmentNoteScreen() {
   const [isClosed, setIsClosed] = useState<boolean>(existing?.isClosed ?? false);
   
   // Child selection state
-  const [selectedChild, setSelectedChild] = useState<string>(existing?.childName ?? '');
+  const [selectedChild, setSelectedChild] = useState<string>('');
   const [showChildrenDropdown, setShowChildrenDropdown] = useState(false);
   const [closureResponse, setClosureResponse] = useState(existing?.closureResponse ?? '');
   const [closedAt, setClosedAt] = useState<Date>(existing?.closedAtISO ? new Date(existing.closedAtISO) : new Date());
@@ -90,12 +90,12 @@ export default function AppointmentNoteScreen() {
   // Load specialist profiles
   useEffect(() => {
     const loadSpecialists = async () => {
-      if (!user?.uid) return;
+      if (!user) return;
       
       setLoadingSpecialists(true);
       try {
-        const specialistService = new SpecialistService();
-        const specialistProfiles = await specialistService.getUserSpecialists(user.uid);
+        const specialistService = SpecialistService;
+        const specialistProfiles = await specialistService.getUserSpecialists(user.email || 'anonymous');
         setSpecialists(specialistProfiles);
       } catch (error) {
         console.error('Failed to load specialists:', error);
@@ -105,7 +105,7 @@ export default function AppointmentNoteScreen() {
     };
 
     loadSpecialists();
-  }, [user?.uid]);
+  }, [user?.email]);
 
   // Audio recording functions (from AddGestaltScreen)
   const startRecording = async () => {
@@ -226,13 +226,11 @@ export default function AppointmentNoteScreen() {
       specialist: specialist.trim() || undefined,
       details: details.trim() || undefined,
       imageUris,
-      audioUri: recordingUri,
+      audioUri: recordingUri || undefined,
       appointmentDateISO: appointmentDate.toISOString(),
       isClosed,
       closedAtISO: isClosed ? closedAt.toISOString() : undefined,
       closureResponse: isClosed ? (closureResponse.trim() || undefined) : undefined,
-      childName: selectedChild || undefined,
-      childProfileId: selectedProfile?.id || undefined,
     };
 
     if (existing && existing.id) {
