@@ -10,7 +10,6 @@ import { getAuth } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
 
 export default function AddGestaltScreen() {
 	const { tokens } = useTheme();
