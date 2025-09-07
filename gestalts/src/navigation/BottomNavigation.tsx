@@ -182,7 +182,8 @@ export function BottomNavigation({
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0,0,0,0.1)',
-            opacity: addMenuAnim
+            opacity: addMenuAnim,
+            zIndex: 2000
           }}
         >
           <TouchableOpacity 
@@ -203,7 +204,8 @@ export function BottomNavigation({
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0,0,0,0.1)',
-            opacity: profileMenuAnim
+            opacity: profileMenuAnim,
+            zIndex: 2000
           }}
         >
           <TouchableOpacity 
@@ -230,6 +232,7 @@ export function BottomNavigation({
             elevation: 15,
             overflow: 'hidden',
             minWidth: 180,
+            zIndex: 2001,
             transform: [
               {
                 translateY: addMenuAnim.interpolate({
@@ -305,6 +308,7 @@ export function BottomNavigation({
             elevation: 15,
             overflow: 'hidden',
             minWidth: 180,
+            zIndex: 2001,
             transform: [
               {
                 translateY: profileMenuAnim.interpolate({

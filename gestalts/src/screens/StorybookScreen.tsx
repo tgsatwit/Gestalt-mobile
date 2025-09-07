@@ -668,21 +668,6 @@ export default function StorybookScreen() {
 						}}>
 							Create your first story and watch it come to life with magical illustrations!
 						</Text>
-						<GradientButton
-							title="Create Your First Story"
-							onPress={() => {
-								resetProgress();
-								setConceptLearning({
-									concept: '',
-									includeChildAsCharacter: false,
-									mode: 'simple',
-									characterIds: []
-								});
-								setStoryWizardStep('character-selection');
-								setStoryModalVisible(true);
-							}}
-							style={{ paddingHorizontal: tokens.spacing.gap.lg }}
-						/>
 					</View>
 				)}
 				

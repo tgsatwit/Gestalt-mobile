@@ -81,48 +81,32 @@ export const useStorybookStore = create<StorybookState>()(
         }
       },
 
-      // Load Gestalts characters (from useMemoriesStore)
+      // Load Gestalts characters (predefined characters)
       loadGestaltsCharacters: async () => {
         try {
-          // Import dynamically to avoid circular dependency
-          const { useMemoriesStore } = await import('./useStore');
-          const memoriesStore = useMemoriesStore.getState();
+          // Create predefined Gestalts characters
+          const gestaltsChars: Character[] = [
+            {
+              id: 'alex-gestalts',
+              name: 'Alex',
+              avatarUrl: 'https://firebasestorage.googleapis.com/v0/b/gestalts-mobile.firebasestorage.app/o/avatars%2FAlex-Avatar.jpeg?alt=media&token=5ec35a3b-1ee4-45a1-a193-53f2c60300a0',
+              type: 'gestalts' as const,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              aiAttributes: 'Friendly and adventurous character who loves exploring and learning new things'
+            },
+            {
+              id: 'emma-gestalts',
+              name: 'Emma',
+              avatarUrl: 'https://firebasestorage.googleapis.com/v0/b/gestalts-mobile.firebasestorage.app/o/avatars%2FEmma-Avatar.jpeg?alt=media&token=1721fb1c-5fa6-4cf0-9f09-08c8bb890d35',
+              type: 'gestalts' as const,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              aiAttributes: 'Kind and creative character who enjoys helping others and solving problems'
+            }
+          ];
           
-          // Convert memory entries to characters
-          const gestaltsChars: Character[] = [];
-          
-          // Add characters from journal entries
-          if (memoriesStore.journal) {
-            memoriesStore.journal.forEach((entry: any) => {
-              if (entry.mood) {
-                gestaltsChars.push({
-                  id: `journal-${entry.id}`,
-                  name: `${entry.mood} Character`,
-                  avatarUrl: '', // Could be generated based on mood
-                  type: 'gestalts' as const,
-                  createdAt: new Date(entry.timestamp || Date.now()),
-                  updatedAt: new Date(entry.timestamp || Date.now()),
-                  aiAttributes: `Character representing ${entry.mood} mood`
-                });
-              }
-            });
-          }
-          
-          // Add characters from milestones
-          if (memoriesStore.milestones) {
-            memoriesStore.milestones.forEach((milestone: any) => {
-              gestaltsChars.push({
-                id: `milestone-${milestone.id}`,
-                name: milestone.title,
-                avatarUrl: '', // Could be generated
-                type: 'gestalts' as const,
-                createdAt: new Date(milestone.timestamp || Date.now()),
-                updatedAt: new Date(milestone.timestamp || Date.now()),
-                aiAttributes: milestone.description || milestone.notes || 'Achievement milestone'
-              });
-            });
-          }
-          
+          console.log('Loading Gestalts characters:', gestaltsChars);
           set({ gestaltsCharacters: gestaltsChars });
         } catch (error) {
           console.error('Failed to load Gestalts characters:', error);
@@ -273,11 +257,12 @@ export const useStorybookStore = create<StorybookState>()(
         });
 
         try {
-          // Get character names
-          const characters = get().characters.filter(c => 
+          // Get character names from both user and gestalts characters
+          const allCharacters = [...get().characters, ...get().gestaltsCharacters];
+          const selectedCharacters = allCharacters.filter(c => 
             request.characterIds.includes(c.id)
           );
-          const characterNames = characters.map(c => c.name);
+          const characterNames = selectedCharacters.map(c => c.name);
 
           // Generate story text
           const storyTexts = await geminiService.generateStoryText(

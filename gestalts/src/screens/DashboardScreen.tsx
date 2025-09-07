@@ -10,6 +10,9 @@ import { BottomNavigation } from '../navigation/BottomNavigation';
 import { ProfileSetupNotification } from '../components/ProfileSetupNotification';
 import { useAuth } from '../contexts/AuthContext';
 import { BlurView } from 'expo-blur';
+import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
+import { getAuth } from 'firebase/auth';
+import dayjs from 'dayjs';
 
 export default function DashboardScreen() {
 	// const { tokens } = useTheme();
@@ -21,6 +24,15 @@ export default function DashboardScreen() {
 	const milestones = useMemoriesStore((s) => s.milestones);
 	const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
 	
+	// Firebase store for gestalts and appointment note updates
+	const { 
+		gestalts, 
+		loadGestalts, 
+		loadAppointmentNotes, 
+		updateAppointmentNote,
+		appointmentNotes: firebaseAppointmentNotes
+	} = useFirebaseMemoriesStore();
+	
 	// Show notification if user has no child profiles
 	const shouldShowNotification = profiles.length === 0;
 	const screenWidth = Dimensions.get('window').width;
@@ -31,6 +43,28 @@ export default function DashboardScreen() {
 	const [expandedAppointments, setExpandedAppointments] = useState(false);
 	const gestaltExpandAnim = useRef(new Animated.Value(0)).current;
 	const appointmentExpandAnim = useRef(new Animated.Value(0)).current;
+	
+	// Load gestalts and appointment notes on mount
+	useEffect(() => {
+		const auth = getAuth();
+		const currentUser = auth.currentUser;
+		if (currentUser && currentProfile?.id) {
+			loadGestalts(currentProfile.id);
+			loadAppointmentNotes(currentProfile.id);
+		}
+	}, [currentProfile?.id, loadGestalts, loadAppointmentNotes]);
+	
+	// Handle closing appointment notes
+	const handleCloseAppointmentNote = async (noteId: string) => {
+		try {
+			await updateAppointmentNote(noteId, {
+				isClosed: true,
+				closedAtISO: dayjs().toISOString()
+			});
+		} catch (error) {
+			console.error('Failed to close appointment note:', error);
+		}
+	};
 
 
 	// AI Coach modes
@@ -52,15 +86,20 @@ export default function DashboardScreen() {
 		}
 	];
 	
-	// Sample data for Gestalt Lists (would come from store in production)
-	const recentGestalts = [
-		{ id: '1', phrase: "To infinity and beyond!", source: "Toy Story", category: "Movies" },
-		{ id: '2', phrase: "Let's go on an adventure", source: "Daily routine", category: "Social" },
-		{ id: '3', phrase: "It's gonna be okay", source: "Parent comfort", category: "Comfort" }
-	];
+	// Get 3 most recently added gestalts from Firebase
+	const recentGestalts = gestalts
+		.sort((a, b) => new Date(b.createdAtISO || '').getTime() - new Date(a.createdAtISO || '').getTime())
+		.slice(0, 3)
+		.map(g => ({
+			id: g.id,
+			phrase: g.phrase,
+			source: g.source,
+			category: g.sourceType || 'Other'
+		}));
 	
-	// Get open appointment notes
-	const openAppointmentNotes = appointmentNotes.filter(note => !note.isClosed).slice(0, 3);
+	// Get open appointment notes - combine local and Firebase notes, prioritizing Firebase
+	const allAppointmentNotes = firebaseAppointmentNotes.length > 0 ? firebaseAppointmentNotes : appointmentNotes;
+	const openAppointmentNotes = allAppointmentNotes.filter(note => !note.isClosed);
 
 	const handleModeSelect = (mode: string) => {
 		(navigation as any).navigate('Coach', { initialMode: mode });
@@ -131,7 +170,8 @@ export default function DashboardScreen() {
 	const addMenuOptions = [
 		{ title: 'Journal', icon: 'create-outline', navigateTo: 'AddJournal' },
 		{ title: 'Milestone', icon: 'flag-outline', navigateTo: 'AddMilestone' },
-		{ title: 'Note', icon: 'calendar-outline', navigateTo: 'AddAppointmentNote' }
+		{ title: 'Appointment Note', icon: 'calendar-outline', navigateTo: 'AppointmentNote' },
+		{ title: 'Gestalt / Phrase', icon: 'chatbubble-outline', navigateTo: 'AddGestalt' }
 	];
 
 	const profileMenuOptions = [
@@ -896,58 +936,79 @@ export default function DashboardScreen() {
 										color: '#6B7280',
 										marginBottom: 15
 									}}>
-										Open Notes
+										Open Notes ({openAppointmentNotes.length})
 									</Text>
 									
 									{openAppointmentNotes.length > 0 ? (
-										openAppointmentNotes.map((note, index) => (
-											<View key={note.id} style={{
-												paddingVertical: 10,
-												borderTopWidth: index > 0 ? 0.5 : 0,
-												borderTopColor: 'rgba(229,231,235,0.5)'
-											}}>
-												<View style={{
-													flexDirection: 'row',
-													justifyContent: 'space-between',
-													alignItems: 'flex-start'
-												}}>
-													<View style={{ flex: 1 }}>
-														<Text style={{
-															fontSize: 14,
-															fontWeight: '600',
-															color: '#374151'
+										<>
+											{/* Scrollable container for appointment notes */}
+											<ScrollView
+												style={{
+													maxHeight: 150, // Show approximately 3 items
+													marginBottom: 15
+												}}
+												showsVerticalScrollIndicator={true}
+												nestedScrollEnabled={true}
+											>
+												{openAppointmentNotes.map((note, index) => (
+													<View key={note.id} style={{
+														paddingVertical: 10,
+														borderTopWidth: index > 0 ? 0.5 : 0,
+														borderTopColor: 'rgba(229,231,235,0.5)'
+													}}>
+														<View style={{
+															flexDirection: 'row',
+															justifyContent: 'space-between',
+															alignItems: 'flex-start'
 														}}>
-															{note.question}
-														</Text>
-														{note.specialist && (
-															<Text style={{
-																fontSize: 12,
-																color: '#9CA3AF',
-																marginTop: 2
-															}}>
-																{note.specialist}
-															</Text>
-														)}
+															<View style={{ flex: 1 }}>
+																<Text style={{
+																	fontSize: 14,
+																	fontWeight: '600',
+																	color: '#374151'
+																}}>
+																	{note.question}
+																</Text>
+																{note.specialist && (
+																	<Text style={{
+																		fontSize: 12,
+																		color: '#9CA3AF',
+																		marginTop: 2
+																	}}>
+																		{note.specialist}
+																	</Text>
+																)}
+																{note.appointmentDateISO && (
+																	<Text style={{
+																		fontSize: 11,
+																		color: '#9CA3AF',
+																		marginTop: 2
+																	}}>
+																		{dayjs(note.appointmentDateISO).format('MMM D, YYYY')}
+																	</Text>
+																)}
+															</View>
+															<TouchableOpacity
+																onPress={() => handleCloseAppointmentNote(note.id)}
+																style={{
+																	padding: 4,
+																	marginLeft: 8
+																}}
+																activeOpacity={0.7}
+															>
+																<Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
+															</TouchableOpacity>
+														</View>
 													</View>
-													<TouchableOpacity
-														onPress={() => {
-															// Mark as closed logic here
-														}}
-														style={{
-															padding: 4,
-															marginLeft: 8
-														}}
-													>
-														<Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
-													</TouchableOpacity>
-												</View>
-											</View>
-										))
+												))}
+											</ScrollView>
+										</>
 									) : (
 										<Text style={{
 											fontSize: 14,
 											color: '#9CA3AF',
-											fontStyle: 'italic'
+											fontStyle: 'italic',
+											marginBottom: 15
 										}}>
 											No open appointment notes
 										</Text>
@@ -956,7 +1017,6 @@ export default function DashboardScreen() {
 									<TouchableOpacity
 										onPress={() => handleTilePress('AddAppointmentNote')}
 										style={{
-											marginTop: 15,
 											paddingVertical: 10,
 											paddingHorizontal: 16,
 											backgroundColor: 'rgba(124,58,237,0.1)',
@@ -1139,94 +1199,6 @@ export default function DashboardScreen() {
 				profileMenuOptions={profileMenuOptions}
 			/>
 
-			{/* Floating Add Menu - Glass Design */}
-			{showAddMenu && addMenuAnim && (
-				<>
-					<Animated.View
-						style={{
-							position: 'absolute',
-							top: 0,
-							left: 0,
-							right: 0,
-							bottom: 0,
-							backgroundColor: 'rgba(0,0,0,0.4)',
-							opacity: addMenuAnim
-						}}
-					>
-						<TouchableOpacity 
-							style={{ flex: 1 }}
-							onPress={toggleAddMenu}
-							activeOpacity={1}
-						/>
-					</Animated.View>
-					
-					<Animated.View
-						style={{
-							position: 'absolute',
-							bottom: 100,
-							left: 20,
-							right: 20,
-							opacity: addMenuAnim,
-							transform: [{
-								translateY: addMenuAnim.interpolate({
-									inputRange: [0, 1],
-									outputRange: [50, 0],
-								})
-							}]
-						}}
-					>
-						<View style={{
-							backgroundColor: 'rgba(255,255,255,0.95)',
-							borderRadius: 24,
-							padding: 20,
-							shadowColor: '#000',
-							shadowOffset: { width: 0, height: 10 },
-							shadowOpacity: 0.2,
-							shadowRadius: 30,
-							elevation: 20
-						}}>
-							<View style={{
-								flexDirection: 'row',
-								justifyContent: 'space-around'
-							}}>
-								{addMenuOptions.map((option, index) => (
-									<TouchableOpacity
-										key={index}
-										onPress={() => {
-											(navigation as any).navigate(option.navigateTo);
-											toggleAddMenu();
-										}}
-										style={{ alignItems: 'center' }}
-									>
-										<View style={{
-											width: 60,
-											height: 60,
-											borderRadius: 20,
-											backgroundColor: 'rgba(124,58,237,0.1)',
-											alignItems: 'center',
-											justifyContent: 'center',
-											marginBottom: 8
-										}}>
-											<Ionicons 
-												name={option.icon as any} 
-												size={28} 
-												color="#4B5563"
-											/>
-										</View>
-										<Text style={{
-											fontSize: 12,
-											color: '#6B7280',
-											fontWeight: '500'
-										}}>
-											{option.title}
-										</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-						</View>
-					</Animated.View>
-				</>
-			)}
 
 		</View>
 	);
