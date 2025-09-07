@@ -17,5 +17,6 @@ export type MainStackParamList = {
   ChildProfilesList: undefined;
   UserProfile: undefined;
   SpecialistProfiles: undefined;
+  AddEditSpecialist: { specialistId?: string } | undefined;
   ProfileSelection: undefined;
 };

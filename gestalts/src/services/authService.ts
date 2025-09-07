@@ -24,6 +24,7 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   displayName: string;
+  name: string;
   signUpDate: Date;
   provider: 'email' | 'apple';
 }

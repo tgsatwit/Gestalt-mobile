@@ -148,29 +148,48 @@ export const useStorybookStore = create<StorybookState>()(
         });
 
         try {
-          // Read photo as base64
-          const photoData = await FileSystem.readAsStringAsync(photoUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          let avatarUrl: string;
+          let visualProfile: any = undefined;
+          
+          // Check if photoUri is already a URL (from avatar generation) or a local file URI
+          if (photoUri.startsWith('http://') || photoUri.startsWith('https://') || photoUri.startsWith('data:')) {
+            // Already have a generated avatar URL, just use it directly
+            avatarUrl = photoUri;
+            console.log('Using provided avatar URL directly:', avatarUrl);
+            
+            set({ 
+              generationProgress: {
+                status: 'generating',
+                message: 'Saving avatar...',
+                progress: 80
+              }
+            });
+          } else {
+            // Local file URI - need to generate avatar
+            // Read photo as base64
+            const photoData = await FileSystem.readAsStringAsync(photoUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
 
-          set({ 
-            generationProgress: {
-              status: 'generating',
-              message: 'Creating avatar...',
-              progress: 30
-            }
-          });
+            set({ 
+              generationProgress: {
+                status: 'generating',
+                message: 'Creating avatar...',
+                progress: 30
+              }
+            });
 
-          // Generate avatar using Gemini (this will use placeholder for now)
-          const avatarResult = await geminiService.generateAvatar({
-            photoData: `data:image/jpeg;base64,${photoData}`,
-            style: 'pixar',
-            characterName: name
-          });
+            // Generate avatar using Gemini
+            const avatarResult = await geminiService.generateAvatar({
+              photoData: `data:image/jpeg;base64,${photoData}`,
+              style: 'pixar',
+              characterName: name
+            });
 
-          // Handle both string and object return types
-          const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-          const visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+            // Handle both string and object return types
+            avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+            visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+          }
 
           // Create character object
           const character: Character = {

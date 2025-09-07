@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,7 @@ import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
 import { getAuth } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
+import { Audio } from 'expo-av';
 
 export default function AddMilestoneScreen() {
 	const { tokens } = useTheme();
@@ -28,6 +29,14 @@ export default function AddMilestoneScreen() {
 	// Child selection state
 	const [selectedChild, setSelectedChild] = useState<string>('');
 	const [showChildrenDropdown, setShowChildrenDropdown] = useState(false);
+	
+	// Audio recording state
+	const [recording, setRecording] = useState<Audio.Recording | null>(null);
+	const [recordingUri, setRecordingUri] = useState<string | null>(null);
+	const [isRecording, setIsRecording] = useState(false);
+	const [recordingDuration, setRecordingDuration] = useState(0);
+	const [playbackSound, setPlaybackSound] = useState<Audio.Sound | null>(null);
+	const [isPlaying, setIsPlaying] = useState(false);
 	
 	// Get available children from current profile
 	const availableChildren = currentProfile ? [currentProfile.childName] : [];
@@ -50,6 +59,111 @@ export default function AddMilestoneScreen() {
 		'Initiated conversation'
 	];
 
+	// Audio recording functions
+	const startRecording = async () => {
+		try {
+			// Request permissions
+			const permission = await Audio.requestPermissionsAsync();
+			if (permission.status !== 'granted') {
+				Alert.alert('Permission needed', 'Please grant audio recording permission');
+				return;
+			}
+
+			// Configure audio mode
+			await Audio.setAudioModeAsync({
+				allowsRecordingIOS: true,
+				playsInSilentModeIOS: true,
+			});
+
+			// Start recording
+			const { recording } = await Audio.Recording.createAsync(
+				Audio.RecordingOptionsPresets.HIGH_QUALITY
+			);
+			setRecording(recording);
+			setIsRecording(true);
+
+			// Update duration every second
+			recording.setOnRecordingStatusUpdate((status) => {
+				if (status.isRecording) {
+					setRecordingDuration(Math.floor(status.durationMillis / 1000));
+				}
+			});
+		} catch (error) {
+			console.error('Failed to start recording:', error);
+			Alert.alert('Error', 'Failed to start recording');
+		}
+	};
+
+	const stopRecording = async () => {
+		if (!recording) return;
+
+		try {
+			setIsRecording(false);
+			await recording.stopAndUnloadAsync();
+			const uri = recording.getURI();
+			setRecording(null);
+			setRecordingUri(uri);
+			setRecordingDuration(0);
+
+			// Configure audio mode for playback
+			await Audio.setAudioModeAsync({
+				allowsRecordingIOS: false,
+				playsInSilentModeIOS: true,
+			});
+		} catch (error) {
+			console.error('Failed to stop recording:', error);
+			Alert.alert('Error', 'Failed to stop recording');
+		}
+	};
+
+	const playRecording = async () => {
+		if (!recordingUri) return;
+
+		try {
+			if (playbackSound) {
+				// Stop current playback
+				await playbackSound.stopAsync();
+				await playbackSound.unloadAsync();
+				setPlaybackSound(null);
+				setIsPlaying(false);
+				return;
+			}
+
+			// Start playback
+			const { sound } = await Audio.Sound.createAsync(
+				{ uri: recordingUri },
+				{ shouldPlay: true }
+			);
+			setPlaybackSound(sound);
+			setIsPlaying(true);
+
+			sound.setOnPlaybackStatusUpdate((status) => {
+				if (status.didJustFinish) {
+					setIsPlaying(false);
+					setPlaybackSound(null);
+				}
+			});
+		} catch (error) {
+			console.error('Failed to play recording:', error);
+			Alert.alert('Error', 'Failed to play recording');
+		}
+	};
+
+	const deleteRecording = () => {
+		setRecordingUri(null);
+		setIsPlaying(false);
+		if (playbackSound) {
+			playbackSound.unloadAsync();
+			setPlaybackSound(null);
+		}
+	};
+
+	const formatDuration = (seconds: number) => {
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	};
+
 	const handleSave = async () => {
 		if (!title.trim()) return;
 		
@@ -57,23 +171,33 @@ export default function AddMilestoneScreen() {
 		const auth = getAuth();
 		const currentUser = auth.currentUser;
 		if (!currentUser) {
-			alert('Please sign in to save milestones');
+			Alert.alert('Authentication Required', 'Please sign in to save milestones');
 			return;
 		}
 		
 		try {
+			// Prepare audio data if recording exists
+			let audioData: { uri: string; recordedAt: string } | undefined = undefined;
+			if (recordingUri) {
+				audioData = {
+					uri: recordingUri,
+					recordedAt: new Date().toISOString()
+				};
+			}
+
 			// Save to Firebase
 			await addMilestone(
 				title.trim(),
 				selectedDate.toISOString(),
 				description.trim() || undefined,
 				selectedChild || undefined,
-				currentProfile?.id
+				currentProfile?.id,
+				audioData
 			);
 			navigation.goBack();
 		} catch (error) {
 			console.error('Failed to save milestone:', error);
-			alert('Failed to save milestone. Please try again.');
+			Alert.alert('Error', 'Failed to save milestone. Please try again.');
 		}
 	};
 
@@ -590,6 +714,126 @@ export default function AddMilestoneScreen() {
 						Add photos or videos
 					</Text>
 				</TouchableOpacity>
+
+				{/* Audio Recording */}
+				<View style={{ marginBottom: tokens.spacing.gap.lg }}>
+					<Text weight="medium" style={{ 
+						fontSize: tokens.font.size.sm,
+						color: tokens.color.text.secondary,
+						marginBottom: tokens.spacing.gap.sm 
+					}}>
+						Record Audio (Optional)
+					</Text>
+					
+					{!recordingUri ? (
+						<TouchableOpacity
+							onPress={isRecording ? stopRecording : startRecording}
+							style={{
+								backgroundColor: isRecording ? '#EF4444' + '20' : tokens.color.surface,
+								borderRadius: tokens.radius.lg,
+								padding: tokens.spacing.gap.lg,
+								alignItems: 'center',
+								borderWidth: 1,
+								borderColor: isRecording ? '#EF4444' : tokens.color.border.default
+							}}
+						>
+							<View style={{
+								width: 60,
+								height: 60,
+								borderRadius: 30,
+								backgroundColor: isRecording ? '#EF4444' : tokens.color.brand.gradient.start,
+								alignItems: 'center',
+								justifyContent: 'center',
+								marginBottom: tokens.spacing.gap.sm
+							}}>
+								<Ionicons 
+									name={isRecording ? "stop" : "mic"} 
+									size={28} 
+									color="white" 
+								/>
+							</View>
+							<Text style={{ 
+								color: isRecording ? '#EF4444' : tokens.color.text.primary,
+								fontWeight: '600',
+								fontSize: tokens.font.size.body
+							}}>
+								{isRecording ? `Recording... ${formatDuration(recordingDuration)}` : 'Tap to Record'}
+							</Text>
+							{!isRecording && (
+								<Text color="secondary" style={{ 
+									fontSize: tokens.font.size.sm,
+									textAlign: 'center',
+									marginTop: tokens.spacing.gap.xs
+								}}>
+									Record your child's voice or add notes
+								</Text>
+							)}
+						</TouchableOpacity>
+					) : (
+						<View style={{
+							backgroundColor: tokens.color.surface,
+							borderRadius: tokens.radius.lg,
+							padding: tokens.spacing.gap.md,
+							borderWidth: 1,
+							borderColor: tokens.color.border.default
+						}}>
+							<View style={{
+								flexDirection: 'row',
+								alignItems: 'center',
+								marginBottom: tokens.spacing.gap.sm
+							}}>
+								<View style={{
+									width: 40,
+									height: 40,
+									borderRadius: 20,
+									backgroundColor: tokens.color.brand.gradient.start + '20',
+									alignItems: 'center',
+									justifyContent: 'center',
+									marginRight: tokens.spacing.gap.sm
+								}}>
+									<Ionicons name="musical-notes" size={20} color={tokens.color.brand.gradient.start} />
+								</View>
+								<View style={{ flex: 1 }}>
+									<Text weight="semibold">Audio Recording</Text>
+									<Text color="secondary" size="sm">Ready to save</Text>
+								</View>
+								<TouchableOpacity
+									onPress={deleteRecording}
+									style={{
+										padding: tokens.spacing.gap.xs,
+										borderRadius: tokens.radius.md
+									}}
+								>
+									<Ionicons name="trash-outline" size={20} color="#EF4444" />
+								</TouchableOpacity>
+							</View>
+							<TouchableOpacity
+								onPress={playRecording}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									justifyContent: 'center',
+									backgroundColor: tokens.color.brand.gradient.start + '10',
+									borderRadius: tokens.radius.md,
+									padding: tokens.spacing.gap.sm
+								}}
+							>
+								<Ionicons 
+									name={isPlaying ? "pause" : "play"} 
+									size={16} 
+									color={tokens.color.brand.gradient.start} 
+								/>
+								<Text style={{
+									marginLeft: tokens.spacing.gap.xs,
+									color: tokens.color.brand.gradient.start,
+									fontWeight: '600'
+								}}>
+									{isPlaying ? 'Pause' : 'Play'}
+								</Text>
+							</TouchableOpacity>
+						</View>
+					)}
+				</View>
 
 				{/* Save Button */}
 				<GradientButton 

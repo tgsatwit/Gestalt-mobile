@@ -13,6 +13,8 @@ interface AuthContextType {
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   isAppleSignInAvailable: boolean;
+  getCurrentUserId: () => string;
+  updateUserName: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firstName: data.firstName ?? '',
         lastName: data.lastName ?? '',
         displayName: data.displayName ?? '',
+        name: data.displayName ?? `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim(),
         signUpDate: data.signUpDate?.toDate?.() ?? new Date(),
         provider: data.provider ?? 'email',
       };
@@ -136,6 +139,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Consider authenticated if Firebase has a current user
   const isAuthenticated = !loading && !!firebaseUser;
 
+  const getCurrentUserId = (): string => {
+    return firebaseUser?.uid || '';
+  };
+
+  const updateUserName = async (name: string): Promise<void> => {
+    if (!firebaseUser) return;
+    
+    try {
+      const { db } = getFirebaseServices();
+      if (!db) return;
+      
+      const { updateDoc, doc } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+        displayName: name,
+        firstName: name.split(' ')[0] || '',
+        lastName: name.split(' ').slice(1).join(' ') || '',
+      });
+      
+      // Update local user state
+      if (user) {
+        setUser({
+          ...user,
+          displayName: name,
+          name: name,
+          firstName: name.split(' ')[0] || '',
+          lastName: name.split(' ').slice(1).join(' ') || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating user name:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -146,7 +183,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInWithApple,
       signOut,
-      isAppleSignInAvailable
+      isAppleSignInAvailable,
+      getCurrentUserId,
+      updateUserName
     }}>
       {children}
     </AuthContext.Provider>

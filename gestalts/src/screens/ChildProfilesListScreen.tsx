@@ -40,12 +40,7 @@ export default function ChildProfilesListScreen() {
 			const userProfiles = await childProfileService.getUserProfiles(userId);
 			setProfiles(userProfiles);
 
-			// If no profiles exist, automatically navigate to create profile
-			if (userProfiles.length === 0) {
-				setTimeout(() => {
-					navigation.navigate('ChildProfile');
-				}, 100);
-			}
+			// Note: Removed auto-navigation to allow user to see empty state and choose to create profile
 		} catch (err) {
 			console.error('Failed to load child profiles:', err);
 			setError('Failed to load child profiles');

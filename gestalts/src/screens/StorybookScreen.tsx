@@ -634,6 +634,59 @@ export default function StorybookScreen() {
 				<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
 					Revisit your magical adventures or create a new one.
 				</Text>
+				
+				{/* Empty state when no stories exist */}
+				{stories.length === 0 && (
+					<View style={{
+						alignItems: 'center',
+						justifyContent: 'center',
+						paddingVertical: 60,
+						paddingHorizontal: tokens.spacing.gap.lg
+					}}>
+						<View style={{
+							width: 80,
+							height: 80,
+							borderRadius: 40,
+							backgroundColor: 'rgba(124, 58, 237, 0.1)',
+							alignItems: 'center',
+							justifyContent: 'center',
+							marginBottom: tokens.spacing.gap.lg
+						}}>
+							<Ionicons name="library-outline" size={40} color={tokens.color.primary.default} />
+						</View>
+						<Text weight="semibold" size="h3" style={{ 
+							textAlign: 'center', 
+							marginBottom: tokens.spacing.gap.sm,
+							color: tokens.color.text.primary
+						}}>
+							No stories yet
+						</Text>
+						<Text color="secondary" style={{ 
+							textAlign: 'center', 
+							marginBottom: tokens.spacing.gap.lg,
+							maxWidth: 250
+						}}>
+							Create your first story and watch it come to life with magical illustrations!
+						</Text>
+						<GradientButton
+							title="Create Your First Story"
+							onPress={() => {
+								resetProgress();
+								setConceptLearning({
+									concept: '',
+									includeChildAsCharacter: false,
+									mode: 'simple',
+									characterIds: []
+								});
+								setStoryWizardStep('character-selection');
+								setStoryModalVisible(true);
+							}}
+							style={{ paddingHorizontal: tokens.spacing.gap.lg }}
+						/>
+					</View>
+				)}
+				
+				{/* Stories list */}
 				{stories.map(story => {
 					const isGenerating = story.status === 'generating' || story.status === 'draft';
 					const isComplete = story.status === 'complete';
@@ -699,7 +752,7 @@ export default function StorybookScreen() {
 									<Text color="secondary" size="sm">
 										{isGenerating ? (
 											<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-												<Text size="sm" style={{ color: tokens.color.primary.default }}>Creating illustrations...</Text>
+												<Text size="sm" style={{ color: tokens.color.primary.default }}>Generating story...</Text>
 												{story.generationProgress && (
 													<Text size="sm" style={{ color: tokens.color.primary.default, marginLeft: 4 }}>
 														({Math.round(story.generationProgress)}%)
@@ -1096,8 +1149,6 @@ export default function StorybookScreen() {
 											console.log('🖼️ Using avatar URL:', generatedAvatar);
 											
 											// Create character using the generated avatar URL directly
-											// The createCharacterFromPhoto function expects a photo URI, but we already have the generated avatar
-											// So we'll pass the generated avatar URL as the photo URI - the store will handle it appropriately
 											const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
 											
 											console.log('✅ Character created successfully:', newCharacter.name);
@@ -1130,9 +1181,16 @@ export default function StorybookScreen() {
 								}} 
 							/>
 							<TouchableOpacity 
-								onPress={() => {
+								onPress={async () => {
 									setAvatarStep('generating');
-									generateAvatarFromPhoto();
+									setGeneratedAvatar(null);
+									// Regenerate with the same photo
+									try {
+										await generateAvatarFromPhoto();
+									} catch (error) {
+										console.error('Failed to regenerate avatar:', error);
+										setAvatarStep('upload');
+									}
 								}} 
 								style={{ marginTop: 12 }}
 							>

@@ -21,6 +21,10 @@ export interface FirebaseMilestone {
   notes?: string;
   childName?: string;
   childProfileId?: string;
+  audioData?: {
+    uri: string;
+    recordedAt: string;
+  };
 }
 
 export interface FirebaseAppointmentNote {
@@ -83,7 +87,7 @@ interface FirebaseMemoriesState {
   
   // Milestone operations
   loadMilestones: (childProfileId?: string) => Promise<void>;
-  addMilestone: (title: string, dateISO?: string, notes?: string, childName?: string, childProfileId?: string) => Promise<void>;
+  addMilestone: (title: string, dateISO?: string, notes?: string, childName?: string, childProfileId?: string, audioData?: { uri: string; recordedAt: string }) => Promise<void>;
   updateMilestone: (id: string, updates: Partial<FirebaseMilestone>) => Promise<void>;
   deleteMilestone: (id: string) => Promise<void>;
   
@@ -261,7 +265,8 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
           dateISO: milestone.dateISO,
           notes: milestone.notes,
           childName: milestone.childName,
-          childProfileId: milestone.childProfileId
+          childProfileId: milestone.childProfileId,
+          audioData: milestone.audioData
         })),
         milestonesLoading: false 
       });
@@ -272,7 +277,7 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
   },
   
-  addMilestone: async (title, dateISO, notes, childName, childProfileId) => {
+  addMilestone: async (title, dateISO, notes, childName, childProfileId, audioData) => {
     const userId = getCurrentUserId();
     if (!userId) {
       set({ milestonesError: 'User not authenticated' });
@@ -286,9 +291,10 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
         dateISO: dateISO || dayjs().toISOString()
       };
       
-      if (notes !== undefined) milestoneData.notes = notes;
-      if (childName !== undefined) milestoneData.childName = childName;
-      if (childProfileId !== undefined) milestoneData.childProfileId = childProfileId;
+      if (notes !== undefined && notes.trim() !== '') milestoneData.notes = notes;
+      if (childName !== undefined && childName.trim() !== '') milestoneData.childName = childName;
+      if (childProfileId !== undefined && childProfileId.trim() !== '') milestoneData.childProfileId = childProfileId;
+      if (audioData !== undefined) milestoneData.audioData = audioData;
       
       const milestoneId = await memoriesService.createMilestone(userId, milestoneData);
       
@@ -296,9 +302,10 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
         id: milestoneId,
         title,
         dateISO: dateISO || dayjs().toISOString(),
-        ...(notes !== undefined && { notes }),
-        ...(childName !== undefined && { childName }),
-        ...(childProfileId !== undefined && { childProfileId })
+        ...(notes !== undefined && notes.trim() !== '' && { notes }),
+        ...(childName !== undefined && childName.trim() !== '' && { childName }),
+        ...(childProfileId !== undefined && childProfileId.trim() !== '' && { childProfileId }),
+        ...(audioData !== undefined && { audioData })
       };
       
       set(state => ({ 
@@ -546,20 +553,32 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      // Filter out undefined values for Firestore
+      // Build gestalt data with only defined values to avoid Firestore errors
       const gestaltData: any = {
         phrase,
         source,
-        sourceType,
-        stage,
-        contexts,
-        dateStartedISO,
-        createdAtISO: dayjs().toISOString(),
-        childName,
-        childProfileId
+        createdAtISO: dayjs().toISOString()
       };
-
-      // Only include audioData if it's not undefined
+      
+      // Only include optional fields if they have values
+      if (sourceType !== undefined && sourceType.trim() !== '') {
+        gestaltData.sourceType = sourceType;
+      }
+      if (stage !== undefined && stage.trim() !== '') {
+        gestaltData.stage = stage;
+      }
+      if (contexts !== undefined && contexts.length > 0) {
+        gestaltData.contexts = contexts;
+      }
+      if (dateStartedISO !== undefined && dateStartedISO.trim() !== '') {
+        gestaltData.dateStartedISO = dateStartedISO;
+      }
+      if (childName !== undefined && childName.trim() !== '') {
+        gestaltData.childName = childName;
+      }
+      if (childProfileId !== undefined && childProfileId.trim() !== '') {
+        gestaltData.childProfileId = childProfileId;
+      }
       if (audioData !== undefined) {
         gestaltData.audioData = audioData;
       }

@@ -68,7 +68,7 @@ export function BottomNavigation({
         bottom: 85, // Positioned right above the navigation bar
         left: 0,
         right: 0,
-        height: 100, // Extended height to blend with shadow
+        height: 50, // Reduced height by ~50% to prevent UI crowding
         pointerEvents: 'none', // Allows touch events to pass through
         zIndex: 998 // Below navigation but above content
       }}>

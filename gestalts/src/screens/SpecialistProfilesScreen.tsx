@@ -1,16 +1,115 @@
-import React from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
+import { useAuth } from '../contexts/AuthContext';
+import { useSpecialistStore } from '../state/useSpecialistStore';
+import { Specialist } from '../types/specialist';
+import specialistService from '../services/specialistService';
 
 export default function SpecialistProfilesScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
 	const navigation = useNavigation();
+	const { getCurrentUserId } = useAuth();
+	const { 
+		specialists, 
+		loading, 
+		error, 
+		loadSpecialists, 
+		clearError 
+	} = useSpecialistStore();
+	
+	const [refreshing, setRefreshing] = useState(false);
+
+	const loadData = async (showRefreshing = false) => {
+		const userId = getCurrentUserId();
+		if (!userId) {
+			return;
+		}
+
+		if (showRefreshing) {
+			setRefreshing(true);
+		}
+
+		try {
+			await loadSpecialists(userId);
+		} finally {
+			if (showRefreshing) {
+				setRefreshing(false);
+			}
+		}
+	};
+
+	useEffect(() => {
+		loadData();
+	}, []);
+
+	// Refresh specialists when screen comes into focus
+	useFocusEffect(
+		useCallback(() => {
+			loadData();
+		}, [])
+	);
+
+	const handleRefresh = () => {
+		loadData(true);
+	};
+
+	const handleAddSpecialist = () => {
+		navigation.navigate('AddEditSpecialist');
+	};
+
+	const handleEditSpecialist = (specialist: Specialist) => {
+		navigation.navigate('AddEditSpecialist', { specialistId: specialist.id });
+	};
+
+	const handleDeleteSpecialist = async (specialist: Specialist) => {
+		const userId = getCurrentUserId();
+		if (!userId) return;
+
+		Alert.alert(
+			'Delete Specialist',
+			`Are you sure you want to delete ${specialist.name}? This will also remove all associated relationships with children.`,
+			[
+				{ text: 'Cancel', style: 'cancel' },
+				{
+					text: 'Delete',
+					style: 'destructive',
+					onPress: async () => {
+						try {
+							await specialistService.deleteSpecialist(specialist.id, userId);
+							Alert.alert('Success', 'Specialist deleted successfully');
+							loadData(); // Refresh list
+						} catch (err) {
+							console.error('Failed to delete specialist:', err);
+							Alert.alert('Error', 'Failed to delete specialist. Please try again.');
+						}
+					}
+				}
+			]
+		);
+	};
+
+	if (loading) {
+		return (
+			<LinearGradient
+				colors={['#7C3AED', '#EC4899', '#FB923C']}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 1, y: 1 }}
+				style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+			>
+				<ActivityIndicator size="large" color="white" />
+				<Text style={{ color: 'white', marginTop: tokens.spacing.gap.md }}>
+					Loading Specialists...
+				</Text>
+			</LinearGradient>
+		);
+	}
 
 	return (
 		<LinearGradient
@@ -34,6 +133,19 @@ export default function SpecialistProfilesScreen() {
 							Specialist Profiles
 						</Text>
 					</View>
+					
+					{/* Add Specialist Button */}
+					<TouchableOpacity
+						onPress={handleAddSpecialist}
+						style={{
+							backgroundColor: 'rgba(255,255,255,0.2)',
+							borderRadius: tokens.radius.lg,
+							padding: tokens.spacing.gap.sm,
+							marginLeft: tokens.spacing.gap.md
+						}}
+					>
+						<Ionicons name="add" size={20} color="white" />
+					</TouchableOpacity>
 				</View>
 			</View>
 
@@ -46,147 +158,313 @@ export default function SpecialistProfilesScreen() {
 			}}>
 				<ScrollView 
 					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 120 }}
+					refreshControl={
+						<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+					}
 				>
-					{/* Coming Soon Message */}
-					<View style={{
-						alignItems: 'center',
-						justifyContent: 'center',
-						paddingVertical: tokens.spacing.gap.xl * 2
-					}}>
+					{/* Error Display */}
+					{error && (
 						<View style={{
-							width: 100,
-							height: 100,
-							borderRadius: 50,
-							backgroundColor: tokens.color.bg.muted,
+							backgroundColor: '#FEE2E2',
+							borderColor: '#EF4444',
+							borderWidth: 1,
+							borderRadius: tokens.radius.lg,
+							padding: tokens.spacing.gap.md,
+							marginBottom: tokens.spacing.gap.md
+						}}>
+							<Text style={{ color: '#EF4444', textAlign: 'center' }}>
+								{error}
+							</Text>
+							<TouchableOpacity onPress={clearError} style={{ marginTop: tokens.spacing.gap.xs }}>
+								<Text style={{ color: '#EF4444', textAlign: 'center', textDecorationLine: 'underline' }}>
+									Dismiss
+								</Text>
+							</TouchableOpacity>
+						</View>
+					)}
+
+					{/* Empty State */}
+					{specialists.length === 0 && !loading && (
+						<View style={{
 							alignItems: 'center',
 							justifyContent: 'center',
-							marginBottom: tokens.spacing.gap.lg
+							paddingVertical: tokens.spacing.gap.xl * 2
 						}}>
-							<Ionicons name="medical" size={50} color={tokens.color.brand.gradient.start} />
-						</View>
-						
-						<Text weight="medium" style={{
-							fontSize: tokens.font.size.xl,
-							color: tokens.color.text.primary,
-							marginBottom: tokens.spacing.gap.sm,
-							textAlign: 'center'
-						}}>
-							Specialist Profiles
-						</Text>
-						
-						<Text style={{
-							fontSize: tokens.font.size.body,
-							color: tokens.color.text.secondary,
-							textAlign: 'center',
-							marginBottom: tokens.spacing.gap.lg,
-							lineHeight: 24,
-							paddingHorizontal: tokens.spacing.gap.lg
-						}}>
-							Manage your healthcare professional network, including speech-language pathologists, occupational therapists, and other specialists working with your child.
-						</Text>
-
-						<View style={{
-							backgroundColor: tokens.color.bg.muted,
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.lg,
-							marginBottom: tokens.spacing.gap.lg,
-							borderWidth: 1,
-							borderColor: tokens.color.border.default
-						}}>
+							<View style={{
+								width: 80,
+								height: 80,
+								borderRadius: 40,
+								backgroundColor: tokens.color.bg.muted,
+								alignItems: 'center',
+								justifyContent: 'center',
+								marginBottom: tokens.spacing.gap.lg
+							}}>
+								<Ionicons name="medical" size={40} color={tokens.color.text.secondary} />
+							</View>
 							<Text weight="medium" style={{
-								fontSize: tokens.font.size.body,
+								fontSize: tokens.font.size.lg,
 								color: tokens.color.text.primary,
 								marginBottom: tokens.spacing.gap.sm,
 								textAlign: 'center'
 							}}>
-								Coming Soon
+								No Specialists Yet
 							</Text>
 							<Text style={{
-								fontSize: tokens.font.size.sm,
+								fontSize: tokens.font.size.body,
 								color: tokens.color.text.secondary,
 								textAlign: 'center',
-								lineHeight: 20
+								marginBottom: tokens.spacing.gap.lg,
+								lineHeight: 24,
+								paddingHorizontal: tokens.spacing.gap.lg
 							}}>
-								This feature is currently in development. You'll soon be able to:
+								Add your first specialist to start managing your healthcare professional network.
 							</Text>
+							<TouchableOpacity
+								onPress={handleAddSpecialist}
+								style={{
+									backgroundColor: tokens.color.brand.gradient.start,
+									borderRadius: tokens.radius.lg,
+									paddingHorizontal: tokens.spacing.gap.lg,
+									paddingVertical: tokens.spacing.gap.md
+								}}
+							>
+								<Text style={{ color: 'white', fontSize: tokens.font.size.body, fontWeight: '600' }}>
+									Add First Specialist
+								</Text>
+							</TouchableOpacity>
 						</View>
+					)}
 
-						{/* Feature List */}
-						<View style={{ width: '100%', marginBottom: tokens.spacing.gap.xl }}>
-							{[
-								'Create specialist profiles with contact information',
-								'Track appointment history and notes',
-								'Share progress reports with your team',
-								'Coordinate care plans and goals',
-								'Schedule and manage appointments',
-								'Store professional recommendations'
-							].map((feature, index) => (
-								<View key={index} style={{
-									flexDirection: 'row',
-									alignItems: 'flex-start',
-									marginBottom: tokens.spacing.gap.md,
-									paddingHorizontal: tokens.spacing.gap.md
-								}}>
-									<View style={{
-										width: 8,
-										height: 8,
-										borderRadius: 4,
-										backgroundColor: tokens.color.brand.gradient.start,
-										marginRight: tokens.spacing.gap.md,
-										marginTop: 8
-									}} />
-									<Text style={{
-										fontSize: tokens.font.size.sm,
-										color: tokens.color.text.secondary,
-										flex: 1,
-										lineHeight: 22
-									}}>
-										{feature}
-									</Text>
-								</View>
-							))}
-						</View>
-
-						{/* CTA Button */}
+					{/* Specialists List */}
+					{specialists.map((specialist) => (
 						<TouchableOpacity
-							onPress={() => {
-								// Navigate back or to feedback
-								navigation.goBack();
-							}}
+							key={specialist.id}
+							onPress={() => handleEditSpecialist(specialist)}
 							style={{
-								backgroundColor: tokens.color.brand.gradient.start + '20',
-								borderColor: tokens.color.brand.gradient.start,
-								borderWidth: 1,
+								backgroundColor: 'white',
 								borderRadius: tokens.radius.lg,
-								paddingHorizontal: tokens.spacing.gap.lg,
-								paddingVertical: tokens.spacing.gap.md
+								padding: tokens.spacing.gap.lg,
+								marginBottom: tokens.spacing.gap.md,
+								shadowColor: '#000',
+								shadowOffset: { width: 0, height: 2 },
+								shadowOpacity: 0.08,
+								shadowRadius: 12,
+								elevation: 4,
+								borderWidth: 1,
+								borderColor: tokens.color.border.default
 							}}
 						>
-							<Text style={{
-								color: tokens.color.brand.gradient.start,
-								fontSize: tokens.font.size.body,
-								fontWeight: '600',
-								textAlign: 'center'
+							{/* Header Row */}
+							<View style={{
+								flexDirection: 'row',
+								alignItems: 'center',
+								justifyContent: 'space-between',
+								marginBottom: tokens.spacing.gap.sm
 							}}>
-								Request Early Access
+								<View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+									{/* Profile Avatar */}
+									<View style={{
+										width: 50,
+										height: 50,
+										borderRadius: 25,
+										backgroundColor: tokens.color.brand.gradient.start + '20',
+										alignItems: 'center',
+										justifyContent: 'center',
+										marginRight: tokens.spacing.gap.md
+									}}>
+										<Text style={{
+											fontSize: tokens.font.size.lg,
+											fontWeight: '600',
+											color: tokens.color.brand.gradient.start
+										}}>
+											{specialist.name.charAt(0).toUpperCase()}
+										</Text>
+									</View>
+
+									{/* Name and Title */}
+									<View style={{ flex: 1 }}>
+										<Text weight="medium" style={{
+											fontSize: tokens.font.size.lg,
+											color: tokens.color.text.primary,
+											marginBottom: 2
+										}}>
+											{specialist.name}
+										</Text>
+										<Text style={{
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.secondary
+										}}>
+											{specialist.title}
+										</Text>
+									</View>
+								</View>
+
+								{/* Actions Menu */}
+								<TouchableOpacity
+									onPress={() => {
+										Alert.alert(
+											'Specialist Actions',
+											`What would you like to do with ${specialist.name}'s profile?`,
+											[
+												{ text: 'Cancel', style: 'cancel' },
+												{ text: 'Edit', onPress: () => handleEditSpecialist(specialist) },
+												{ text: 'Delete', style: 'destructive', onPress: () => handleDeleteSpecialist(specialist) }
+											]
+										);
+									}}
+									style={{ padding: tokens.spacing.gap.xs }}
+								>
+									<Ionicons name="ellipsis-vertical" size={16} color={tokens.color.text.secondary} />
+								</TouchableOpacity>
+							</View>
+
+							{/* Details Card */}
+							<View style={{
+								backgroundColor: tokens.color.bg.muted,
+								borderRadius: tokens.radius.lg,
+								padding: tokens.spacing.gap.md
+							}}>
+								{/* Organization */}
+								{specialist.organization && (
+									<View style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										marginBottom: tokens.spacing.gap.sm
+									}}>
+										<Ionicons 
+											name="business" 
+											size={16} 
+											color={tokens.color.brand.gradient.start}
+											style={{ marginRight: tokens.spacing.gap.sm }}
+										/>
+										<Text style={{
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.secondary
+										}}>
+											{specialist.organization}
+										</Text>
+									</View>
+								)}
+
+								{/* Contact Info */}
+								{(specialist.email || specialist.phone) && (
+									<View style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										marginBottom: tokens.spacing.gap.sm
+									}}>
+										<Ionicons 
+											name="call" 
+											size={16} 
+											color={tokens.color.brand.gradient.start}
+											style={{ marginRight: tokens.spacing.gap.sm }}
+										/>
+										<Text style={{
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.secondary,
+											flex: 1
+										}}>
+											{specialist.phone || specialist.email}
+										</Text>
+									</View>
+								)}
+
+								{/* Specialties */}
+								{specialist.specialties && specialist.specialties.length > 0 && (
+									<View style={{
+										flexDirection: 'row',
+										alignItems: 'center',
+										marginBottom: tokens.spacing.gap.sm
+									}}>
+										<Ionicons 
+											name="star" 
+											size={16} 
+											color={tokens.color.brand.gradient.start}
+											style={{ marginRight: tokens.spacing.gap.sm }}
+										/>
+										<Text style={{
+											fontSize: tokens.font.size.sm,
+											color: tokens.color.text.secondary,
+											flex: 1
+										}}>
+											{specialist.specialties.slice(0, 2).join(', ')}
+											{specialist.specialties.length > 2 && ` +${specialist.specialties.length - 2} more`}
+										</Text>
+									</View>
+								)}
+
+								{/* Updated Date */}
+								<View style={{
+									flexDirection: 'row',
+									alignItems: 'center'
+								}}>
+									<Ionicons 
+										name="time" 
+										size={16} 
+										color={tokens.color.text.secondary}
+										style={{ marginRight: tokens.spacing.gap.sm }}
+									/>
+									<Text style={{
+										fontSize: tokens.font.size.xs,
+										color: tokens.color.text.secondary
+									}}>
+										Updated {specialist.updatedAt.toLocaleDateString()}
+									</Text>
+								</View>
+							</View>
+
+							{/* Quick Actions */}
+							<View style={{
+								flexDirection: 'row',
+								justifyContent: 'flex-end',
+								marginTop: tokens.spacing.gap.md,
+								gap: tokens.spacing.gap.sm
+							}}>
+								<TouchableOpacity
+									onPress={() => handleEditSpecialist(specialist)}
+									style={{
+										backgroundColor: tokens.color.brand.gradient.start,
+										borderRadius: tokens.radius.lg,
+										paddingHorizontal: tokens.spacing.gap.md,
+										paddingVertical: tokens.spacing.gap.sm
+									}}
+								>
+									<Text style={{
+										fontSize: tokens.font.size.sm,
+										color: 'white',
+										fontWeight: '500'
+									}}>
+										Edit Profile
+									</Text>
+								</TouchableOpacity>
+							</View>
+						</TouchableOpacity>
+					))}
+
+					{/* Add New Specialist Card */}
+					{specialists.length > 0 && (
+						<TouchableOpacity
+							onPress={handleAddSpecialist}
+							style={{
+								backgroundColor: tokens.color.bg.muted,
+								borderRadius: tokens.radius.lg,
+								padding: tokens.spacing.gap.xl,
+								alignItems: 'center',
+								borderWidth: 2,
+								borderColor: tokens.color.border.default,
+								borderStyle: 'dashed'
+							}}
+						>
+							<Ionicons name="add-circle" size={40} color={tokens.color.brand.gradient.start} />
+							<Text weight="medium" style={{
+								fontSize: tokens.font.size.body,
+								color: tokens.color.brand.gradient.start,
+								marginTop: tokens.spacing.gap.sm
+							}}>
+								Add Another Specialist
 							</Text>
 						</TouchableOpacity>
-
-						{/* Beta Notice */}
-						<View style={{
-							marginTop: tokens.spacing.gap.xl,
-							paddingHorizontal: tokens.spacing.gap.lg
-						}}>
-							<Text style={{
-								fontSize: tokens.font.size.xs,
-								color: tokens.color.text.secondary,
-								textAlign: 'center',
-								lineHeight: 18
-							}}>
-								Want to help shape this feature? Contact us to join our beta testing program and get early access to specialist profile management.
-							</Text>
-						</View>
-					</View>
+					)}
 				</ScrollView>
 			</View>
 

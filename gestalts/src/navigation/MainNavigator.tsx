@@ -19,6 +19,7 @@ import ChildProfilesListScreen from '../screens/ChildProfilesListScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SpecialistProfilesScreen from '../screens/SpecialistProfilesScreen';
+import AddEditSpecialistScreen from '../screens/AddEditSpecialistScreen';
 import ProfileSelectionScreen from '../screens/ProfileSelectionScreen';
 import type { MainStackParamList } from './types';
 
@@ -121,6 +122,12 @@ const SpecialistProfilesWithDrawer = () => (
   </DrawerProvider>
 );
 
+const AddEditSpecialistWithDrawer = () => (
+  <DrawerProvider>
+    <AddEditSpecialistScreen />
+  </DrawerProvider>
+);
+
 const ProfileSelectionWithDrawer = () => (
   <DrawerProvider>
     <ProfileSelectionScreen />
@@ -179,6 +186,7 @@ export default function MainNavigator() {
       <Stack.Screen name="ChildProfilesList" component={ChildProfilesListWithDrawer} />
       <Stack.Screen name="UserProfile" component={UserProfileWithDrawer} />
       <Stack.Screen name="SpecialistProfiles" component={SpecialistProfilesWithDrawer} />
+      <Stack.Screen name="AddEditSpecialist" component={AddEditSpecialistWithDrawer} />
       <Stack.Screen name="ProfileSelection" component={ProfileSelectionWithDrawer} />
     </Stack.Navigator>
   );

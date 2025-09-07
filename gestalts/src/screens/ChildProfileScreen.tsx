@@ -20,7 +20,7 @@ export default function ChildProfileScreen() {
 	const { getCurrentUserId, user } = useAuth();
 	
 	// Get profileId from route params if editing existing profile
-	const profileId = route.params?.profileId;
+	const profileId = (route.params as any)?.profileId;
 	const { 
 		currentProfile, 
 		profileLoading, 
@@ -199,9 +199,9 @@ export default function ChildProfileScreen() {
 			
 			// Navigate back to child profiles list if we came from there, otherwise to dashboard
 			if (profileId) {
-				navigation.navigate('ChildProfilesList');
+				(navigation as any).navigate('ChildProfilesList');
 			} else {
-				navigation.navigate('Dashboard');
+				(navigation as any).navigate('Dashboard');
 			}
 		} catch (error) {
 			console.error('Save profile error:', error);
@@ -305,7 +305,7 @@ export default function ChildProfileScreen() {
 
 						{/* Close Button */}
 						<TouchableOpacity
-							onPress={() => navigation.navigate('Dashboard')}
+							onPress={() => (navigation as any).navigate('Dashboard')}
 							activeOpacity={0.7}
 							style={{
 								padding: 6

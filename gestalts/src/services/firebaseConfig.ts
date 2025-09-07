@@ -52,10 +52,10 @@ export const initializeFirebase = () => {
     initialized = true;
     
     console.log('Firebase initialized successfully with Web SDK');
-    return { app: firebaseApp, db, auth, storage, initialized };
+    return { app: firebaseApp, db, auth, storage, firestore: db, initialized };
   } catch (error) {
     console.error('Failed to initialize Firebase:', error);
-    return { app: null, db: null, auth: null, storage: null, initialized: false };
+    return { app: null, db: null, auth: null, storage: null, firestore: null, initialized: false };
   }
 };
 
@@ -63,5 +63,5 @@ export const getFirebaseServices = () => {
   if (!initialized) {
     return initializeFirebase();
   }
-  return { app: firebaseApp, db, auth, storage, initialized };
+  return { app: firebaseApp, db, auth, storage, firestore: db, initialized };
 };

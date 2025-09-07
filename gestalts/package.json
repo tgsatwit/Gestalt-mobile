@@ -44,6 +44,7 @@
     "expo-status-bar": "~2.2.3",
     "firebase": "^12.2.1",
     "livekit-client": "^2.11.4",
+    "openai": "^5.19.1",
     "react": "19.0.0",
     "react-native": "0.79.5",
     "react-native-gesture-handler": "~2.24.0",

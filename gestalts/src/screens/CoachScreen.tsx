@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Animated } from 'react-native';
+import { View, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Animated, Modal, Dimensions, StatusBar, Keyboard } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { useMemoriesStore } from '../state/useStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +46,13 @@ export default function CoachScreen() {
 	const [showModeSelector, setShowModeSelector] = useState(false);
 	const [hasUserInteracted, setHasUserInteracted] = useState(false);
 	const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+	const [dropdownPosition, setDropdownPosition] = useState<{
+		x: number;
+		y: number;
+		width: number;
+		showAbove: boolean;
+	} | null>(null);
+	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const [showConversationHistory, setShowConversationHistory] = useState(false);
 	const [conversationHistory, setConversationHistory] = useState<Array<{
 		id: string;
@@ -76,6 +83,7 @@ export default function CoachScreen() {
 	
 	// Refs
 	const scrollViewRef = useRef<ScrollView>(null);
+	const modeSelectorRef = useRef<TouchableOpacity>(null);
 	const historySlideAnim = useRef(new Animated.Value(300)).current; // Start off-screen
 	const historyOverlayOpacity = useRef(new Animated.Value(0)).current;
 	
@@ -97,6 +105,32 @@ export default function CoachScreen() {
 			setMode(route.params.initialMode);
 		}
 	}, [route.params]);
+
+	// Keyboard event listeners
+	useEffect(() => {
+		const keyboardWillShowListener = Keyboard.addListener(
+			Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+			(e) => {
+				setKeyboardHeight(e.endCoordinates.height);
+				// Close dropdown when keyboard appears
+				if (showModeSelector) {
+					setShowModeSelector(false);
+					setDropdownPosition(null);
+				}
+			}
+		);
+		const keyboardWillHideListener = Keyboard.addListener(
+			Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+			() => {
+				setKeyboardHeight(0);
+			}
+		);
+
+		return () => {
+			keyboardWillShowListener?.remove();
+			keyboardWillHideListener?.remove();
+		};
+	}, [showModeSelector]);
 
 	// ElevenLabs RN SDK conversation
 	const conversationSdk = useConversation({
@@ -403,9 +437,58 @@ export default function CoachScreen() {
 	};
 
 
+	const measureDropdownPosition = () => {
+		if (modeSelectorRef.current) {
+			modeSelectorRef.current.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
+				const screenHeight = Dimensions.get('window').height;
+				const statusBarHeight = StatusBar.currentHeight || 0;
+				const availableHeight = screenHeight - statusBarHeight - keyboardHeight;
+				
+				// Calculate dropdown height (approximate)
+				const dropdownHeight = MODES.length * 36 + 8; // 36px per item + padding
+				const spaceBelow = availableHeight - pageY - height;
+				const spaceAbove = pageY - statusBarHeight;
+				
+				// Show above if there's not enough space below and there's more space above
+				const showAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow && spaceAbove >= dropdownHeight;
+				
+				// Adjust position to fit within screen bounds
+				let finalY = showAbove ? pageY - dropdownHeight - 4 : pageY + height + 4;
+				
+				// Ensure dropdown doesn't go above screen top
+				if (finalY < statusBarHeight + 10) {
+					finalY = statusBarHeight + 10;
+				}
+				
+				// Ensure dropdown doesn't go below available space
+				if (finalY + dropdownHeight > availableHeight) {
+					finalY = availableHeight - dropdownHeight - 10;
+				}
+				
+				setDropdownPosition({
+					x: pageX,
+					y: finalY,
+					width: Math.max(width, 140), // Ensure minimum width
+					showAbove
+				});
+			});
+		}
+	};
+
+	const handleModeSelector = () => {
+		if (showModeSelector) {
+			setShowModeSelector(false);
+			setDropdownPosition(null);
+		} else {
+			measureDropdownPosition();
+			setShowModeSelector(true);
+		}
+	};
+
 	const handleModeChange = async (newMode: Mode) => {
 		setMode(newMode);
 		setShowModeSelector(false);
+		setDropdownPosition(null);
 		// Clear conversation when switching modes
 		setConversation([]);
 		setStreamingContent('');
@@ -878,7 +961,8 @@ export default function CoachScreen() {
 							{/* Mode Selector Button - Compact style */}
 							<View style={{ position: 'relative', marginRight: tokens.spacing.gap.sm }}>
 								<TouchableOpacity
-									onPress={() => setShowModeSelector(!showModeSelector)}
+									ref={modeSelectorRef}
+									onPress={handleModeSelector}
 									activeOpacity={0.7}
 									style={{
 										flexDirection: 'row',
@@ -906,53 +990,6 @@ export default function CoachScreen() {
 									/>
 								</TouchableOpacity>
 
-								{/* Mode Dropdown */}
-								{showModeSelector && (
-									<View style={{
-										position: 'absolute',
-										top: '100%',
-										left: 0,
-										minWidth: 140,
-										marginTop: 4,
-										backgroundColor: 'white',
-										borderRadius: tokens.radius.lg,
-										shadowColor: '#000',
-										shadowOffset: { width: 0, height: 2 },
-										shadowOpacity: 0.08,
-										shadowRadius: 12,
-										elevation: 6,
-										zIndex: 1000
-									}}>
-										{MODES.map((m, index) => (
-											<TouchableOpacity
-												key={m}
-												onPress={() => handleModeChange(m)}
-												activeOpacity={0.7}
-												style={{
-													paddingVertical: tokens.spacing.gap.xs,
-													paddingHorizontal: tokens.spacing.gap.sm,
-													borderBottomWidth: index !== MODES.length - 1 ? 0.5 : 0,
-													borderBottomColor: 'rgba(0,0,0,0.08)',
-													backgroundColor: mode === m ? tokens.color.bg.muted : 'transparent',
-													flexDirection: 'row',
-													alignItems: 'center',
-													justifyContent: 'space-between'
-												}}
-											>
-												<Text style={{
-													fontSize: tokens.font.size.xs,
-													color: mode === m ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
-													fontWeight: '400'
-												}}>
-													{m}
-												</Text>
-												{mode === m && (
-													<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
-												)}
-											</TouchableOpacity>
-										))}
-									</View>
-								)}
 							</View>
 
 							{/* Right Side: Talk/Chat Toggle - Matches dropdown style */}
@@ -1331,6 +1368,82 @@ export default function CoachScreen() {
 						/>
 					</Animated.View>
 				)}
+
+				{/* Mode Selector Modal Dropdown */}
+				<Modal
+					visible={showModeSelector && dropdownPosition !== null}
+					transparent
+					animationType="fade"
+					onRequestClose={() => {
+						setShowModeSelector(false);
+						setDropdownPosition(null);
+					}}
+				>
+					<TouchableOpacity 
+						style={{ flex: 1 }}
+						activeOpacity={1}
+						onPress={() => {
+							setShowModeSelector(false);
+							setDropdownPosition(null);
+						}}
+					>
+						{dropdownPosition && (
+							<View
+								style={{
+									position: 'absolute',
+									left: dropdownPosition.x,
+									top: dropdownPosition.y,
+									width: dropdownPosition.width,
+									backgroundColor: 'white',
+									borderRadius: tokens.radius.lg,
+									shadowColor: '#000',
+									shadowOffset: { width: 0, height: 4 },
+									shadowOpacity: 0.15,
+									shadowRadius: 16,
+									elevation: 8,
+									zIndex: 10000
+								}}
+							>
+								{MODES.map((m, index) => (
+									<TouchableOpacity
+										key={m}
+										onPress={() => handleModeChange(m)}
+										activeOpacity={0.7}
+										style={{
+											paddingVertical: tokens.spacing.gap.xs + 2,
+											paddingHorizontal: tokens.spacing.gap.sm,
+											borderBottomWidth: index !== MODES.length - 1 ? 0.5 : 0,
+											borderBottomColor: 'rgba(0,0,0,0.08)',
+											backgroundColor: mode === m ? tokens.color.bg.muted : 'transparent',
+											flexDirection: 'row',
+											alignItems: 'center',
+											justifyContent: 'space-between',
+											...(index === 0 && {
+												borderTopLeftRadius: tokens.radius.lg,
+												borderTopRightRadius: tokens.radius.lg
+											}),
+											...(index === MODES.length - 1 && {
+												borderBottomLeftRadius: tokens.radius.lg,
+												borderBottomRightRadius: tokens.radius.lg
+											})
+										}}
+									>
+										<Text style={{
+											fontSize: tokens.font.size.xs,
+											color: mode === m ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+											fontWeight: '400'
+										}}>
+											{m}
+										</Text>
+										{mode === m && (
+											<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+										)}
+									</TouchableOpacity>
+								))}
+							</View>
+						)}
+					</TouchableOpacity>
+				</Modal>
 			</LinearGradient>
 		</KeyboardAvoidingView>
 	);

@@ -28,6 +28,7 @@ export const radius = {
 	lg: 12,
 	xl: 16,
 	'2xl': 20,
+	full: 9999,
 };
 
 export const elevation = {
@@ -40,7 +41,7 @@ export const spacing = {
 	unit: 4,
 	containerX: 16,
 	sectionY: { sm: 24, md: 32 },
-	gap: { xs: 8, sm: 12, md: 16, lg: 24 },
+	gap: { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 },
 };
 
 export const font = {
