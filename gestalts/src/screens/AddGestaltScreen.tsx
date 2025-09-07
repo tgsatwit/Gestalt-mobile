@@ -4,31 +4,37 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
+import { DatePickerField } from '../components/DatePickerField';
 import { useMemoriesStore } from '../state/useStore';
 import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
 import { getAuth } from 'firebase/auth';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { Audio } from 'expo-av';
+
+type AddGestaltScreenRouteProp = RouteProp<MainStackParamList, 'AddGestalt'>;
 
 export default function AddGestaltScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
-	const { currentProfile } = useMemoriesStore((s) => ({ currentProfile: s.currentProfile }));
-	const { addGestalt } = useFirebaseMemoriesStore();
+	const route = useRoute<AddGestaltScreenRouteProp>();
+	const { id: editingId } = route.params || {};
+	const { profiles } = useMemoriesStore((s) => ({ profiles: s.profiles }));
+	
+	// Get available children from all profiles
+	const availableChildren = profiles.map(profile => profile.childName);
+	const { addGestalt, updateGestalt, gestalts } = useFirebaseMemoriesStore();
 	
 	const [phrase, setPhrase] = useState('');
 	const [source, setSource] = useState('');
 	const [sourceType, setSourceType] = useState<string>('');
-	const [stage, setStage] = useState<string>('Stage 1');
 	const [contexts, setContexts] = useState<string[]>([]);
 	const [newContext, setNewContext] = useState('');
 	const [isRandom, setIsRandom] = useState(false);
 	
 	// Date selection state
 	const [dateStarted, setDateStarted] = useState<Date>(new Date());
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date>(new Date());
 	
 	// Child selection state
 	const [selectedChild, setSelectedChild] = useState<string>('');
@@ -44,10 +50,30 @@ export default function AddGestaltScreen() {
 	
 	// Search state
 	const [isSearching, setIsSearching] = useState(false);
-	const [searchResults, setSearchResults] = useState<string | null>(null);
+	const [searchResults, setSearchResults] = useState<Array<{source: string, confidence: 'low' | 'medium' | 'high', reason?: string}> | null>(null);
+	const [searchResultsExpanded, setSearchResultsExpanded] = useState(true);
 	
-	// Get available children from current profile
-	const availableChildren = currentProfile ? [currentProfile.childName] : [];
+	// Find existing gestalt if editing
+	const existingGestalt = editingId ? gestalts.find(g => g.id === editingId) : null;
+	const isEditing = !!existingGestalt;
+
+	// Initialize selected child when component mounts
+	React.useEffect(() => {
+		if (availableChildren.length === 1 && selectedChild === '' && !isEditing) {
+			setSelectedChild(availableChildren[0]);
+		}
+	}, [availableChildren.length, selectedChild, isEditing]);
+
+	// Load existing gestalt data when editing
+	React.useEffect(() => {
+		if (existingGestalt) {
+			setPhrase(existingGestalt.phrase);
+			setSource(existingGestalt.source);
+			setSourceType(existingGestalt.sourceType || '');
+			setSelectedChild(existingGestalt.childName || '');
+			setDateStarted(new Date(existingGestalt.dateStartedISO || existingGestalt.dateStarted));
+		}
+	}, [existingGestalt]);
 
 	const sourceTypes = [
 		{ name: 'TV/Movie', icon: 'tv', color: '#EC4899' },
@@ -58,7 +84,6 @@ export default function AddGestaltScreen() {
 		{ name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280' }
 	];
 
-	const stages = ['Stage 1', 'Stage 2', 'Stage 3', 'Stage 4', 'Stage 5', 'Stage 6'];
 
 	const commonContexts = [
 		'Playing', 'Requesting', 'Commenting', 'Protesting',
@@ -200,26 +225,75 @@ export default function AddGestaltScreen() {
 				await new Promise(resolve => setTimeout(resolve, 2000));
 				
 				// Mock responses based on some common phrases
-				const commonSources: { [key: string]: string } = {
-					'to infinity and beyond': 'Toy Story (Movie)',
-					'let it go': 'Frozen (Movie)',
-					'may the force be with you': 'Star Wars (Movie)',
-					'hakuna matata': 'The Lion King (Movie)',
-					'just keep swimming': 'Finding Nemo (Movie)'
+				const exactMatches: { [key: string]: {source: string, confidence: 'high'} } = {
+					'to infinity and beyond': {source: 'Toy Story (Movie)', confidence: 'high'},
+					'let it go': {source: 'Frozen (Movie)', confidence: 'high'},
+					'may the force be with you': {source: 'Star Wars (Movie)', confidence: 'high'},
+					'hakuna matata': {source: 'The Lion King (Movie)', confidence: 'high'},
+					'just keep swimming': {source: 'Finding Nemo (Movie)', confidence: 'high'}
 				};
 
 				const lowerPhrase = phrase.toLowerCase();
-				for (const [key, value] of Object.entries(commonSources)) {
+				
+				// Check for exact matches first
+				for (const [key, match] of Object.entries(exactMatches)) {
 					if (lowerPhrase.includes(key)) {
-						return value;
+						return [match];
 					}
 				}
 
-				return 'Unable to identify a definitive source. This may be from daily conversation or an unknown media source.';
+				// Generate potential matches with varying confidence for generic phrases
+				const results = [];
+				
+				// Look for keywords that might indicate source type
+				if (lowerPhrase.includes('mom') || lowerPhrase.includes('mommy') || lowerPhrase.includes('mama')) {
+					results.push(
+						{source: 'Parent/Caregiver', confidence: 'medium' as const, reason: 'Contains parent reference'},
+						{source: 'Family conversation', confidence: 'low' as const, reason: 'Common in family settings'}
+					);
+				} else if (lowerPhrase.includes('go') || lowerPhrase.includes('come') || lowerPhrase.includes('stop')) {
+					results.push(
+						{source: 'Daily routine/Instructions', confidence: 'medium' as const, reason: 'Common directive language'},
+						{source: 'Peppa Pig', confidence: 'low' as const, reason: 'Features simple directive language'},
+						{source: 'Bluey', confidence: 'low' as const, reason: 'Common in play-based shows'}
+					);
+				} else if (lowerPhrase.includes('wow') || lowerPhrase.includes('oh') || lowerPhrase.includes('whoa')) {
+					results.push(
+						{source: 'Exclamatory expression', confidence: 'high' as const, reason: 'Common exclamation'},
+						{source: 'YouTube Kids videos', confidence: 'medium' as const, reason: 'Frequent in children\'s content'},
+						{source: 'Interactive play', confidence: 'low' as const, reason: 'Used during active play'}
+					);
+				} else if (lowerPhrase.length <= 10) {
+					// Short phrases - likely from media or routine
+					results.push(
+						{source: 'Children\'s TV show', confidence: 'medium' as const, reason: 'Short phrases common in kids media'},
+						{source: 'YouTube/Online video', confidence: 'medium' as const, reason: 'Repetitive phrases in digital content'},
+						{source: 'Book or story', confidence: 'low' as const, reason: 'Could be from children\'s literature'}
+					);
+				} else {
+					// Longer phrases - could be from various sources
+					results.push(
+						{source: 'Movie or TV show', confidence: 'medium' as const, reason: 'Longer dialogue suggests scripted content'},
+						{source: 'Daily conversation', confidence: 'medium' as const, reason: 'Could be from family interactions'},
+						{source: 'Educational content', confidence: 'low' as const, reason: 'Possible from learning videos/apps'}
+					);
+				}
+
+				// Always include a generic option if no specific matches
+				if (results.length === 0) {
+					results.push(
+						{source: 'Unknown source', confidence: 'low' as const, reason: 'Unable to identify likely sources'},
+						{source: 'Daily conversation', confidence: 'low' as const, reason: 'May be from everyday interactions'},
+						{source: 'Media content', confidence: 'low' as const, reason: 'Possibly from unidentified show/video'}
+					);
+				}
+
+				return results;
 			};
 
-			const result = await mockSearch();
-			setSearchResults(result);
+			const results = await mockSearch();
+			setSearchResults(results);
+			setSearchResultsExpanded(true);
 		} catch (error) {
 			console.error('Search failed:', error);
 			Alert.alert('Search Error', 'Failed to search for gestalt source');
@@ -254,18 +328,32 @@ export default function AddGestaltScreen() {
 				};
 			}
 
-			// Save to Firebase
-			await addGestalt(
-				phrase.trim(),
-				source.trim() || 'Unknown',
-				sourceType || 'Other',
-				stage,
-				isRandom ? ['Random'] : contexts,
-				dateStarted.toISOString(),
-				selectedChild || undefined,
-				currentProfile?.id,
-				audioData
-			);
+			if (isEditing && existingGestalt) {
+				// Update existing gestalt
+				await updateGestalt(existingGestalt.id, {
+					phrase: phrase.trim(),
+					source: source.trim() || 'Unknown',
+					sourceType: sourceType || 'Other',
+					contexts: isRandom ? ['Random'] : contexts,
+					dateStartedISO: dateStarted.toISOString(),
+					childName: selectedChild || undefined,
+					childProfileId: profiles.find(p => p.childName === selectedChild)?.id || undefined,
+					audioData
+				});
+			} else {
+				// Create new gestalt
+				await addGestalt(
+					phrase.trim(),
+					source.trim() || 'Unknown',
+					sourceType || 'Other',
+					'', // stage - empty string as default
+					isRandom ? ['Random'] : contexts,
+					dateStarted.toISOString(),
+					selectedChild || undefined,
+					profiles.find(p => p.childName === selectedChild)?.id || undefined,
+					audioData
+				);
+			}
 			navigation.goBack();
 		} catch (error) {
 			console.error('Failed to save gestalt:', error);
@@ -273,44 +361,6 @@ export default function AddGestaltScreen() {
 		}
 	};
 
-	// Calendar helper functions
-	const getDaysInMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-	};
-
-	const getFirstDayOfMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-	};
-
-	const generateCalendarDays = () => {
-		const daysInMonth = getDaysInMonth(currentCalendarMonth);
-		const firstDay = getFirstDayOfMonth(currentCalendarMonth);
-		const days = [];
-
-		// Add empty cells for days before the first day of the month
-		for (let i = 0; i < firstDay; i++) {
-			days.push(null);
-		}
-
-		// Add all days of the month
-		for (let day = 1; day <= daysInMonth; day++) {
-			days.push(new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), day));
-		}
-
-		return days;
-	};
-
-	const navigateMonth = (direction: 'prev' | 'next') => {
-		const newMonth = new Date(currentCalendarMonth);
-		if (direction === 'prev') {
-			newMonth.setMonth(newMonth.getMonth() - 1);
-		} else {
-			newMonth.setMonth(newMonth.getMonth() + 1);
-		}
-		setCurrentCalendarMonth(newMonth);
-	};
-
-	const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 	// Context management
 	const addContext = (context: string) => {
@@ -328,6 +378,22 @@ export default function AddGestaltScreen() {
 		const secs = seconds % 60;
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	};
+
+	// Load existing gestalt data when editing
+	useEffect(() => {
+		if (existingGestalt) {
+			setPhrase(existingGestalt.phrase);
+			setSource(existingGestalt.source);
+			setSourceType(existingGestalt.sourceType || '');
+			setContexts(existingGestalt.contexts || []);
+			setSelectedChild(existingGestalt.childName || '');
+			if (existingGestalt.dateStartedISO) {
+				setDateStarted(new Date(existingGestalt.dateStartedISO));
+			}
+			// Check if this is a random gestalt
+			setIsRandom(existingGestalt.contexts?.includes('Random') || false);
+		}
+	}, [existingGestalt]);
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -360,7 +426,7 @@ export default function AddGestaltScreen() {
 							<Ionicons name="arrow-back" size={24} color="white" />
 						</TouchableOpacity>
 						<Text style={{ color: 'white', fontSize: tokens.font.size.h3, fontWeight: '600' }}>
-							Add Gestalt
+							{isEditing ? 'Edit Gestalt' : 'Add Gestalt'}
 						</Text>
 					</View>
 				</View>
@@ -376,7 +442,6 @@ export default function AddGestaltScreen() {
 				<ScrollView 
 					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 150 }}
 					onScrollBeginDrag={() => {
-						setShowDatePicker(false);
 						setShowChildrenDropdown(false);
 					}}
 				>
@@ -437,52 +502,118 @@ export default function AddGestaltScreen() {
 									color: tokens.color.brand.gradient.start,
 									fontWeight: '500'
 								}}>
-									Search for source using AI
+									Search for source of the Gestalt
 								</Text>
 							</>
 						)}
 					</TouchableOpacity>
 
 					{/* Search Results */}
-					{searchResults && (
+					{searchResults && searchResults.length > 0 && (
 						<View style={{
-							backgroundColor: tokens.color.surface,
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.md,
-							marginBottom: tokens.spacing.gap.lg,
-							borderLeftWidth: 3,
-							borderLeftColor: tokens.color.brand.gradient.start
+							marginBottom: tokens.spacing.gap.lg
 						}}>
-							<Text style={{ 
-								fontSize: tokens.font.size.sm,
-								color: tokens.color.text.primary
-							}}>
-								{searchResults}
-							</Text>
-							{searchResults !== 'Unable to identify a definitive source. This may be from daily conversation or an unknown media source.' && (
-								<TouchableOpacity
-									onPress={() => {
-										setSource(searchResults);
-										// Try to determine source type from result
-										if (searchResults.includes('Movie')) setSourceType('TV/Movie');
-										else if (searchResults.includes('Book')) setSourceType('Book');
-										else if (searchResults.includes('Song')) setSourceType('Song');
-									}}
-									style={{
-										marginTop: tokens.spacing.gap.sm,
-										flexDirection: 'row',
-										alignItems: 'center'
-									}}
-								>
-									<Text style={{
-										color: tokens.color.brand.gradient.start,
-										fontWeight: '500',
-										fontSize: tokens.font.size.sm
-									}}>
-										Use this source
-									</Text>
-									<Ionicons name="arrow-forward" size={16} color={tokens.color.brand.gradient.start} style={{ marginLeft: 4 }} />
-								</TouchableOpacity>
+							<TouchableOpacity
+								onPress={() => setSearchResultsExpanded(!searchResultsExpanded)}
+								style={{
+									flexDirection: 'row',
+									alignItems: 'center',
+									justifyContent: 'space-between',
+									marginBottom: searchResultsExpanded ? tokens.spacing.gap.sm : 0
+								}}
+							>
+								<Text style={{
+									fontSize: tokens.font.size.sm,
+									color: tokens.color.text.secondary,
+									fontWeight: '600'
+								}}>
+									Possible Sources ({searchResults.length})
+								</Text>
+								<Ionicons 
+									name={searchResultsExpanded ? "chevron-up" : "chevron-down"} 
+									size={16} 
+									color={tokens.color.text.secondary} 
+								/>
+							</TouchableOpacity>
+							
+							{searchResultsExpanded && (
+								<View>
+									{searchResults.map((result, index) => {
+										const getConfidenceColor = (confidence: string) => {
+											switch (confidence) {
+												case 'high': return '#10B981'; // Green
+												case 'medium': return '#F59E0B'; // Orange
+												case 'low': return '#6B7280'; // Gray
+												default: return '#6B7280';
+											}
+										};
+
+										return (
+											<TouchableOpacity
+												key={index}
+												onPress={() => {
+													setSource(result.source);
+													// Try to determine source type from result
+													if (result.source.includes('Movie') || result.source.includes('TV')) setSourceType('TV/Movie');
+													else if (result.source.includes('Book')) setSourceType('Book');
+													else if (result.source.includes('Song')) setSourceType('Song');
+													else if (result.source.includes('Parent') || result.source.includes('conversation')) setSourceType('Parent');
+													else setSourceType('Other');
+													// Collapse results after selection
+													setSearchResultsExpanded(false);
+												}}
+												style={{
+													backgroundColor: tokens.color.surface,
+													borderRadius: tokens.radius.lg,
+													padding: tokens.spacing.gap.sm,
+													marginBottom: tokens.spacing.gap.xs,
+													borderLeftWidth: 3,
+													borderLeftColor: getConfidenceColor(result.confidence)
+												}}
+											>
+												<View style={{
+													flexDirection: 'row',
+													justifyContent: 'space-between',
+													alignItems: 'center'
+												}}>
+													<View style={{ flex: 1, marginRight: tokens.spacing.gap.sm }}>
+														<Text style={{
+															fontSize: tokens.font.size.body,
+															color: tokens.color.text.primary,
+															fontWeight: '600'
+														}}>
+															{result.source}
+														</Text>
+														{result.reason && (
+															<Text style={{
+																fontSize: tokens.font.size.xs,
+																color: tokens.color.text.secondary,
+																marginTop: 2
+															}}>
+																{result.reason}
+															</Text>
+														)}
+													</View>
+													<View style={{
+														backgroundColor: getConfidenceColor(result.confidence) + '20',
+														borderRadius: tokens.radius.pill,
+														paddingHorizontal: 6,
+														paddingVertical: 3
+													}}>
+														<Text style={{
+															color: getConfidenceColor(result.confidence),
+															fontSize: 10,
+															fontWeight: '600',
+															textTransform: 'uppercase'
+														}}>
+															{result.confidence}
+														</Text>
+													</View>
+												</View>
+											</TouchableOpacity>
+										);
+									})}
+								</View>
 							)}
 						</View>
 					)}
@@ -658,209 +789,14 @@ export default function AddGestaltScreen() {
 						</View>
 					)}
 
-					{/* Language Stage */}
-					<View style={{ marginBottom: tokens.spacing.gap.lg }}>
-						<Text weight="medium" style={{ 
-							fontSize: tokens.font.size.sm,
-							color: tokens.color.text.secondary,
-							marginBottom: tokens.spacing.gap.sm 
-						}}>
-							Language Stage
-						</Text>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-							{stages.map((s) => (
-								<TouchableOpacity
-									key={s}
-									onPress={() => setStage(s)}
-									style={{
-										backgroundColor: stage === s ? tokens.color.brand.gradient.start + '20' : tokens.color.surface,
-										borderColor: stage === s ? tokens.color.brand.gradient.start : tokens.color.border.default,
-										borderWidth: stage === s ? 2 : 1,
-										borderRadius: tokens.radius.pill,
-										paddingHorizontal: 16,
-										paddingVertical: 10,
-										marginRight: tokens.spacing.gap.xs
-									}}
-								>
-									<Text style={{ 
-										color: stage === s ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
-										fontSize: tokens.font.size.sm,
-										fontWeight: stage === s ? '600' : '400'
-									}}>
-										{s}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</ScrollView>
-					</View>
 
 					{/* Date Started */}
-					<View style={{ marginBottom: tokens.spacing.gap.lg, position: 'relative' }}>
-						<Text weight="medium" style={{ 
-							fontSize: tokens.font.size.sm,
-							color: tokens.color.text.secondary,
-							marginBottom: tokens.spacing.gap.sm 
-						}}>
-							When did they start using this?
-						</Text>
-						<TouchableOpacity
-							onPress={() => setShowDatePicker(!showDatePicker)}
-							style={{
-								backgroundColor: tokens.color.surface,
-								borderRadius: tokens.radius.lg,
-								padding: tokens.spacing.gap.md,
-								flexDirection: 'row',
-								alignItems: 'center',
-								borderWidth: 1,
-								borderColor: showDatePicker ? tokens.color.brand.gradient.start + '30' : tokens.color.border.default
-							}}
-						>
-							<Ionicons name="calendar" size={20} color={tokens.color.text.secondary} />
-							<Text style={{ marginLeft: tokens.spacing.gap.sm, flex: 1 }}>
-								{dateStarted.toLocaleDateString('en-US', { 
-									weekday: 'long', 
-									year: 'numeric', 
-									month: 'long', 
-									day: 'numeric' 
-								})}
-							</Text>
-							<Ionicons 
-								name={showDatePicker ? "chevron-up" : "chevron-down"} 
-								size={16} 
-								color={tokens.color.text.secondary} 
-							/>
-						</TouchableOpacity>
-
-						{/* Calendar Picker Dropdown */}
-						{showDatePicker && (
-							<View style={{
-								position: 'absolute',
-								top: '100%',
-								left: 0,
-								right: 0,
-								marginTop: 4,
-								backgroundColor: 'white',
-								borderRadius: tokens.radius.lg,
-								shadowColor: '#000',
-								shadowOffset: { width: 0, height: 2 },
-								shadowOpacity: 0.08,
-								shadowRadius: 12,
-								elevation: 6,
-								zIndex: 9999,
-								padding: tokens.spacing.gap.md
-							}}>
-								{/* Calendar Header */}
-								<View style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									justifyContent: 'space-between',
-									marginBottom: tokens.spacing.gap.md
-								}}>
-									<TouchableOpacity
-										onPress={() => navigateMonth('prev')}
-										style={{
-											padding: tokens.spacing.gap.xs,
-											borderRadius: tokens.radius.lg / 2
-										}}
-									>
-										<Ionicons name="chevron-back" size={20} color={tokens.color.text.primary} />
-									</TouchableOpacity>
-									
-									<Text style={{
-										fontSize: tokens.font.size.body,
-										fontWeight: '600',
-										color: tokens.color.text.primary
-									}}>
-										{currentCalendarMonth.toLocaleDateString('en-US', { 
-											month: 'long', 
-											year: 'numeric' 
-										})}
-									</Text>
-									
-									<TouchableOpacity
-										onPress={() => navigateMonth('next')}
-										style={{
-											padding: tokens.spacing.gap.xs,
-											borderRadius: tokens.radius.lg / 2
-										}}
-									>
-										<Ionicons name="chevron-forward" size={20} color={tokens.color.text.primary} />
-									</TouchableOpacity>
-								</View>
-
-								{/* Day Names Header */}
-								<View style={{
-									flexDirection: 'row',
-									marginBottom: tokens.spacing.gap.xs
-								}}>
-									{dayNames.map((dayName) => (
-										<View key={dayName} style={{ flex: 1, alignItems: 'center' }}>
-											<Text style={{
-												fontSize: tokens.font.size.xs,
-												fontWeight: '600',
-												color: tokens.color.text.secondary
-											}}>
-												{dayName}
-											</Text>
-										</View>
-									))}
-								</View>
-
-								{/* Calendar Grid */}
-								<View style={{
-									flexDirection: 'row',
-									flexWrap: 'wrap'
-								}}>
-									{generateCalendarDays().map((date, index) => {
-										if (!date) {
-											return <View key={`empty-${index}`} style={{ width: '14.28%', height: 40 }} />;
-										}
-
-										const isSelected = date.toDateString() === dateStarted.toDateString();
-										const isToday = date.toDateString() === new Date().toDateString();
-
-										return (
-											<TouchableOpacity
-												key={date.toISOString()}
-												onPress={() => {
-													setDateStarted(date);
-													setShowDatePicker(false);
-												}}
-												style={{
-													width: '14.28%',
-													height: 40,
-													alignItems: 'center',
-													justifyContent: 'center',
-													borderRadius: tokens.radius.lg / 2,
-													backgroundColor: isSelected ? tokens.color.brand.gradient.start : 'transparent',
-													marginBottom: 2
-												}}
-											>
-												<Text style={{
-													fontSize: tokens.font.size.sm,
-													fontWeight: isSelected ? '600' : '400',
-													color: isSelected ? 'white' : 
-														   isToday ? tokens.color.brand.gradient.start :
-														   tokens.color.text.primary
-												}}>
-													{date.getDate()}
-												</Text>
-												{isToday && !isSelected && (
-													<View style={{
-														position: 'absolute',
-														bottom: 4,
-														width: 4,
-														height: 4,
-														borderRadius: 2,
-														backgroundColor: tokens.color.brand.gradient.start
-													}} />
-												)}
-											</TouchableOpacity>
-										);
-									})}
-								</View>
-							</View>
-						)}
+					<View style={{ marginBottom: tokens.spacing.gap.lg }}>
+						<DatePickerField
+							selectedDate={dateStarted}
+							onDateSelect={setDateStarted}
+							label="When did they start using this?"
+						/>
 					</View>
 
 					{/* Context of Use */}
@@ -1150,7 +1086,7 @@ export default function AddGestaltScreen() {
 
 					{/* Save Button */}
 					<GradientButton 
-						title="Save Gestalt" 
+						title={isEditing ? "Update Gestalt" : "Save Gestalt"} 
 						onPress={handleSave}
 					/>
 				</ScrollView>

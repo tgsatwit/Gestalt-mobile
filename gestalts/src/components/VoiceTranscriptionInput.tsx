@@ -4,7 +4,7 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import OpenAI from 'openai';
+import { transcribeAudio } from '../services/transcriptionService';
 
 interface VoiceTranscriptionInputProps extends TextInputProps {
   value: string;
@@ -28,11 +28,6 @@ export const VoiceTranscriptionInput: React.FC<VoiceTranscriptionInputProps> = (
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
-
-  // Initialize OpenAI client (you'll need to set up your API key)
-  const openai = new OpenAI({
-    apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY, // Set this in your .env file
-  });
 
   const startRecording = async () => {
     try {
@@ -82,7 +77,7 @@ export const VoiceTranscriptionInput: React.FC<VoiceTranscriptionInputProps> = (
       recordingRef.current = null;
       
       if (uri) {
-        await transcribeAudio(uri);
+        await transcribeAudioFromUri(uri);
       }
     } catch (error) {
       console.error('Error stopping recording:', error);
@@ -91,7 +86,7 @@ export const VoiceTranscriptionInput: React.FC<VoiceTranscriptionInputProps> = (
     }
   };
 
-  const transcribeAudio = async (audioUri: string) => {
+  const transcribeAudioFromUri = async (audioUri: string) => {
     try {
       console.log('Starting transcription...');
       
@@ -100,25 +95,18 @@ export const VoiceTranscriptionInput: React.FC<VoiceTranscriptionInputProps> = (
         encoding: FileSystem.EncodingType.Base64,
       });
       
-      // Convert base64 to blob for OpenAI API
+      // Convert base64 to blob for API
       const audioBlob = new Blob([Uint8Array.from(atob(audioFile), c => c.charCodeAt(0))], {
         type: 'audio/m4a'
       });
       
-      // Create a File object from the blob
-      const audioFileForAPI = new File([audioBlob], 'recording.m4a', { type: 'audio/m4a' });
+      // Call server-side transcription API
+      const transcriptionText = await transcribeAudio(audioBlob, 'en');
       
-      // Call OpenAI Whisper API
-      const transcription = await openai.audio.transcriptions.create({
-        file: audioFileForAPI,
-        model: 'whisper-1',
-        language: 'en', // You can make this configurable
-      });
-      
-      console.log('Transcription completed:', transcription.text);
+      console.log('Transcription completed:', transcriptionText);
       
       // Append the transcription to existing text
-      const newText = value ? `${value}\n${transcription.text}` : transcription.text;
+      const newText = value ? `${value}\n${transcriptionText}` : transcriptionText;
       onChangeText(newText);
       
     } catch (error) {

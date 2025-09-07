@@ -4,18 +4,24 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
+import { DatePickerField } from '../components/DatePickerField';
 import { useMemoriesStore } from '../state/useStore';
 import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
 import { getAuth } from 'firebase/auth';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { Audio } from 'expo-av';
+
+type AddMilestoneScreenRouteProp = RouteProp<MainStackParamList, 'AddMilestone'>;
 
 export default function AddMilestoneScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
+	const route = useRoute<AddMilestoneScreenRouteProp>();
+	const { id: editingId } = route.params || {};
 	const { currentProfile } = useMemoriesStore((s) => ({ currentProfile: s.currentProfile }));
-	const { addMilestone } = useFirebaseMemoriesStore();
+	const { addMilestone, updateMilestone, milestones } = useFirebaseMemoriesStore();
 	
 	const [title, setTitle] = useState('');
 	const [description, setDescription] = useState('');
@@ -23,11 +29,10 @@ export default function AddMilestoneScreen() {
 	
 	// Date selection state
 	const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date>(new Date());
 	
-	// Child selection state
-	const [selectedChild, setSelectedChild] = useState<string>('');
+	// Child selection state - support multiple children
+	const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
+	const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]);
 	const [showChildrenDropdown, setShowChildrenDropdown] = useState(false);
 	
 	// Audio recording state
@@ -38,8 +43,16 @@ export default function AddMilestoneScreen() {
 	const [playbackSound, setPlaybackSound] = useState<Audio.Sound | null>(null);
 	const [isPlaying, setIsPlaying] = useState(false);
 	
-	// Get available children from current profile
-	const availableChildren = currentProfile ? [currentProfile.childName] : [];
+	// Get available children from all profiles
+	const { profiles } = useMemoriesStore((s) => ({ profiles: s.profiles }));
+	const availableChildren = profiles.map(profile => ({
+		id: profile.id,
+		name: profile.childName
+	}));
+	
+	// Find existing milestone if editing
+	const existingMilestone = editingId ? milestones.find(m => m.id === editingId) : null;
+	const isEditing = !!existingMilestone;
 
 	const milestoneCategories = [
 		{ name: 'First Words', icon: 'chatbubble', color: '#7C3AED' },
@@ -185,15 +198,31 @@ export default function AddMilestoneScreen() {
 				};
 			}
 
-			// Save to Firebase
-			await addMilestone(
-				title.trim(),
-				selectedDate.toISOString(),
-				description.trim() || undefined,
-				selectedChild || undefined,
-				currentProfile?.id,
-				audioData
-			);
+			if (isEditing && existingMilestone) {
+				// Update existing milestone - for now, use first selected child
+				const primaryChildName = selectedChildren.length > 0 ? selectedChildren[0] : undefined;
+				const primaryChildId = selectedChildIds.length > 0 ? selectedChildIds[0] : undefined;
+				await updateMilestone(existingMilestone.id, {
+					title: title.trim(),
+					dateISO: selectedDate.toISOString(),
+					notes: description.trim() || undefined,
+					childName: primaryChildName,
+					childProfileId: primaryChildId,
+					audioData
+				});
+			} else {
+				// Create new milestone - for now, use first selected child
+				const primaryChildName = selectedChildren.length > 0 ? selectedChildren[0] : undefined;
+				const primaryChildId = selectedChildIds.length > 0 ? selectedChildIds[0] : undefined;
+				await addMilestone(
+					title.trim(),
+					selectedDate.toISOString(),
+					description.trim() || undefined,
+					primaryChildName,
+					primaryChildId,
+					audioData
+				);
+			}
 			navigation.goBack();
 		} catch (error) {
 			console.error('Failed to save milestone:', error);
@@ -201,56 +230,61 @@ export default function AddMilestoneScreen() {
 		}
 	};
 
-	// Initialize selected child when component mounts
+	// Initialize selected children when component mounts
 	React.useEffect(() => {
-		if (availableChildren.length > 0 && !selectedChild) {
-			setSelectedChild(availableChildren[0]);
+		if (availableChildren.length > 0 && selectedChildren.length === 0) {
+			// Default to first child if only one exists
+			if (availableChildren.length === 1) {
+				setSelectedChildren([availableChildren[0].name]);
+				setSelectedChildIds([availableChildren[0].id]);
+			}
 		}
-	}, [availableChildren.length, selectedChild]);
+	}, [availableChildren.length, selectedChildren.length]);
 
-	// Calendar helper functions
-	const getDaysInMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+	// Load existing milestone data when editing
+	React.useEffect(() => {
+		if (existingMilestone) {
+			setTitle(existingMilestone.title);
+			setDescription(existingMilestone.notes || '');
+			// Set selected children based on existing milestone
+			if (existingMilestone.childName) {
+				setSelectedChildren([existingMilestone.childName]);
+				if (existingMilestone.childProfileId) {
+					setSelectedChildIds([existingMilestone.childProfileId]);
+				}
+			}
+			setSelectedDate(new Date(existingMilestone.dateISO));
+			// Note: Audio data from existing entries isn't loaded for editing
+		}
+	}, [existingMilestone]);
+
+
+	// Child selection helper functions - support multiple selection
+	const toggleChildSelection = (childName: string, childId: string) => {
+		setSelectedChildren(prev => {
+			if (prev.includes(childName)) {
+				return prev.filter(name => name !== childName);
+			} else {
+				return [...prev, childName];
+			}
+		});
+		setSelectedChildIds(prev => {
+			if (prev.includes(childId)) {
+				return prev.filter(id => id !== childId);
+			} else {
+				return [...prev, childId];
+			}
+		});
 	};
 
-	const getFirstDayOfMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-	};
-
-	const generateCalendarDays = () => {
-		const daysInMonth = getDaysInMonth(currentCalendarMonth);
-		const firstDay = getFirstDayOfMonth(currentCalendarMonth);
-		const days = [];
-
-		// Add empty cells for days before the first day of the month
-		for (let i = 0; i < firstDay; i++) {
-			days.push(null);
+	const getSelectedChildrenText = () => {
+		if (selectedChildren.length === 0) {
+			return 'Select Children';
 		}
-
-		// Add all days of the month
-		for (let day = 1; day <= daysInMonth; day++) {
-			days.push(new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), day));
+		if (selectedChildren.length === 1) {
+			return selectedChildren[0];
 		}
-
-		return days;
-	};
-
-	const navigateMonth = (direction: 'prev' | 'next') => {
-		const newMonth = new Date(currentCalendarMonth);
-		if (direction === 'prev') {
-			newMonth.setMonth(newMonth.getMonth() - 1);
-		} else {
-			newMonth.setMonth(newMonth.getMonth() + 1);
-		}
-		setCurrentCalendarMonth(newMonth);
-	};
-
-	const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-	// Child selection helper functions
-	const toggleChildSelection = (child: string) => {
-		setSelectedChild(child);
-		setShowChildrenDropdown(false);
+		return `${selectedChildren.length} Children Selected`;
 	};
 
 	return (
@@ -273,7 +307,7 @@ export default function AddMilestoneScreen() {
 							<Ionicons name="arrow-back" size={24} color="white" />
 						</TouchableOpacity>
 						<Text style={{ color: 'white', fontSize: tokens.font.size.h3, fontWeight: '600' }}>
-							Add Milestone
+							{isEditing ? 'Edit Milestone' : 'Add Milestone'}
 						</Text>
 					</View>
 				</View>
@@ -289,7 +323,6 @@ export default function AddMilestoneScreen() {
 				<ScrollView 
 					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 150 }}
 					onScrollBeginDrag={() => {
-						setShowDatePicker(false);
 						setShowChildrenDropdown(false);
 					}}
 				>
@@ -345,15 +378,15 @@ export default function AddMilestoneScreen() {
 					</View>
 				</View>
 
-				{/* Child Selection - Only show if there are multiple children */}
-				{availableChildren.length > 1 && (
+				{/* Child Selection - Always show if children exist */}
+				{availableChildren.length > 0 && (
 					<View style={{ marginBottom: tokens.spacing.gap.lg, position: 'relative' }}>
 						<Text weight="medium" style={{ 
 							fontSize: tokens.font.size.sm,
 							color: tokens.color.text.secondary,
 							marginBottom: tokens.spacing.gap.sm 
 						}}>
-							Child
+							Children (multiple selection allowed)
 						</Text>
 						<TouchableOpacity
 							onPress={() => setShowChildrenDropdown(!showChildrenDropdown)}
@@ -376,7 +409,7 @@ export default function AddMilestoneScreen() {
 								fontWeight: '400',
 								flex: 1
 							}}>
-								{selectedChild || 'Select Child'}
+								{getSelectedChildrenText()}
 							</Text>
 							<Ionicons 
 								name={showChildrenDropdown ? "chevron-up" : "chevron-down"} 
@@ -406,15 +439,15 @@ export default function AddMilestoneScreen() {
 								<ScrollView style={{ maxHeight: 150 }}>
 									{availableChildren.map((child, index) => (
 										<TouchableOpacity
-											key={child}
-											onPress={() => toggleChildSelection(child)}
+											key={child.id}
+											onPress={() => toggleChildSelection(child.name, child.id)}
 											activeOpacity={0.7}
 											style={{
 												paddingVertical: tokens.spacing.gap.xs,
 												paddingHorizontal: tokens.spacing.gap.sm,
 												borderBottomWidth: index !== availableChildren.length - 1 ? 0.5 : 0,
 												borderBottomColor: 'rgba(0,0,0,0.08)',
-												backgroundColor: selectedChild === child ? tokens.color.bg.muted : 'transparent',
+												backgroundColor: selectedChildren.includes(child.name) ? tokens.color.bg.muted : 'transparent',
 												flexDirection: 'row',
 												alignItems: 'center',
 												justifyContent: 'space-between'
@@ -422,12 +455,12 @@ export default function AddMilestoneScreen() {
 										>
 											<Text style={{
 												fontSize: tokens.font.size.sm,
-												color: selectedChild === child ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+												color: selectedChildren.includes(child.name) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
 												fontWeight: '400'
 											}}>
-												{child}
+												{child.name}
 											</Text>
-											{selectedChild === child && (
+											{selectedChildren.includes(child.name) && (
 												<Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
 											)}
 										</TouchableOpacity>
@@ -524,175 +557,12 @@ export default function AddMilestoneScreen() {
 				</View>
 
 				{/* Date */}
-				<View style={{ marginBottom: tokens.spacing.gap.lg, position: 'relative' }}>
-					<Text weight="medium" style={{ 
-						fontSize: tokens.font.size.sm,
-						color: tokens.color.text.secondary,
-						marginBottom: tokens.spacing.gap.sm 
-					}}>
-						When did this happen?
-					</Text>
-					<TouchableOpacity
-						onPress={() => setShowDatePicker(!showDatePicker)}
-						style={{
-							backgroundColor: tokens.color.surface,
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.md,
-							flexDirection: 'row',
-							alignItems: 'center',
-							borderWidth: 1,
-							borderColor: showDatePicker ? tokens.color.brand.gradient.start + '30' : tokens.color.border.default
-						}}
-					>
-						<Ionicons name="calendar" size={20} color={tokens.color.text.secondary} />
-						<Text style={{ marginLeft: tokens.spacing.gap.sm, flex: 1 }}>
-							{selectedDate.toLocaleDateString('en-US', { 
-								weekday: 'long', 
-								year: 'numeric', 
-								month: 'long', 
-								day: 'numeric' 
-							})}
-						</Text>
-						<Ionicons 
-							name={showDatePicker ? "chevron-up" : "chevron-down"} 
-							size={16} 
-							color={tokens.color.text.secondary} 
-						/>
-					</TouchableOpacity>
-
-					{/* Calendar Picker Dropdown */}
-					{showDatePicker && (
-						<View style={{
-							position: 'absolute',
-							top: '100%',
-							left: 0,
-							right: 0,
-							marginTop: 4,
-							backgroundColor: 'white',
-							borderRadius: tokens.radius.lg,
-							shadowColor: '#000',
-							shadowOffset: { width: 0, height: 2 },
-							shadowOpacity: 0.08,
-							shadowRadius: 12,
-							elevation: 6,
-							zIndex: 9999,
-							padding: tokens.spacing.gap.md
-						}}>
-							{/* Calendar Header */}
-							<View style={{
-								flexDirection: 'row',
-								alignItems: 'center',
-								justifyContent: 'space-between',
-								marginBottom: tokens.spacing.gap.md
-							}}>
-								<TouchableOpacity
-									onPress={() => navigateMonth('prev')}
-									style={{
-										padding: tokens.spacing.gap.xs,
-										borderRadius: tokens.radius.lg / 2
-									}}
-								>
-									<Ionicons name="chevron-back" size={20} color={tokens.color.text.primary} />
-								</TouchableOpacity>
-								
-								<Text style={{
-									fontSize: tokens.font.size.body,
-									fontWeight: '600',
-									color: tokens.color.text.primary
-								}}>
-									{currentCalendarMonth.toLocaleDateString('en-US', { 
-										month: 'long', 
-										year: 'numeric' 
-									})}
-								</Text>
-								
-								<TouchableOpacity
-									onPress={() => navigateMonth('next')}
-									style={{
-										padding: tokens.spacing.gap.xs,
-										borderRadius: tokens.radius.lg / 2
-									}}
-								>
-									<Ionicons name="chevron-forward" size={20} color={tokens.color.text.primary} />
-								</TouchableOpacity>
-							</View>
-
-							{/* Day Names Header */}
-							<View style={{
-								flexDirection: 'row',
-								marginBottom: tokens.spacing.gap.xs
-							}}>
-								{dayNames.map((dayName) => (
-									<View key={dayName} style={{ flex: 1, alignItems: 'center' }}>
-										<Text style={{
-											fontSize: tokens.font.size.xs,
-											fontWeight: '600',
-											color: tokens.color.text.secondary
-										}}>
-											{dayName}
-										</Text>
-									</View>
-								))}
-							</View>
-
-							{/* Calendar Grid */}
-							<View style={{
-								flexDirection: 'row',
-								flexWrap: 'wrap'
-							}}>
-								{generateCalendarDays().map((date, index) => {
-									if (!date) {
-										// Empty cell for days before the first day of the month
-										return <View key={`empty-${index}`} style={{ width: '14.28%', height: 40 }} />;
-									}
-
-									const isSelected = date.toDateString() === selectedDate.toDateString();
-									const isToday = date.toDateString() === new Date().toDateString();
-									const isPastMonth = date.getMonth() !== currentCalendarMonth.getMonth();
-
-									return (
-										<TouchableOpacity
-											key={date.toISOString()}
-											onPress={() => {
-												setSelectedDate(date);
-												setShowDatePicker(false);
-											}}
-											style={{
-												width: '14.28%',
-												height: 40,
-												alignItems: 'center',
-												justifyContent: 'center',
-												borderRadius: tokens.radius.lg / 2,
-												backgroundColor: isSelected ? tokens.color.brand.gradient.start : 'transparent',
-												marginBottom: 2
-											}}
-										>
-											<Text style={{
-												fontSize: tokens.font.size.sm,
-												fontWeight: isSelected ? '600' : '400',
-												color: isSelected ? 'white' : 
-													   isToday ? tokens.color.brand.gradient.start :
-													   isPastMonth ? tokens.color.text.secondary + '60' :
-													   tokens.color.text.primary
-											}}>
-												{date.getDate()}
-											</Text>
-											{isToday && !isSelected && (
-												<View style={{
-													position: 'absolute',
-													bottom: 4,
-													width: 4,
-													height: 4,
-													borderRadius: 2,
-													backgroundColor: tokens.color.brand.gradient.start
-												}} />
-											)}
-										</TouchableOpacity>
-									);
-								})}
-							</View>
-						</View>
-					)}
+				<View style={{ marginBottom: tokens.spacing.gap.lg }}>
+					<DatePickerField
+						selectedDate={selectedDate}
+						onDateSelect={setSelectedDate}
+						label="When did this happen?"
+					/>
 				</View>
 
 				{/* Photo Attachment */}
@@ -837,7 +707,7 @@ export default function AddMilestoneScreen() {
 
 				{/* Save Button */}
 				<GradientButton 
-					title="Save Milestone" 
+					title={isEditing ? "Update Milestone" : "Save Milestone"}
 					onPress={handleSave}
 				/>
 				</ScrollView>

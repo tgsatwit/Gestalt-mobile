@@ -7,11 +7,10 @@ export type MainStackParamList = {
   PlayAnalyzer: undefined;
   Storybook: undefined;
   Knowledge: undefined;
-  AddJournal: undefined;
-  AddMilestone: undefined;
-  AddGestalt: undefined;
+  AddJournal: { id?: string } | undefined;
+  AddMilestone: { id?: string } | undefined;
+  AddGestalt: { id?: string } | undefined;
   AppointmentNote: { id?: string } | undefined;
-  GestaltLists: undefined;
   Profile: undefined;
   ChildProfile: { profileId?: string } | undefined;
   ChildProfilesList: undefined;

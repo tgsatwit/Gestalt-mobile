@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { GradientButton } from '../components/GradientButton';
+import { DatePickerField } from '../components/DatePickerField';
 import { useMemoriesStore } from '../state/useStore';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
@@ -34,8 +35,6 @@ export default function ChildProfileScreen() {
 	const [parentName, setParentName] = useState('');
 	const [birthDate, setBirthDate] = useState('');
 	const [selectedBirthDate, setSelectedBirthDate] = useState<Date | null>(null);
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date>(new Date());
 	const [knowsStage, setKnowsStage] = useState(false);
 	const [currentStage, setCurrentStage] = useState(1);
 	const [interests, setInterests] = useState<string[]>(['Cars', 'Books', 'Music']);
@@ -79,7 +78,6 @@ export default function ChildProfileScreen() {
 				const parsedDate = new Date(profile.birthDate);
 				if (!isNaN(parsedDate.getTime())) {
 					setSelectedBirthDate(parsedDate);
-					setCurrentCalendarMonth(parsedDate);
 				}
 			} catch (error) {
 				console.log('Error parsing birth date:', error);
@@ -105,7 +103,6 @@ export default function ChildProfileScreen() {
 					const parsedDate = new Date(currentProfile.birthDate);
 					if (!isNaN(parsedDate.getTime())) {
 						setSelectedBirthDate(parsedDate);
-						setCurrentCalendarMonth(parsedDate);
 					}
 				} catch (error) {
 					console.log('Error parsing birth date:', error);
@@ -123,7 +120,6 @@ export default function ChildProfileScreen() {
 			setParentName('');
 			setBirthDate('');
 			setSelectedBirthDate(null);
-			setCurrentCalendarMonth(new Date());
 			setKnowsStage(false);
 			setCurrentStage(1);
 			setInterests(['Cars', 'Books', 'Music']);
@@ -228,44 +224,6 @@ export default function ChildProfileScreen() {
 		setInterests(interests.filter((_, i) => i !== index));
 	};
 
-	// Calendar helper functions
-	const getDaysInMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-	};
-
-	const getFirstDayOfMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-	};
-
-	const generateCalendarDays = () => {
-		const daysInMonth = getDaysInMonth(currentCalendarMonth);
-		const firstDay = getFirstDayOfMonth(currentCalendarMonth);
-		const days = [];
-
-		// Add empty cells for days before the first day of the month
-		for (let i = 0; i < firstDay; i++) {
-			days.push(null);
-		}
-
-		// Add all days of the month
-		for (let day = 1; day <= daysInMonth; day++) {
-			days.push(new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), day));
-		}
-
-		return days;
-	};
-
-	const navigateMonth = (direction: 'prev' | 'next') => {
-		const newMonth = new Date(currentCalendarMonth);
-		if (direction === 'prev') {
-			newMonth.setMonth(newMonth.getMonth() - 1);
-		} else {
-			newMonth.setMonth(newMonth.getMonth() + 1);
-		}
-		setCurrentCalendarMonth(newMonth);
-	};
-
-	const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 	return (
 		<LinearGradient
@@ -326,7 +284,6 @@ export default function ChildProfileScreen() {
 			}}>
 				<ScrollView 
 					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 120 }}
-					onScrollBeginDrag={() => setShowDatePicker(false)}
 				>
 
 				{/* Basic Information */}
@@ -354,176 +311,56 @@ export default function ChildProfileScreen() {
 
 
 					{/* Date of Birth */}
-					<View style={{ marginBottom: tokens.spacing.gap.lg, position: 'relative' }}>
-						<Text weight="medium" style={{ 
-							fontSize: tokens.font.size.sm,
-							color: tokens.color.text.secondary,
-							marginBottom: tokens.spacing.gap.sm 
-						}}>
-							Date of Birth (Optional)
-						</Text>
-						<TouchableOpacity
-							onPress={() => setShowDatePicker(!showDatePicker)}
-							style={{
-								backgroundColor: tokens.color.surface,
-								borderRadius: tokens.radius.lg,
-								padding: tokens.spacing.gap.md,
-								flexDirection: 'row',
-								alignItems: 'center',
-								borderWidth: 1,
-								borderColor: showDatePicker ? tokens.color.brand.gradient.start + '30' : tokens.color.border.default
-							}}
-						>
-							<Ionicons name="calendar" size={20} color={tokens.color.text.secondary} />
-							<Text style={{ marginLeft: tokens.spacing.gap.sm, flex: 1, color: selectedBirthDate ? tokens.color.text.primary : tokens.color.text.secondary }}>
-								{selectedBirthDate ? selectedBirthDate.toLocaleDateString('en-US', { 
-									weekday: 'long', 
-									year: 'numeric', 
-									month: 'long', 
-									day: 'numeric' 
-								}) : 'Select date of birth'}
-							</Text>
-							<Ionicons 
-								name={showDatePicker ? "chevron-up" : "chevron-down"} 
-								size={16} 
-								color={tokens.color.text.secondary} 
-							/>
-						</TouchableOpacity>
-
-						{/* Calendar Picker Dropdown */}
-						{showDatePicker && (
-							<View style={{
-								position: 'absolute',
-								top: '100%',
-								left: 0,
-								right: 0,
-								marginTop: 4,
-								backgroundColor: 'white',
-								borderRadius: tokens.radius.lg,
-								shadowColor: '#000',
-								shadowOffset: { width: 0, height: 2 },
-								shadowOpacity: 0.08,
-								shadowRadius: 12,
-								elevation: 6,
-								zIndex: 1000,
-								padding: tokens.spacing.gap.md
+					{selectedBirthDate && (
+						<View style={{ marginBottom: tokens.spacing.gap.lg }}>
+							<Text weight="medium" style={{ 
+								fontSize: tokens.font.size.sm,
+								color: tokens.color.text.secondary,
+								marginBottom: tokens.spacing.gap.sm 
 							}}>
-								{/* Calendar Header */}
-								<View style={{
+								Date of Birth (Optional)
+							</Text>
+							<DatePickerField
+								selectedDate={selectedBirthDate}
+								onDateSelect={setSelectedBirthDate}
+								label=""
+							/>
+						</View>
+					)}
+					
+					{!selectedBirthDate && (
+						<View style={{ marginBottom: tokens.spacing.gap.lg }}>
+							<Text weight="medium" style={{ 
+								fontSize: tokens.font.size.sm,
+								color: tokens.color.text.secondary,
+								marginBottom: tokens.spacing.gap.sm 
+							}}>
+								Date of Birth (Optional)
+							</Text>
+							<TouchableOpacity
+								onPress={() => setSelectedBirthDate(new Date())}
+								style={{
+									backgroundColor: tokens.color.surface,
+									borderRadius: tokens.radius.lg,
+									padding: tokens.spacing.gap.md,
 									flexDirection: 'row',
 									alignItems: 'center',
-									justifyContent: 'space-between',
-									marginBottom: tokens.spacing.gap.md
-								}}>
-									<TouchableOpacity
-										onPress={() => navigateMonth('prev')}
-										style={{
-											padding: tokens.spacing.gap.xs,
-											borderRadius: tokens.radius.lg / 2
-										}}
-									>
-										<Ionicons name="chevron-back" size={20} color={tokens.color.text.primary} />
-									</TouchableOpacity>
-									
-									<Text style={{
-										fontSize: tokens.font.size.body,
-										fontWeight: '600',
-										color: tokens.color.text.primary
-									}}>
-										{currentCalendarMonth.toLocaleDateString('en-US', { 
-											month: 'long', 
-											year: 'numeric' 
-										})}
-									</Text>
-									
-									<TouchableOpacity
-										onPress={() => navigateMonth('next')}
-										style={{
-											padding: tokens.spacing.gap.xs,
-											borderRadius: tokens.radius.lg / 2
-										}}
-									>
-										<Ionicons name="chevron-forward" size={20} color={tokens.color.text.primary} />
-									</TouchableOpacity>
-								</View>
-
-								{/* Day Names Header */}
-								<View style={{
-									flexDirection: 'row',
-									marginBottom: tokens.spacing.gap.xs
-								}}>
-									{dayNames.map((dayName) => (
-										<View key={dayName} style={{ flex: 1, alignItems: 'center' }}>
-											<Text style={{
-												fontSize: tokens.font.size.xs,
-												fontWeight: '600',
-												color: tokens.color.text.secondary
-											}}>
-												{dayName}
-											</Text>
-										</View>
-									))}
-								</View>
-
-								{/* Calendar Grid */}
-								<View style={{
-									flexDirection: 'row',
-									flexWrap: 'wrap'
-								}}>
-									{generateCalendarDays().map((date, index) => {
-										if (!date) {
-											// Empty cell for days before the first day of the month
-											return <View key={`empty-${index}`} style={{ width: '14.28%', height: 40 }} />;
-										}
-
-										const isSelected = selectedBirthDate && date.toDateString() === selectedBirthDate.toDateString();
-										const isToday = date.toDateString() === new Date().toDateString();
-										const isPastMonth = date.getMonth() !== currentCalendarMonth.getMonth();
-
-										return (
-											<TouchableOpacity
-												key={date.toISOString()}
-												onPress={() => {
-													setSelectedBirthDate(date);
-													setShowDatePicker(false);
-												}}
-												style={{
-													width: '14.28%',
-													height: 40,
-													alignItems: 'center',
-													justifyContent: 'center',
-													borderRadius: tokens.radius.lg / 2,
-													backgroundColor: isSelected ? tokens.color.brand.gradient.start : 'transparent',
-													marginBottom: 2
-												}}
-											>
-												<Text style={{
-													fontSize: tokens.font.size.sm,
-													fontWeight: isSelected ? '600' : '400',
-													color: isSelected ? 'white' : 
-														   isToday ? tokens.color.brand.gradient.start :
-														   isPastMonth ? tokens.color.text.secondary + '60' :
-														   tokens.color.text.primary
-												}}>
-													{date.getDate()}
-												</Text>
-												{isToday && !isSelected && (
-													<View style={{
-														position: 'absolute',
-														bottom: 4,
-														width: 4,
-														height: 4,
-														borderRadius: 2,
-														backgroundColor: tokens.color.brand.gradient.start
-													}} />
-												)}
-											</TouchableOpacity>
-										);
-									})}
-								</View>
-							</View>
-						)}
-					</View>
+									borderWidth: 1,
+									borderColor: tokens.color.border.default
+								}}
+							>
+								<Ionicons name="calendar" size={20} color={tokens.color.text.secondary} />
+								<Text style={{ marginLeft: tokens.spacing.gap.sm, flex: 1, color: tokens.color.text.secondary }}>
+									Select date of birth
+								</Text>
+								<Ionicons 
+									name="chevron-down" 
+									size={16} 
+									color={tokens.color.text.secondary} 
+								/>
+							</TouchableOpacity>
+						</View>
+					)}
 				</View>
 
 				{/* Gestalt Stage Selection */}

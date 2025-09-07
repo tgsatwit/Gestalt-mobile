@@ -5,17 +5,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
 import { VoiceTranscriptionInput } from '../components/VoiceTranscriptionInput';
+import { DatePickerField } from '../components/DatePickerField';
 import { useMemoriesStore } from '../state/useStore';
 import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
 import { getAuth } from 'firebase/auth';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
+
+type AddJournalScreenRouteProp = RouteProp<MainStackParamList, 'AddJournal'>;
 
 export default function AddJournalScreen() {
 	const { tokens } = useTheme();
 	const navigation = useNavigation();
+	const route = useRoute<AddJournalScreenRouteProp>();
+	const { id: editingId } = route.params || {};
 	const { currentProfile } = useMemoriesStore((s) => ({ currentProfile: s.currentProfile }));
-	const { addJournalEntry } = useFirebaseMemoriesStore();
+	const { addJournalEntry, updateJournalEntry, journal } = useFirebaseMemoriesStore();
 	
 	const [entry, setEntry] = useState('');
 	const [mood, setMood] = useState<'good' | 'neutral' | 'tough' | null>(null);
@@ -29,11 +35,32 @@ export default function AddJournalScreen() {
 	
 	// Date selection state
 	const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date>(new Date());
 	
-	// Get available children from current profile
-	const availableChildren = currentProfile ? [currentProfile.childName] : [];
+	// Get available children from all profiles
+	const { profiles } = useMemoriesStore((s) => ({ profiles: s.profiles }));
+	const availableChildren = profiles.map(profile => profile.childName);
+	
+	// Find existing entry if editing
+	const existingEntry = editingId ? journal.find(j => j.id === editingId) : null;
+	const isEditing = !!existingEntry;
+
+	// Initialize selected child when component mounts
+	React.useEffect(() => {
+		if (availableChildren.length === 1 && selectedChild === '' && !isEditing) {
+			setSelectedChild(availableChildren[0]);
+		}
+	}, [availableChildren.length, selectedChild, isEditing]);
+
+	// Load existing entry data when editing
+	React.useEffect(() => {
+		if (existingEntry) {
+			setEntry(existingEntry.content);
+			setMood(existingEntry.mood || null);
+			setJournalType(existingEntry.type || 'personal');
+			setSelectedChild(existingEntry.childName || '');
+			setSelectedDate(new Date(existingEntry.createdAtISO));
+		}
+	}, [existingEntry]);
 
 	const moods = [
 		{ type: 'good' as const, icon: 'happy', color: '#10B981', label: 'Good Day' },
@@ -58,18 +85,42 @@ export default function AddJournalScreen() {
 		}
 		
 		const childName = journalType === 'child' ? selectedChild : undefined;
-		const childProfileId = journalType === 'child' && currentProfile ? currentProfile.id : undefined;
+		const selectedProfile = profiles.find(p => p.childName === selectedChild);
+		const childProfileId = journalType === 'child' && selectedProfile ? selectedProfile.id : undefined;
 		
 		try {
-			// Save to Firebase
-			await addJournalEntry(
-				entry,
-				mood || undefined,
-				journalType,
-				childName,
-				childProfileId,
-				selectedDate.toISOString()
-			);
+			if (isEditing && existingEntry) {
+				// Update existing entry - filter out undefined values
+				const updates: any = {
+					content: entry,
+					type: journalType,
+					createdAtISO: selectedDate.toISOString()
+				};
+				
+				if (mood) {
+					updates.mood = mood;
+				}
+				
+				if (childName) {
+					updates.childName = childName;
+				}
+				
+				if (childProfileId) {
+					updates.childProfileId = childProfileId;
+				}
+				
+				await updateJournalEntry(existingEntry.id, updates);
+			} else {
+				// Create new entry
+				await addJournalEntry(
+					entry,
+					mood || undefined,
+					journalType,
+					childName,
+					childProfileId,
+					selectedDate.toISOString()
+				);
+			}
 			navigation.goBack();
 		} catch (error) {
 			console.error('Failed to save journal entry:', error);
@@ -77,44 +128,6 @@ export default function AddJournalScreen() {
 		}
 	};
 
-	// Calendar helper functions
-	const getDaysInMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-	};
-
-	const getFirstDayOfMonth = (date: Date) => {
-		return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-	};
-
-	const generateCalendarDays = () => {
-		const daysInMonth = getDaysInMonth(currentCalendarMonth);
-		const firstDay = getFirstDayOfMonth(currentCalendarMonth);
-		const days = [];
-
-		// Add empty cells for days before the first day of the month
-		for (let i = 0; i < firstDay; i++) {
-			days.push(null);
-		}
-
-		// Add all days of the month
-		for (let day = 1; day <= daysInMonth; day++) {
-			days.push(new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), day));
-		}
-
-		return days;
-	};
-
-	const navigateMonth = (direction: 'prev' | 'next') => {
-		const newMonth = new Date(currentCalendarMonth);
-		if (direction === 'prev') {
-			newMonth.setMonth(newMonth.getMonth() - 1);
-		} else {
-			newMonth.setMonth(newMonth.getMonth() + 1);
-		}
-		setCurrentCalendarMonth(newMonth);
-	};
-
-	const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	
 	// Initialize selected child when switching to child type or when component mounts
 	React.useEffect(() => {
@@ -122,6 +135,17 @@ export default function AddJournalScreen() {
 			setSelectedChild(availableChildren[0]);
 		}
 	}, [journalType, availableChildren.length, selectedChild]);
+
+	// Load existing entry data when editing
+	React.useEffect(() => {
+		if (existingEntry) {
+			setEntry(existingEntry.content);
+			setMood(existingEntry.mood || null);
+			setJournalType(existingEntry.type || 'personal');
+			setSelectedChild(existingEntry.childName || '');
+			setSelectedDate(new Date(existingEntry.createdAtISO));
+		}
+	}, [existingEntry]);
 
 	const addTag = (tag: string) => {
 		if (!tags.includes(tag)) {
@@ -153,7 +177,7 @@ export default function AddJournalScreen() {
 							<Ionicons name="arrow-back" size={24} color="white" />
 						</TouchableOpacity>
 						<Text style={{ color: 'white', fontSize: tokens.font.size.h3, fontWeight: '600' }}>
-							Add Journal Entry
+							{isEditing ? 'Edit Journal Entry' : 'Add Journal Entry'}
 						</Text>
 					</View>
 				</View>
@@ -168,178 +192,14 @@ export default function AddJournalScreen() {
 			}}>
 				<ScrollView 
 					contentContainerStyle={{ padding: tokens.spacing.containerX, paddingBottom: 150 }}
-					onScrollBeginDrag={() => setShowDatePicker(false)}
 				>
 				{/* Date */}
-				<View style={{ marginBottom: tokens.spacing.gap.lg, position: 'relative' }}>
-					<Text weight="medium" style={{ 
-						fontSize: tokens.font.size.sm,
-						color: tokens.color.text.secondary,
-						marginBottom: tokens.spacing.gap.xs 
-					}}>
-						Date
-					</Text>
-					<TouchableOpacity
-						onPress={() => setShowDatePicker(!showDatePicker)}
-						style={{
-							backgroundColor: tokens.color.surface,
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.md,
-							flexDirection: 'row',
-							alignItems: 'center',
-							borderWidth: 1,
-							borderColor: showDatePicker ? tokens.color.brand.gradient.start + '30' : tokens.color.border.default
-						}}
-					>
-						<Ionicons name="calendar" size={20} color={tokens.color.text.secondary} />
-						<Text style={{ marginLeft: tokens.spacing.gap.sm, flex: 1 }}>
-							{selectedDate.toLocaleDateString('en-US', { 
-								weekday: 'long', 
-								year: 'numeric', 
-								month: 'long', 
-								day: 'numeric' 
-							})}
-						</Text>
-						<Ionicons 
-							name={showDatePicker ? "chevron-up" : "chevron-down"} 
-							size={16} 
-							color={tokens.color.text.secondary} 
-						/>
-					</TouchableOpacity>
-
-					{/* Calendar Picker Dropdown */}
-					{showDatePicker && (
-						<View style={{
-							position: 'absolute',
-							top: '100%',
-							left: 0,
-							right: 0,
-							marginTop: 4,
-							backgroundColor: 'white',
-							borderRadius: tokens.radius.lg,
-							shadowColor: '#000',
-							shadowOffset: { width: 0, height: 2 },
-							shadowOpacity: 0.08,
-							shadowRadius: 12,
-							elevation: 6,
-							zIndex: 9999,
-							padding: tokens.spacing.gap.md
-						}}>
-							{/* Calendar Header */}
-							<View style={{
-								flexDirection: 'row',
-								alignItems: 'center',
-								justifyContent: 'space-between',
-								marginBottom: tokens.spacing.gap.md
-							}}>
-								<TouchableOpacity
-									onPress={() => navigateMonth('prev')}
-									style={{
-										padding: tokens.spacing.gap.xs,
-										borderRadius: tokens.radius.lg / 2
-									}}
-								>
-									<Ionicons name="chevron-back" size={20} color={tokens.color.text.primary} />
-								</TouchableOpacity>
-								
-								<Text style={{
-									fontSize: tokens.font.size.body,
-									fontWeight: '600',
-									color: tokens.color.text.primary
-								}}>
-									{currentCalendarMonth.toLocaleDateString('en-US', { 
-										month: 'long', 
-										year: 'numeric' 
-									})}
-								</Text>
-								
-								<TouchableOpacity
-									onPress={() => navigateMonth('next')}
-									style={{
-										padding: tokens.spacing.gap.xs,
-										borderRadius: tokens.radius.lg / 2
-									}}
-								>
-									<Ionicons name="chevron-forward" size={20} color={tokens.color.text.primary} />
-								</TouchableOpacity>
-							</View>
-
-							{/* Day Names Header */}
-							<View style={{
-								flexDirection: 'row',
-								marginBottom: tokens.spacing.gap.xs
-							}}>
-								{dayNames.map((dayName) => (
-									<View key={dayName} style={{ flex: 1, alignItems: 'center' }}>
-										<Text style={{
-											fontSize: tokens.font.size.xs,
-											fontWeight: '600',
-											color: tokens.color.text.secondary
-										}}>
-											{dayName}
-										</Text>
-									</View>
-								))}
-							</View>
-
-							{/* Calendar Grid */}
-							<View style={{
-								flexDirection: 'row',
-								flexWrap: 'wrap'
-							}}>
-								{generateCalendarDays().map((date, index) => {
-									if (!date) {
-										// Empty cell for days before the first day of the month
-										return <View key={`empty-${index}`} style={{ width: '14.28%', height: 40 }} />;
-									}
-
-									const isSelected = date.toDateString() === selectedDate.toDateString();
-									const isToday = date.toDateString() === new Date().toDateString();
-									const isPastMonth = date.getMonth() !== currentCalendarMonth.getMonth();
-
-									return (
-										<TouchableOpacity
-											key={date.toISOString()}
-											onPress={() => {
-												setSelectedDate(date);
-												setShowDatePicker(false);
-											}}
-											style={{
-												width: '14.28%',
-												height: 40,
-												alignItems: 'center',
-												justifyContent: 'center',
-												borderRadius: tokens.radius.lg / 2,
-												backgroundColor: isSelected ? tokens.color.brand.gradient.start : 'transparent',
-												marginBottom: 2
-											}}
-										>
-											<Text style={{
-												fontSize: tokens.font.size.sm,
-												fontWeight: isSelected ? '600' : '400',
-												color: isSelected ? 'white' : 
-													   isToday ? tokens.color.brand.gradient.start :
-													   isPastMonth ? tokens.color.text.secondary + '60' :
-													   tokens.color.text.primary
-											}}>
-												{date.getDate()}
-											</Text>
-											{isToday && !isSelected && (
-												<View style={{
-													position: 'absolute',
-													bottom: 4,
-													width: 4,
-													height: 4,
-													borderRadius: 2,
-													backgroundColor: tokens.color.brand.gradient.start
-												}} />
-											)}
-										</TouchableOpacity>
-									);
-								})}
-							</View>
-						</View>
-					)}
+				<View style={{ marginBottom: tokens.spacing.gap.lg }}>
+					<DatePickerField
+						selectedDate={selectedDate}
+						onDateSelect={setSelectedDate}
+						label="Date"
+					/>
 				</View>
 
 				{/* Journal Type Selection */}
@@ -656,7 +516,7 @@ export default function AddJournalScreen() {
 
 				{/* Save Button */}
 				<GradientButton 
-					title="Save Entry" 
+					title={isEditing ? "Update Entry" : "Save Entry"}
 					onPress={handleSave}
 				/>
 				</ScrollView>

@@ -746,7 +746,7 @@ export default function DashboardScreen() {
 									))}
 									
 									<TouchableOpacity
-										onPress={() => handleTilePress('GestaltLists')}
+										onPress={() => navigation.navigate('Memories' as never)}
 										style={{
 											marginTop: 15,
 											paddingVertical: 10,

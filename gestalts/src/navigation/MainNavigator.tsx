@@ -13,7 +13,6 @@ import AddJournalScreen from '../screens/AddJournalScreen';
 import AddMilestoneScreen from '../screens/AddMilestoneScreen';
 import AddGestaltScreen from '../screens/AddGestaltScreen';
 import AppointmentNoteScreen from '../screens/AppointmentNoteScreen';
-import GestaltListsScreen from '../screens/GestaltListsScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
 import ChildProfilesListScreen from '../screens/ChildProfilesListScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
@@ -86,11 +85,6 @@ const AppointmentNoteWithDrawer = () => (
   </DrawerProvider>
 );
 
-const GestaltListsWithDrawer = () => (
-  <DrawerProvider>
-    <GestaltListsScreen />
-  </DrawerProvider>
-);
 
 const ChildProfileWithDrawer = () => (
   <DrawerProvider>
@@ -178,7 +172,6 @@ export default function MainNavigator() {
       <Stack.Screen name="AddMilestone" component={AddMilestoneWithDrawer} />
       <Stack.Screen name="AddGestalt" component={AddGestaltWithDrawer} />
       <Stack.Screen name="AppointmentNote" component={AppointmentNoteWithDrawer} />
-      <Stack.Screen name="GestaltLists" component={GestaltListsWithDrawer} />
       
       {/* Profile Screens */}
       <Stack.Screen name="Profile" component={ProfileWithDrawer} />

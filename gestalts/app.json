@@ -58,6 +58,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      "expo-dev-client",
+      "@livekit/react-native-expo-plugin"
+    ]
   }
 }

@@ -66,17 +66,14 @@ class GeminiService {
       this.genAI = new GoogleGenerativeAI(apiKey);
       // Initialize different models for different tasks
       this.textModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-      // Use Gemini 2.5 Flash with Imagen 3 for image generation
+      // Use Gemini 2.5 Flash with image preview for image generation
       this.imageModel = this.genAI.getGenerativeModel({ 
-        model: 'imagen-3.0-generate-001',
-        generationConfig: {
-          responseMimeType: 'image/png'
-        }
+        model: 'gemini-2.5-flash-image-preview'
       });
       this.visionModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro-vision-latest' });
       this.initialized = true;
       console.log('✅ Gemini service initialized successfully');
-      console.log('🎨 Image generation model: imagen-3.0-generate-001 (Imagen 3)');
+      console.log('🎨 Image generation model: gemini-2.5-flash-image-preview');
       console.log('💬 Text generation model: gemini-1.5-pro');
       console.log('👁️ Vision model: gemini-1.5-pro-vision-latest');
     } catch (error) {
@@ -115,7 +112,7 @@ class GeminiService {
     try {
       this.checkInitialized();
       
-      console.log('🎨 Starting avatar generation with Imagen 3 for:', request.characterName);
+      console.log('🎨 Starting avatar generation with Gemini 2.5 Flash for:', request.characterName);
       
       // First, analyze the photo with Gemini Vision to understand the person's features
       const imagePart = {
@@ -147,7 +144,7 @@ class GeminiService {
       }
       
       try {
-        console.log('🎨 Generating Pixar-style avatar with Imagen 3...');
+        console.log('🎨 Generating Pixar-style avatar with Gemini 2.5 Flash...');
         
         // Create prompt for Imagen 3 image generation
         const imagePrompt = `Create a Pixar-style 3D animated character portrait based on: ${characterDescription}.
@@ -162,11 +159,11 @@ class GeminiService {
         
         console.log('📝 Image generation prompt:', imagePrompt);
         
-        // Generate image using Imagen 3
+        // Generate image using Gemini 2.5 Flash image preview
         const imageResult = await this.imageModel.generateContent(imagePrompt);
         const imageResponse = await imageResult.response;
         
-        console.log('📥 Imagen 3 response received');
+        console.log('📥 Gemini 2.5 Flash response received');
         
         // Extract the generated image
         if (imageResponse.candidates && imageResponse.candidates[0]) {
@@ -182,7 +179,7 @@ class GeminiService {
                 const mimeType = part.inlineData.mimeType || 'image/png';
                 const imageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
                 
-                console.log('✅ Avatar generated successfully with Imagen 3');
+                console.log('✅ Avatar generated successfully with Gemini 2.5 Flash');
                 
                 return {
                   imageUrl: imageUrl,
@@ -198,13 +195,13 @@ class GeminiService {
           }
         }
         
-        console.warn('⚠️ No image data in Imagen response, using fallback');
+        console.warn('⚠️ No image data in Gemini response, using fallback');
         // Fallback to stylized avatar
-        const fallbackUrl = await this.generateStylizedAvatar(request.characterName, null);
+        const fallbackUrl = await this.generateStylizedAvatar(request.characterName || null, null);
         return fallbackUrl;
         
       } catch (error) {
-        console.error('⚠️ Imagen 3 generation failed:', error);
+        console.error('⚠️ Gemini 2.5 Flash generation failed:', error);
         // Return a high-quality placeholder
         const fallbackUrl = await this.generateStylizedAvatar(request.characterName || 'Character', null);
         return fallbackUrl;
@@ -748,12 +745,12 @@ KEY_FEATURES: [list 3-5 distinctive features]`;
       parts[0] = enhancedPrompt;
 
       try {
-        console.log('🎨 Generating story illustration with Imagen 3...');
+        console.log('🎨 Generating story illustration with Gemini 2.5 Flash...');
         console.log(`📖 Page ${request.context?.pageNumber || 1} of ${request.context?.totalPages || 1}`);
         console.log(`🎭 Characters: ${request.context?.characterNames?.join(', ') || 'none'}`);
         console.log(`📝 Scene: ${request.prompt.substring(0, 100)}...`);
         
-        // Build a comprehensive prompt for Imagen 3
+        // Build a comprehensive prompt for Gemini 2.5 Flash
         const characterList = request.context?.characterNames?.length ? 
           `featuring ${request.context.characterNames.join(', ')}` : '';
         
@@ -774,14 +771,14 @@ KEY_FEATURES: [list 3-5 distinctive features]`;
           
           Page ${request.context?.pageNumber || 1} of ${request.context?.totalPages || 1}`;
         
-        console.log('📝 Imagen 3 prompt created');
+        console.log('📝 Gemini 2.5 Flash prompt created');
         
         try {
-          // Generate image using Imagen 3
+          // Generate image using Gemini 2.5 Flash image preview
           const imageResult = await this.imageModel.generateContent(imagePrompt);
           const imageResponse = await imageResult.response;
           
-          console.log('📥 Imagen 3 response received for story page');
+          console.log('📥 Gemini 2.5 Flash response received for story page');
           
           // Extract the generated image
           if (imageResponse.candidates && imageResponse.candidates[0]) {
@@ -797,17 +794,17 @@ KEY_FEATURES: [list 3-5 distinctive features]`;
                   const mimeType = part.inlineData.mimeType || 'image/png';
                   const imageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
                   
-                  console.log('✅ Story page illustration generated successfully with Imagen 3');
+                  console.log('✅ Story page illustration generated successfully with Gemini 2.5 Flash');
                   return imageUrl;
                 }
               }
             }
           }
           
-          console.warn('⚠️ No image data in Imagen response, using fallback');
+          console.warn('⚠️ No image data in Gemini response, using fallback');
           
         } catch (imagenError) {
-          console.error('⚠️ Imagen 3 failed for story illustration:', imagenError);
+          console.error('⚠️ Gemini 2.5 Flash failed for story illustration:', imagenError);
           
           // Return error placeholder as specified in requirements
           return this.generateErrorPlaceholder('Image generation failed, tap to retry');
