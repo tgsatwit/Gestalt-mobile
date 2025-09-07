@@ -16,6 +16,7 @@ import * as FileSystem from 'expo-file-system';
 interface StorybookState {
   // Data
   characters: Character[];
+  gestaltsCharacters: Character[];
   stories: Story[];
   
   // UI State
@@ -25,6 +26,7 @@ interface StorybookState {
   
   // Actions - Characters
   loadCharacters: () => Promise<void>;
+  loadGestaltsCharacters: () => Promise<void>;
   createCharacterFromPhoto: (photoUri: string, name: string) => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
   
@@ -56,6 +58,7 @@ export const useStorybookStore = create<StorybookState>()(
     (set, get) => ({
       // Initial state
       characters: [],
+      gestaltsCharacters: [],
       stories: [],
       currentStory: null,
       generationProgress: initialProgress,
@@ -71,6 +74,62 @@ export const useStorybookStore = create<StorybookState>()(
             error: {
               code: 'LOAD_ERROR',
               message: 'Failed to load characters',
+              details: error,
+              retryable: true
+            }
+          });
+        }
+      },
+
+      // Load Gestalts characters (from useMemoriesStore)
+      loadGestaltsCharacters: async () => {
+        try {
+          // Import dynamically to avoid circular dependency
+          const { useMemoriesStore } = await import('./useStore');
+          const memoriesStore = useMemoriesStore.getState();
+          
+          // Convert memory entries to characters
+          const gestaltsChars: Character[] = [];
+          
+          // Add characters from journal entries
+          if (memoriesStore.journal) {
+            memoriesStore.journal.forEach((entry: any) => {
+              if (entry.mood) {
+                gestaltsChars.push({
+                  id: `journal-${entry.id}`,
+                  name: `${entry.mood} Character`,
+                  avatarUrl: '', // Could be generated based on mood
+                  type: 'gestalts' as const,
+                  createdAt: new Date(entry.timestamp || Date.now()),
+                  updatedAt: new Date(entry.timestamp || Date.now()),
+                  aiAttributes: `Character representing ${entry.mood} mood`
+                });
+              }
+            });
+          }
+          
+          // Add characters from milestones
+          if (memoriesStore.milestones) {
+            memoriesStore.milestones.forEach((milestone: any) => {
+              gestaltsChars.push({
+                id: `milestone-${milestone.id}`,
+                name: milestone.title,
+                avatarUrl: '', // Could be generated
+                type: 'gestalts' as const,
+                createdAt: new Date(milestone.timestamp || Date.now()),
+                updatedAt: new Date(milestone.timestamp || Date.now()),
+                aiAttributes: milestone.description || milestone.notes || 'Achievement milestone'
+              });
+            });
+          }
+          
+          set({ gestaltsCharacters: gestaltsChars });
+        } catch (error) {
+          console.error('Failed to load Gestalts characters:', error);
+          set({ 
+            error: {
+              code: 'LOAD_ERROR',
+              message: 'Failed to load Gestalts characters',
               details: error,
               retryable: true
             }

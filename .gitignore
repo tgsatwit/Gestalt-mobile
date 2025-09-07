@@ -35,6 +35,13 @@ yarn-error.*
 .env*.local
 .env.production
 
+*.env.production
+*.env
+
+# gestalts folder env files
+gestalts/.env
+gestalts/.env.production
+
 # typescript
 *.tsbuildinfo
 eas.json

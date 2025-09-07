@@ -166,24 +166,28 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      const entryId = await memoriesService.createJournalEntry(userId, {
+      // Filter out undefined values for Firestore
+      const entryData: any = {
         content,
-        mood,
-        type,
-        childName,
-        childProfileId,
         createdAtISO: customDate || dayjs().toISOString()
-      });
+      };
+      
+      if (mood !== undefined) entryData.mood = mood;
+      if (type !== undefined) entryData.type = type;
+      if (childName !== undefined) entryData.childName = childName;
+      if (childProfileId !== undefined) entryData.childProfileId = childProfileId;
+      
+      const entryId = await memoriesService.createJournalEntry(userId, entryData);
       
       // Add to local state optimistically
       const newEntry: FirebaseJournalEntry = {
         id: entryId,
         content,
-        mood,
-        type,
-        childName,
-        childProfileId,
-        createdAtISO: customDate || dayjs().toISOString()
+        createdAtISO: customDate || dayjs().toISOString(),
+        ...(mood !== undefined && { mood }),
+        ...(type !== undefined && { type }),
+        ...(childName !== undefined && { childName }),
+        ...(childProfileId !== undefined && { childProfileId })
       };
       
       set(state => ({ 
@@ -276,21 +280,25 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      const milestoneId = await memoriesService.createMilestone(userId, {
+      // Filter out undefined values for Firestore
+      const milestoneData: any = {
         title,
-        dateISO: dateISO || dayjs().toISOString(),
-        notes,
-        childName,
-        childProfileId
-      });
+        dateISO: dateISO || dayjs().toISOString()
+      };
+      
+      if (notes !== undefined) milestoneData.notes = notes;
+      if (childName !== undefined) milestoneData.childName = childName;
+      if (childProfileId !== undefined) milestoneData.childProfileId = childProfileId;
+      
+      const milestoneId = await memoriesService.createMilestone(userId, milestoneData);
       
       const newMilestone: FirebaseMilestone = {
         id: milestoneId,
         title,
         dateISO: dateISO || dayjs().toISOString(),
-        notes,
-        childName,
-        childProfileId
+        ...(notes !== undefined && { notes }),
+        ...(childName !== undefined && { childName }),
+        ...(childProfileId !== undefined && { childProfileId })
       };
       
       set(state => ({ 
@@ -390,19 +398,23 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      const noteId = await memoriesService.createAppointmentNote(userId, {
+      // Filter out undefined values for Firestore
+      const noteData: any = {
         question,
-        specialist,
-        childProfileId,
         createdAtISO: dayjs().toISOString()
-      });
+      };
+      
+      if (specialist !== undefined) noteData.specialist = specialist;
+      if (childProfileId !== undefined) noteData.childProfileId = childProfileId;
+      
+      const noteId = await memoriesService.createAppointmentNote(userId, noteData);
       
       const newNote: FirebaseAppointmentNote = {
         id: noteId,
         question,
-        specialist,
-        childProfileId,
-        createdAtISO: dayjs().toISOString()
+        createdAtISO: dayjs().toISOString(),
+        ...(specialist !== undefined && { specialist }),
+        ...(childProfileId !== undefined && { childProfileId })
       };
       
       set(state => ({ 
@@ -424,10 +436,18 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      const noteId = await memoriesService.createAppointmentNote(userId, data);
+      // Filter out undefined values for Firestore
+      const filteredData: any = {};
+      Object.keys(data).forEach(key => {
+        if ((data as any)[key] !== undefined) {
+          filteredData[key] = (data as any)[key];
+        }
+      });
+      
+      const noteId = await memoriesService.createAppointmentNote(userId, filteredData);
       
       const newNote: FirebaseAppointmentNote = {
-        ...data,
+        ...filteredData,
         id: noteId
       };
       
@@ -526,18 +546,23 @@ export const useFirebaseMemoriesStore = create<FirebaseMemoriesState>((set, get)
     }
     
     try {
-      const gestaltData = {
+      // Filter out undefined values for Firestore
+      const gestaltData: any = {
         phrase,
         source,
         sourceType,
         stage,
         contexts,
         dateStartedISO,
-        audioData,
         createdAtISO: dayjs().toISOString(),
         childName,
         childProfileId
       };
+
+      // Only include audioData if it's not undefined
+      if (audioData !== undefined) {
+        gestaltData.audioData = audioData;
+      }
 
       const gestaltId = await memoriesService.createGestalt(userId, gestaltData);
       

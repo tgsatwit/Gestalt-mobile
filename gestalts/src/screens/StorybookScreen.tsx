@@ -4,7 +4,7 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
-import { useStorybookStore } from '../state/useStorybookStore-firebase';
+import { useStorybookStore } from '../state/useStorybookStore';
 import { useMemoriesStore } from '../state/useStore';
 import { Character, ConceptLearningRequest, StoryWizardStep } from '../types/storybook';
 import { useDrawer } from '../navigation/SimpleDrawer';
@@ -81,7 +81,7 @@ export default function StorybookScreen() {
 			narrative: 'third-person',
 			pageCount: 6,
 			complexity: 'simple',
-			communicationStyle: 'simple-and-clear',
+			communicationStyle: 'balanced',
 			tone: 'playful',
 			goal: 'Keep sentences to 10-12 words maximum, use simple vocabulary suitable for young children'
 		}
@@ -693,7 +693,7 @@ export default function StorybookScreen() {
 								)}
 								
 								<View style={{ flex: 1 }}>
-									<Text weight="semibold" size="md" style={{ color: isGenerating ? tokens.color.primary.default : tokens.color.text.primary }}>
+									<Text weight="semibold" size="body" style={{ color: isGenerating ? tokens.color.primary.default : tokens.color.text.primary }}>
 										{story.title}
 									</Text>
 									<Text color="secondary" size="sm">
@@ -1478,7 +1478,7 @@ export default function StorybookScreen() {
 														narrative: 'third-person',
 														pageCount: 6,
 														complexity: 'simple',
-														communicationStyle: 'simple-and-clear',
+														communicationStyle: 'balanced',
 														tone: 'playful',
 														goal: 'Keep sentences to 10-12 words maximum, use simple vocabulary suitable for young children'
 													}

@@ -4,6 +4,7 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
+import { VoiceTranscriptionInput } from '../components/VoiceTranscriptionInput';
 import { useMemoriesStore } from '../state/useStore';
 import { useFirebaseMemoriesStore } from '../state/useFirebaseMemoriesStore';
 import { getAuth } from 'firebase/auth';
@@ -530,7 +531,9 @@ export default function AddJournalScreen() {
 								<Text style={{ 
 									marginTop: tokens.spacing.gap.xs,
 									color: mood === m.type ? m.color : tokens.color.text.secondary,
-									fontWeight: mood === m.type ? '600' : '400'
+									fontWeight: mood === m.type ? '600' : '400',
+									fontSize: tokens.font.size.xs,
+									textAlign: 'center'
 								}}>
 									{m.label}
 								</Text>
@@ -541,36 +544,14 @@ export default function AddJournalScreen() {
 
 				{/* Journal Entry */}
 				<View style={{ marginBottom: tokens.spacing.gap.lg }}>
-					<Text weight="medium" style={{ 
-						fontSize: tokens.font.size.sm,
-						color: tokens.color.text.secondary,
-						marginBottom: tokens.spacing.gap.sm 
-					}}>
-						Today's Observations
-					</Text>
-					<TextInput
+					<VoiceTranscriptionInput
+						label="Today's Observations"
 						placeholder="What happened today? Any progress, challenges, or special moments?"
 						value={entry}
 						onChangeText={setEntry}
-						style={{
-							borderColor: tokens.color.border.default,
-							borderWidth: 1,
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.md,
-							minHeight: 150,
-							textAlignVertical: 'top',
-							fontSize: tokens.font.size.body
-						}}
-						multiline
+						minHeight={150}
+						showCharacterCount={true}
 					/>
-					<Text style={{ 
-						fontSize: tokens.font.size.xs,
-						color: tokens.color.text.secondary,
-						marginTop: tokens.spacing.gap.xs,
-						textAlign: 'right'
-					}}>
-						{entry.length} characters
-					</Text>
 				</View>
 
 				{/* Tags */}
