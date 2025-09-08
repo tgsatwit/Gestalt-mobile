@@ -1,5 +1,18 @@
 import { getFirebaseServices } from './firebaseConfig';
 import { 
+  collection, 
+  doc, 
+  addDoc, 
+  getDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy,
+  writeBatch
+} from 'firebase/firestore';
+import { 
   Specialist, 
   CreateSpecialistData, 
   UpdateSpecialistData,
@@ -61,7 +74,8 @@ class SpecialistService {
         firestoreData.notes = specialistData.notes;
       }
 
-      const docRef = await firestore.collection('specialists').add(firestoreData);
+      const specialistsCollection = collection(firestore, 'specialists');
+      const docRef = await addDoc(specialistsCollection, firestoreData);
       return docRef.id;
     } catch (error) {
       console.error('Failed to create specialist:', error);
@@ -83,11 +97,13 @@ class SpecialistService {
     }
 
     try {
-      const snapshot = await firestore
-        .collection('specialists')
-        .where('userId', '==', userId)
-        .orderBy('name')
-        .get();
+      const specialistsCollection = collection(firestore, 'specialists');
+      const q = query(
+        specialistsCollection,
+        where('userId', '==', userId),
+        orderBy('name')
+      );
+      const snapshot = await getDocs(q);
 
       const specialists: Specialist[] = [];
       snapshot.forEach((doc) => {
@@ -129,13 +145,14 @@ class SpecialistService {
     }
 
     try {
-      const doc = await firestore.collection('specialists').doc(specialistId).get();
+      const docRef = doc(firestore, 'specialists', specialistId);
+      const docSnap = await getDoc(docRef);
       
-      if (!doc.exists) {
+      if (!docSnap.exists()) {
         return null;
       }
 
-      const data = doc.data()!;
+      const data = docSnap.data();
       
       // Verify ownership
       if (data.userId !== userId) {
@@ -143,7 +160,7 @@ class SpecialistService {
       }
 
       return {
-        id: doc.id,
+        id: docSnap.id,
         name: data.name,
         title: data.title,
         organization: data.organization,
@@ -232,7 +249,8 @@ class SpecialistService {
         }
       }
 
-      await firestore.collection('specialists').doc(specialistId).update(updateData);
+      const docRef = doc(firestore, 'specialists', specialistId);
+      await updateDoc(docRef, updateData);
     } catch (error) {
       console.error('Failed to update specialist:', error);
       throw error;
@@ -260,17 +278,20 @@ class SpecialistService {
       }
 
       // Also delete all child-specialist links for this specialist
-      const linksSnapshot = await firestore
-        .collection('childSpecialistLinks')
-        .where('specialistId', '==', specialistId)
-        .where('userId', '==', userId)
-        .get();
+      const linksCollection = collection(firestore, 'childSpecialistLinks');
+      const q = query(
+        linksCollection,
+        where('specialistId', '==', specialistId),
+        where('userId', '==', userId)
+      );
+      const linksSnapshot = await getDocs(q);
 
       // Use batch delete for efficiency
-      const batch = firestore.batch();
+      const batch = writeBatch(firestore);
       
       // Delete the specialist
-      batch.delete(firestore.collection('specialists').doc(specialistId));
+      const specialistRef = doc(firestore, 'specialists', specialistId);
+      batch.delete(specialistRef);
       
       // Delete all links
       linksSnapshot.forEach((linkDoc) => {
@@ -319,7 +340,8 @@ class SpecialistService {
         firestoreData.notes = linkData.notes;
       }
 
-      const docRef = await firestore.collection('childSpecialistLinks').add(firestoreData);
+      const linksCollection = collection(firestore, 'childSpecialistLinks');
+      const docRef = await addDoc(linksCollection, firestoreData);
       return docRef.id;
     } catch (error) {
       console.error('Failed to create child-specialist link:', error);
@@ -342,11 +364,13 @@ class SpecialistService {
 
     try {
       // Get all links for this child
-      const linksSnapshot = await firestore
-        .collection('childSpecialistLinks')
-        .where('childId', '==', childId)
-        .where('userId', '==', userId)
-        .get();
+      const linksCollection = collection(firestore, 'childSpecialistLinks');
+      const q = query(
+        linksCollection,
+        where('childId', '==', childId),
+        where('userId', '==', userId)
+      );
+      const linksSnapshot = await getDocs(q);
 
       const specialists: ChildSpecialistView[] = [];
       
@@ -413,7 +437,8 @@ class SpecialistService {
         updateData.notes = updates.notes?.trim() || null;
       }
 
-      await firestore.collection('childSpecialistLinks').doc(linkId).update(updateData);
+      const docRef = doc(firestore, 'childSpecialistLinks', linkId);
+      await updateDoc(docRef, updateData);
     } catch (error) {
       console.error('Failed to update child-specialist link:', error);
       throw error;
@@ -434,7 +459,8 @@ class SpecialistService {
     }
 
     try {
-      await firestore.collection('childSpecialistLinks').doc(linkId).delete();
+      const docRef = doc(firestore, 'childSpecialistLinks', linkId);
+      await deleteDoc(docRef);
     } catch (error) {
       console.error('Failed to delete child-specialist link:', error);
       throw error;

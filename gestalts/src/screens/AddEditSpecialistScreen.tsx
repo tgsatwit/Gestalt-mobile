@@ -6,7 +6,9 @@ import {
   TextInput, 
   Alert,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Modal,
+  Pressable
 } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpecialistStore } from '../state/useSpecialistStore';
+import { useMemoriesStore } from '../state/useStore';
+import { DatePickerField } from '../components/DatePickerField';
 import specialistService from '../services/specialistService';
 import { CreateSpecialistData, UpdateSpecialistData } from '../types/specialist';
 
@@ -38,14 +42,43 @@ export default function AddEditSpecialistScreen() {
     organization: existingSpecialist?.organization || '',
     email: existingSpecialist?.email || '',
     phone: existingSpecialist?.phone || '',
-    address: existingSpecialist?.address || '',
-    specialties: existingSpecialist?.specialties || [],
     notes: existingSpecialist?.notes || '',
   });
   
-  const [specialtyInput, setSpecialtyInput] = useState('');
+  // New state for form fields
+  const [selectedProfession, setSelectedProfession] = useState(existingSpecialist?.title || '');
+  const [showProfessionDropdown, setShowProfessionDropdown] = useState(false);
+  const [customProfession, setCustomProfession] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
+  const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]);
+  const [showChildrenDropdown, setShowChildrenDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Get available children from profiles
+  const { profiles } = useMemoriesStore((s) => ({ profiles: s.profiles }));
+  const availableChildren = profiles.map(profile => ({
+    id: profile.id,
+    name: profile.childName
+  }));
+
+  // Profession options
+  const professionOptions = [
+    'Speech-Language Pathologist',
+    'Occupational Therapist', 
+    'Behavioural Therapist',
+    'Psychologist',
+    'Paediatrician',
+    'Developmental Paediatrician',
+    'Psychiatrist',
+    'Social Worker',
+    'Special Education Teacher',
+    'Music Therapist',
+    'Art Therapist',
+    'Physiotherapist',
+    'Other'
+  ];
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -54,8 +87,9 @@ export default function AddEditSpecialistScreen() {
       newErrors.name = 'Name is required';
     }
     
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title/profession is required';
+    const finalProfession = selectedProfession === 'Other' ? customProfession : selectedProfession;
+    if (!finalProfession.trim()) {
+      newErrors.profession = 'Profession is required';
     }
     
     if (formData.email && !isValidEmail(formData.email)) {
@@ -65,29 +99,45 @@ export default function AddEditSpecialistScreen() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const getSelectedChildrenText = () => {
+    if (selectedChildren.length === 0) {
+      return 'Select Children (Optional)';
+    }
+    if (selectedChildren.length === 1) {
+      return selectedChildren[0];
+    }
+    return `${selectedChildren.length} Children Selected`;
+  };
+
+  const toggleChildSelection = (childName: string, childId: string) => {
+    if (selectedChildren.includes(childName)) {
+      setSelectedChildren(prev => prev.filter(name => name !== childName));
+      setSelectedChildIds(prev => prev.filter(id => id !== childId));
+    } else {
+      setSelectedChildren(prev => [...prev, childName]);
+      setSelectedChildIds(prev => [...prev, childId]);
+    }
+  };
   
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
-  
-  const handleAddSpecialty = () => {
-    const specialty = specialtyInput.trim();
-    if (specialty && !formData.specialties?.includes(specialty)) {
-      setFormData(prev => ({
-        ...prev,
-        specialties: [...(prev.specialties || []), specialty]
-      }));
-      setSpecialtyInput('');
+
+  // Initialize form when editing
+  useEffect(() => {
+    if (existingSpecialist) {
+      // Set profession dropdown
+      if (professionOptions.includes(existingSpecialist.title)) {
+        setSelectedProfession(existingSpecialist.title);
+      } else {
+        setSelectedProfession('Other');
+        setCustomProfession(existingSpecialist.title);
+      }
     }
-  };
+  }, [existingSpecialist]);
   
-  const handleRemoveSpecialty = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      specialties: prev.specialties?.filter((_, i) => i !== index) || []
-    }));
-  };
   
   const handleSave = async () => {
     if (!validateForm()) {
@@ -103,9 +153,15 @@ export default function AddEditSpecialistScreen() {
     setLoading(true);
     
     try {
+      const finalProfession = selectedProfession === 'Other' ? customProfession : selectedProfession;
+      const specialistData = {
+        ...formData,
+        title: finalProfession,
+      };
+
       if (isEditing && specialistId) {
         // Update existing specialist
-        const updates: UpdateSpecialistData = { ...formData };
+        const updates: UpdateSpecialistData = { ...specialistData };
         await specialistService.updateSpecialist(specialistId, userId, updates);
         updateSpecialist(specialistId, updates);
         
@@ -114,12 +170,12 @@ export default function AddEditSpecialistScreen() {
         ]);
       } else {
         // Create new specialist
-        const newSpecialistId = await specialistService.createSpecialist(userId, formData);
+        const newSpecialistId = await specialistService.createSpecialist(userId, specialistData);
         
         // Add to store
         const newSpecialist = {
           id: newSpecialistId,
-          ...formData,
+          ...specialistData,
           userId,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -248,14 +304,80 @@ export default function AddEditSpecialistScreen() {
               errors.name
             )}
             
-            {renderInput(
-              'Title/Profession *',
-              formData.title,
-              (text) => setFormData(prev => ({ ...prev, title: text })),
-              'e.g., Speech-Language Pathologist, Occupational Therapist',
-              'default',
-              false,
-              errors.title
+            {/* Profession Dropdown */}
+            <View style={{ marginBottom: tokens.spacing.gap.md }}>
+              <Text weight="medium" style={{
+                fontSize: tokens.font.size.sm,
+                color: tokens.color.text.primary,
+                marginBottom: tokens.spacing.gap.xs
+              }}>
+                Profession *
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowProfessionDropdown(!showProfessionDropdown)}
+                style={{
+                  borderWidth: 1,
+                  borderColor: errors.profession ? '#EF4444' : tokens.color.border.default,
+                  borderRadius: tokens.radius.lg,
+                  paddingHorizontal: tokens.spacing.gap.md,
+                  paddingVertical: tokens.spacing.gap.sm,
+                  backgroundColor: 'white',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Text style={{
+                  fontSize: tokens.font.size.body,
+                  color: selectedProfession ? tokens.color.text.primary : tokens.color.text.secondary
+                }}>
+                  {selectedProfession || 'Select profession'}
+                </Text>
+                <Ionicons 
+                  name={showProfessionDropdown ? "chevron-up" : "chevron-down"} 
+                  size={16} 
+                  color={tokens.color.text.secondary} 
+                />
+              </TouchableOpacity>
+              {errors.profession && (
+                <Text style={{
+                  fontSize: tokens.font.size.xs,
+                  color: '#EF4444',
+                  marginTop: tokens.spacing.gap.xs
+                }}>
+                  {errors.profession}
+                </Text>
+              )}
+            </View>
+
+            {/* Custom Profession Input (when Other is selected) */}
+            {selectedProfession === 'Other' && (
+              <View style={{ marginBottom: tokens.spacing.gap.md }}>
+                <Text weight="medium" style={{
+                  fontSize: tokens.font.size.sm,
+                  color: tokens.color.text.primary,
+                  marginBottom: tokens.spacing.gap.xs
+                }}>
+                  Specify Profession *
+                </Text>
+                <TextInput
+                  value={customProfession}
+                  onChangeText={setCustomProfession}
+                  placeholder="Enter profession"
+                  style={{
+                    borderWidth: 1,
+                    borderColor: tokens.color.border.default,
+                    borderRadius: tokens.radius.lg,
+                    paddingHorizontal: tokens.spacing.gap.md,
+                    paddingVertical: tokens.spacing.gap.sm,
+                    fontSize: tokens.font.size.body,
+                    color: tokens.color.text.primary,
+                    backgroundColor: 'white',
+                    minHeight: 44
+                  }}
+                  placeholderTextColor={tokens.color.text.secondary}
+                />
+              </View>
             )}
             
             {renderInput(
@@ -264,6 +386,15 @@ export default function AddEditSpecialistScreen() {
               (text) => setFormData(prev => ({ ...prev, organization: text })),
               'Hospital, clinic, or practice name'
             )}
+
+            {/* Date Field */}
+            <View style={{ marginBottom: tokens.spacing.gap.md }}>
+              <DatePickerField
+                selectedDate={selectedDate}
+                onDateSelect={setSelectedDate}
+                label="First Appointment Date (Optional)"
+              />
+            </View>
 
             {/* Contact Information Section */}
             <Text weight="medium" style={{
@@ -289,103 +420,98 @@ export default function AddEditSpecialistScreen() {
               'Phone',
               formData.phone || '',
               (text) => setFormData(prev => ({ ...prev, phone: text })),
-              '(555) 123-4567',
+              '0412 345 678',
               'phone-pad'
             )}
-            
-            {renderInput(
-              'Address',
-              formData.address || '',
-              (text) => setFormData(prev => ({ ...prev, address: text })),
-              'Street address or general location',
-              'default',
-              true
-            )}
 
-            {/* Specialties Section */}
-            <Text weight="medium" style={{
-              fontSize: tokens.font.size.lg,
-              color: tokens.color.text.primary,
-              marginBottom: tokens.spacing.gap.md,
-              marginTop: tokens.spacing.gap.lg
-            }}>
-              Areas of Expertise
-            </Text>
-            
-            <View style={{ marginBottom: tokens.spacing.gap.md }}>
-              <View style={{ flexDirection: 'row', gap: tokens.spacing.gap.sm }}>
-                <TextInput
-                  value={specialtyInput}
-                  onChangeText={setSpecialtyInput}
-                  placeholder="Add area of expertise (e.g., Autism, ADHD)"
-                  style={{
-                    flex: 1,
-                    borderWidth: 1,
-                    borderColor: tokens.color.border.default,
-                    borderRadius: tokens.radius.lg,
-                    paddingHorizontal: tokens.spacing.gap.md,
-                    paddingVertical: tokens.spacing.gap.sm,
-                    fontSize: tokens.font.size.body,
-                    color: tokens.color.text.primary,
-                    backgroundColor: 'white',
-                    height: 44
-                  }}
-                  placeholderTextColor={tokens.color.text.secondary}
-                  returnKeyType="done"
-                  onSubmitEditing={handleAddSpecialty}
-                />
-                <TouchableOpacity
-                  onPress={handleAddSpecialty}
-                  style={{
-                    backgroundColor: tokens.color.brand.gradient.start,
-                    borderRadius: tokens.radius.lg,
-                    paddingHorizontal: tokens.spacing.gap.md,
-                    paddingVertical: tokens.spacing.gap.sm,
-                    height: 44,
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Text style={{ color: 'white', fontWeight: '500' }}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {/* Display existing specialties */}
-            {formData.specialties && formData.specialties.length > 0 && (
-              <View style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: tokens.spacing.gap.sm,
-                marginBottom: tokens.spacing.gap.lg
+            {/* Children Selection */}
+            <View style={{ marginBottom: tokens.spacing.gap.md, position: 'relative' }}>
+              <Text weight="medium" style={{
+                fontSize: tokens.font.size.sm,
+                color: tokens.color.text.primary,
+                marginBottom: tokens.spacing.gap.xs
               }}>
-                {formData.specialties.map((specialty, index) => (
-                  <View
-                    key={index}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: tokens.color.brand.gradient.start + '20',
-                      borderColor: tokens.color.brand.gradient.start,
-                      borderWidth: 1,
-                      borderRadius: tokens.radius.full,
-                      paddingHorizontal: tokens.spacing.gap.md,
-                      paddingVertical: tokens.spacing.gap.xs,
-                      gap: tokens.spacing.gap.xs
-                    }}
-                  >
-                    <Text style={{
-                      fontSize: tokens.font.size.sm,
-                      color: tokens.color.brand.gradient.start
-                    }}>
-                      {specialty}
-                    </Text>
-                    <TouchableOpacity onPress={() => handleRemoveSpecialty(index)}>
-                      <Ionicons name="close" size={16} color={tokens.color.brand.gradient.start} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+                Children
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowChildrenDropdown(!showChildrenDropdown)}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'white',
+                  paddingHorizontal: tokens.spacing.gap.md,
+                  paddingVertical: tokens.spacing.gap.sm,
+                  borderRadius: tokens.radius.lg,
+                  borderWidth: 1,
+                  borderColor: tokens.color.border.default
+                }}
+              >
+                <Text style={{
+                  fontSize: tokens.font.size.body,
+                  color: selectedChildren.length > 0 ? tokens.color.text.primary : tokens.color.text.secondary,
+                  flex: 1
+                }}>
+                  {getSelectedChildrenText()}
+                </Text>
+                <Ionicons 
+                  name={showChildrenDropdown ? "chevron-up" : "chevron-down"} 
+                  size={16} 
+                  color={tokens.color.text.secondary} 
+                />
+              </TouchableOpacity>
+              {/* Children Dropdown */}
+              {showChildrenDropdown && (
+                <View style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: 4,
+                  backgroundColor: 'white',
+                  borderRadius: tokens.radius.lg,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 12,
+                  elevation: 6,
+                  zIndex: 9999,
+                  maxHeight: 150
+                }}>
+                  <ScrollView style={{ maxHeight: 150 }}>
+                    {availableChildren.map((child, index) => (
+                      <TouchableOpacity
+                        key={child.id}
+                        onPress={() => toggleChildSelection(child.name, child.id)}
+                        activeOpacity={0.7}
+                        style={{
+                          paddingVertical: tokens.spacing.gap.xs,
+                          paddingHorizontal: tokens.spacing.gap.sm,
+                          borderBottomWidth: index !== availableChildren.length - 1 ? 0.5 : 0,
+                          borderBottomColor: 'rgba(0,0,0,0.08)',
+                          backgroundColor: selectedChildren.includes(child.name) ? tokens.color.bg.muted : 'transparent',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: tokens.font.size.sm,
+                          color: selectedChildren.includes(child.name) ? tokens.color.brand.gradient.start : tokens.color.text.secondary,
+                          fontWeight: '400'
+                        }}>
+                          {child.name}
+                        </Text>
+                        {selectedChildren.includes(child.name) && (
+                          <Ionicons name="checkmark" size={12} color={tokens.color.brand.gradient.start} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+
 
             {/* Notes Section */}
             <Text weight="medium" style={{
@@ -439,6 +565,64 @@ export default function AddEditSpecialistScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Profession Dropdown Modal */}
+        <Modal
+          transparent
+          visible={showProfessionDropdown}
+          animationType="fade"
+          onRequestClose={() => setShowProfessionDropdown(false)}
+        >
+          <Pressable 
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} 
+            onPress={() => setShowProfessionDropdown(false)}
+          >
+            <View style={{
+              position: 'absolute',
+              top: '30%',
+              left: 20,
+              right: 20,
+              backgroundColor: 'white',
+              borderRadius: tokens.radius.lg,
+              maxHeight: 300,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 8,
+              elevation: 5,
+            }}>
+              <ScrollView style={{ maxHeight: 300 }}>
+                {professionOptions.map((profession, index) => (
+                  <TouchableOpacity
+                    key={profession}
+                    onPress={() => {
+                      setSelectedProfession(profession);
+                      setShowProfessionDropdown(false);
+                      if (profession !== 'Other') {
+                        setCustomProfession('');
+                      }
+                    }}
+                    style={{
+                      paddingVertical: tokens.spacing.gap.md,
+                      paddingHorizontal: tokens.spacing.gap.lg,
+                      borderBottomWidth: index !== professionOptions.length - 1 ? 0.5 : 0,
+                      borderBottomColor: 'rgba(0,0,0,0.08)',
+                      backgroundColor: selectedProfession === profession ? tokens.color.bg.muted : 'transparent'
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: tokens.font.size.body,
+                      color: selectedProfession === profession ? tokens.color.brand.gradient.start : tokens.color.text.primary,
+                      fontWeight: selectedProfession === profession ? '500' : '400'
+                    }}>
+                      {profession}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
       </LinearGradient>
     </KeyboardAvoidingView>
   );

@@ -156,6 +156,33 @@ service cloud.firestore {
                      request.auth.uid == request.resource.data.userId;
     }
     
+    // Users can read and write their own specialists
+    match /specialists/{specialistId} {
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && 
+                     isValidUserId() &&
+                     hasValidString('name') &&
+                     hasValidString('title') &&
+                     request.resource.data.keys().hasAll(['userId', 'name', 'title']);
+    }
+    
+    // Users can read and write their own child-specialist links
+    match /childSpecialistLinks/{linkId} {
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == resource.data.userId;
+      allow update, delete: if isAuthenticated() && 
+                             request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && 
+                     isValidUserId() &&
+                     hasValidString('childId') &&
+                     hasValidString('specialistId') &&
+                     hasValidString('relationshipType') &&
+                     request.resource.data.keys().hasAll(['userId', 'childId', 'specialistId', 'relationshipType']);
+    }
+    
     // Deny all other document access
     match /{document=**} {
       allow read, write: if false;

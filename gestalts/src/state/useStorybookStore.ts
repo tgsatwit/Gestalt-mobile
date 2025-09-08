@@ -166,7 +166,7 @@ export const useStorybookStore = create<StorybookState>()(
             // Generate avatar using Gemini
             const avatarResult = await geminiService.generateAvatar({
               photoData: `data:image/jpeg;base64,${photoData}`,
-              style: 'pixar',
+              style: 'animated',
               characterName: name
             });
 
@@ -304,7 +304,7 @@ export const useStorybookStore = create<StorybookState>()(
             // Generate illustration
             const imageUrl = await geminiService.generateStoryImage({
               prompt: storyTexts[i],
-              style: 'pixar'
+              style: 'animated'
             });
 
             pages.push({

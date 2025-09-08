@@ -15,14 +15,32 @@ export interface Character {
     style: string; // Clothing and visual style notes
     personality: string; // Visual personality traits
     keyFeatures: string[]; // Distinctive features to maintain
+    // Enhanced for character mapping
+    characterRole?: 'primary' | 'secondary' | 'supporting';
+    referenceDescription?: string; // How this character appears in generated images
   };
 }
 
 export interface StoryPage {
+  id: string;
   pageNumber: number;
   text: string;
-  imageUrl: string;
+  imageUrl?: string;
   imagePrompt?: string; // The prompt used to generate this image
+  generationStatus: 'pending' | 'generating' | 'completed' | 'error';
+  characterIds?: string[]; // Characters appearing in this page
+  // Enhanced for sequential consistency
+  visualConsistencyData?: {
+    isReferenceImage?: boolean; // True for first page that serves as reference
+    characterPositions?: Record<string, string>; // Character name -> position description
+    visualStyle?: {
+      lighting: string;
+      colorPalette: string[];
+      backgroundStyle: string;
+    };
+    generationAttempts?: number;
+    refinementHistory?: string[];
+  };
 }
 
 export interface Story {
@@ -50,15 +68,30 @@ export interface Story {
 
 export interface ImageGenerationRequest {
   prompt: string;
-  style?: 'pixar' | 'watercolor' | 'cartoon' | 'realistic';
+  style?: 'animated' | 'watercolor' | 'cartoon' | 'realistic';
   referenceImages?: string[]; // Base64 or URLs of reference images
   width?: number;
   height?: number;
+  // Enhanced for sequential consistency
+  isFirstPage?: boolean;
+  referencePageImage?: string; // Base64 of first generated page for subsequent pages
+  characterMappings?: CharacterMapping[];
+}
+
+// New interface for character mapping in image generation
+export interface CharacterMapping {
+  characterId: string;
+  name: string;
+  role: 'primary' | 'secondary' | 'supporting';
+  avatarUrl?: string;
+  avatarIndex: number; // Position in image input array (0-2, respecting Gemini's 3-image limit)
+  visualDescription: string;
+  positionInReference?: string; // How character appears in reference image
 }
 
 export interface AvatarGenerationRequest {
   photoData: string; // Base64 encoded photo
-  style?: 'pixar' | 'disney' | 'anime';
+  style?: 'animated' | 'stylized' | 'anime';
   characterName?: string;
 }
 
@@ -66,6 +99,10 @@ export interface ImageRefinementRequest {
   imageUrl: string;
   refinementPrompt: string;
   pageId?: number;
+  // Enhanced for conversational editing
+  previousRefinements?: string[]; // Track refinement history
+  characterConsistencyRef?: string; // Reference image for character consistency
+  characterMappings?: CharacterMapping[]; // Character identification for consistency
 }
 
 export interface ConceptLearningRequest {

@@ -958,9 +958,27 @@ export default function DashboardScreen() {
 													}}>
 														<View style={{
 															flexDirection: 'row',
-															justifyContent: 'space-between',
-															alignItems: 'flex-start'
+															alignItems: 'flex-start',
+															gap: 12
 														}}>
+															{/* Completion Circle */}
+															<TouchableOpacity 
+																onPress={() => handleCloseAppointmentNote(note.id)}
+																style={{
+																	width: 20,
+																	height: 20,
+																	borderRadius: 10,
+																	borderWidth: 2,
+																	borderColor: '#D1D5DB',
+																	backgroundColor: 'transparent',
+																	alignItems: 'center',
+																	justifyContent: 'center',
+																	marginTop: 2
+																}}
+															>
+															</TouchableOpacity>
+
+															{/* Content */}
 															<View style={{ flex: 1 }}>
 																<Text style={{
 																	fontSize: 14,
@@ -988,16 +1006,6 @@ export default function DashboardScreen() {
 																	</Text>
 																)}
 															</View>
-															<TouchableOpacity
-																onPress={() => handleCloseAppointmentNote(note.id)}
-																style={{
-																	padding: 4,
-																	marginLeft: 8
-																}}
-																activeOpacity={0.7}
-															>
-																<Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
-															</TouchableOpacity>
 														</View>
 													</View>
 												))}

@@ -10,6 +10,14 @@ export interface ChildProfile {
   userId: string; // Link to user who created the profile
   createdAt: Date;
   updatedAt: Date;
+  // Avatar information
+  avatarUrl?: string;
+  visualProfile?: {
+    appearance: string;
+    style: string;
+    personality: string;
+    keyFeatures: string[];
+  };
 }
 
 export interface CreateChildProfileData {
@@ -20,6 +28,14 @@ export interface CreateChildProfileData {
   interests?: string[];
   challenges?: string;
   strengths?: string;
+  // Avatar information
+  avatarUrl?: string;
+  visualProfile?: {
+    appearance: string;
+    style: string;
+    personality: string;
+    keyFeatures: string[];
+  };
 }
 
 export interface UpdateChildProfileData extends Partial<CreateChildProfileData> {}

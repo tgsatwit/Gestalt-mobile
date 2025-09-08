@@ -12,7 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { getAuth } from 'firebase/auth';
-import { SpecialistService } from '../services/specialistService';
+import SpecialistService from '../services/specialistService';
 import { Specialist } from '../types/specialist';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -107,14 +107,14 @@ export default function MemoriesScreen() {
 
 	// Load specialist profiles
 	useEffect(() => {
-		if (user?.uid) {
+		if (user?.id) {
 			setLoadingSpecialistProfiles(true);
-			SpecialistService.getUserSpecialists(user.uid)
+			SpecialistService.getUserSpecialists(user.id)
 				.then(setSpecialistProfiles)
-				.catch(error => console.error('Failed to load specialist profiles:', error))
+				.catch((error: Error) => console.error('Failed to load specialist profiles:', error))
 				.finally(() => setLoadingSpecialistProfiles(false));
 		}
-	}, [user?.uid]);
+	}, [user?.id]);
 	
 	// Get unique specialists and children (combine appointment specialists with specialist profiles)
 	const availableSpecialists = [...new Set([

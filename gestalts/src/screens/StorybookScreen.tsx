@@ -68,7 +68,7 @@ export default function StorybookScreen() {
 	const [avatarStep, setAvatarStep] = useState('upload'); // upload, generating, review
 	const [storyWizardStep, setStoryWizardStep] = useState<StoryWizardStep>('child-concept');
 	// Get user's child profile from memories store
-	const { profile } = useMemoriesStore();
+	const { profile, profiles, createChildAvatar, profileLoading } = useMemoriesStore();
 	
 	// Form states for GLP workflow
 	const [conceptLearning, setConceptLearning] = useState<ConceptLearningRequest>({
@@ -247,7 +247,7 @@ export default function StorybookScreen() {
 			const avatarResult = await geminiService.generateAvatar({
 				photoData: base64Photo,
 				characterName: characterName || 'Character',
-				style: 'pixar'
+				style: 'animated'
 			});
 			
 			console.log('✅ Avatar generation completed:', typeof avatarResult);
@@ -373,7 +373,7 @@ export default function StorybookScreen() {
 					setting: 'A warm, child-friendly environment',
 					mood: conceptLearning.advanced?.tone || 'gentle',
 					colorPalette: ['warm', 'bright', 'friendly'],
-					visualStyle: 'Pixar-style 3D animation'
+					visualStyle: '3D animated style'
 				}
 			}));
 
@@ -520,7 +520,7 @@ export default function StorybookScreen() {
 					setting: 'A warm, child-friendly environment',
 					mood: conceptLearning.advanced?.tone || 'gentle',
 					colorPalette: ['warm', 'bright', 'friendly'],
-					visualStyle: 'Pixar-style 3D animation'
+					visualStyle: '3D animated style'
 				}
 			}));
 
@@ -892,13 +892,78 @@ export default function StorybookScreen() {
 				<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
 					Create and manage personalized avatars for your stories.
 				</Text>
-				<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg * 2 }}>
-					{characters.map((char: Character) => (
-						<View key={char.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
-							<Image source={{ uri: char.avatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
-							<Text weight="medium">{char.name}</Text>
+				
+				{/* Child Profiles Section */}
+				{profiles.length > 0 && (
+					<>
+						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.default }}>Child Profiles</Text>
+						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
+							{profiles.map((childProfile) => (
+								<View key={childProfile.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+									{childProfile.avatarUrl ? (
+										<Image 
+											source={{ uri: childProfile.avatarUrl }} 
+											style={{ 
+												width: 100, 
+												height: 100, 
+												borderRadius: 50,
+												borderWidth: 3,
+												borderColor: tokens.color.primary.default 
+											}} 
+										/>
+									) : (
+										<TouchableOpacity 
+											onPress={() => {
+												resetProgress();
+												setCharacterName(childProfile.childName);
+												setSelectedPhoto(null);
+												setGeneratedAvatar(null);
+												setAvatarStep('upload');
+												setAvatarModalVisible(true);
+												// Store the child profile ID for avatar creation
+												(global as any).currentChildProfileId = childProfile.id;
+											}}
+											style={{
+												width: 100,
+												height: 100,
+												borderRadius: 50,
+												backgroundColor: tokens.color.surface,
+												borderWidth: 2,
+												borderColor: tokens.color.primary.default,
+												borderStyle: 'dashed',
+												alignItems: 'center',
+												justifyContent: 'center'
+											}}
+										>
+											<Ionicons name="person-add" size={24} color={tokens.color.primary.default} />
+											<Text size="xs" color="primary" style={{ textAlign: 'center' }}>Add Avatar</Text>
+										</TouchableOpacity>
+									)}
+									<Text weight="medium" size="sm">{childProfile.childName}</Text>
+									<Text size="xs" color="secondary">Child Profile</Text>
+								</View>
+							))}
 						</View>
-					))}
+					</>
+				)}
+				
+				{/* Custom Characters Section */}
+				{characters.length > 0 && (
+					<>
+						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.default }}>Custom Characters</Text>
+						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
+							{characters.map((char: Character) => (
+								<View key={char.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+									<Image source={{ uri: char.avatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+									<Text weight="medium">{char.name}</Text>
+								</View>
+							))}
+						</View>
+					</>
+				)}
+				
+				{/* Add New Character Button */}
+				<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg * 2 }}>
 					<TouchableOpacity onPress={() => {
 						resetProgress();
 						setCharacterName('');
@@ -906,6 +971,8 @@ export default function StorybookScreen() {
 						setGeneratedAvatar(null);
 						setAvatarStep('upload');
 						setAvatarModalVisible(true);
+						// Clear any child profile ID
+						(global as any).currentChildProfileId = undefined;
 					}} style={{
 						width: 100,
 						height: 100,
@@ -918,6 +985,7 @@ export default function StorybookScreen() {
 						justifyContent: 'center'
 					}}>
 						<Ionicons name="add" size={32} color={tokens.color.text.secondary} />
+						<Text size="xs" color="secondary" style={{ textAlign: 'center' }}>New Character</Text>
 					</TouchableOpacity>
 				</View>
 
@@ -979,7 +1047,7 @@ export default function StorybookScreen() {
 					
 					{avatarStep === 'upload' && (
 						<>
-							<RNText style={{ color: tokens.color.text.secondary, textAlign: 'center', marginBottom: tokens.spacing.gap.lg }}>Take a photo or select from your gallery to generate a Pixar-style avatar.</RNText>
+							<RNText style={{ color: tokens.color.text.secondary, textAlign: 'center', marginBottom: tokens.spacing.gap.lg }}>Take a photo or select from your gallery to generate an animated avatar.</RNText>
 							
 							{/* Photo Selection Options */}
 							<View style={{ flexDirection: 'row', gap: 12, marginBottom: tokens.spacing.gap.lg }}>
@@ -1133,10 +1201,38 @@ export default function StorybookScreen() {
 											console.log('💾 Saving character to store:', characterName.trim());
 											console.log('🖼️ Using avatar URL:', generatedAvatar);
 											
-											// Create character using the generated avatar URL directly
-											const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+											// Check if this is for a child profile
+											const childProfileId = (global as any).currentChildProfileId;
 											
-											console.log('✅ Character created successfully:', newCharacter.name);
+											if (childProfileId) {
+												// This is for a child profile - save avatar to child profile
+												console.log('🧒 Saving avatar to child profile:', childProfileId);
+												
+												// Get user ID (you may need to add this to your auth system)
+												const userId = 'current-user-id'; // TODO: Get from auth system
+												
+												await createChildAvatar(childProfileId, userId, generatedAvatar);
+												console.log('✅ Child profile avatar saved successfully');
+												
+												Alert.alert(
+													'Avatar Created!', 
+													`Avatar for ${characterName.trim()} has been saved to their profile.`,
+													[{ text: 'Great!' }]
+												);
+											} else {
+												// This is for a custom character
+												const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+												console.log('✅ Character created successfully:', newCharacter.name);
+												
+												// Reload characters to show the new one
+												await loadCharacters();
+												
+												Alert.alert(
+													'Character Created!', 
+													`${newCharacter.name} is now ready to appear in your stories!`,
+													[{ text: 'Great!' }]
+												);
+											}
 											
 											// Reset state and close modal
 											setAvatarModalVisible(false); 
@@ -1144,16 +1240,9 @@ export default function StorybookScreen() {
 											setCharacterName('');
 											setSelectedPhoto(null);
 											setGeneratedAvatar(null);
+											// Clear the child profile ID
+											(global as any).currentChildProfileId = undefined;
 											
-											// Reload characters to show the new one
-											await loadCharacters();
-											
-											// Show success message
-											Alert.alert(
-												'Character Created!', 
-												`${newCharacter.name} is now ready to appear in your stories!`,
-												[{ text: 'Great!' }]
-											);
 										} catch (error) {
 											console.error('❌ Failed to save character:', error);
 											Alert.alert(
@@ -2116,7 +2205,7 @@ export default function StorybookScreen() {
 											
 											// Generate story summary and context from edited content
 											const summary = `${conceptLearning.title}: A learning story about ${conceptLearning.concept} for ${profile?.childName || 'a child'}`;
-											const imageContext = `Child-friendly Pixar-style illustrations for a story teaching ${conceptLearning.concept}`;
+											const imageContext = `Child-friendly animated illustrations for a story teaching ${conceptLearning.concept}`;
 											
 											setConceptLearning({
 												...conceptLearning,

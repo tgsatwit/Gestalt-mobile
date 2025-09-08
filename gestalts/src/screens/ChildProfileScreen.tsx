@@ -250,28 +250,15 @@ export default function ChildProfileScreen() {
 					</View>
 					
 					{/* Right Side Controls */}
-					<View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.gap.sm }}>
-						{/* Settings Button */}
-						<TouchableOpacity
-							activeOpacity={0.7}
-							style={{
-								padding: 6
-							}}
-						>
-							<Ionicons name="ellipsis-horizontal" size={18} color="white" />
-						</TouchableOpacity>
-
-						{/* Close Button */}
-						<TouchableOpacity
-							onPress={() => (navigation as any).navigate('Dashboard')}
-							activeOpacity={0.7}
-							style={{
-								padding: 6
-							}}
-						>
-							<Ionicons name="close" size={18} color="white" />
-						</TouchableOpacity>
-					</View>
+					<TouchableOpacity
+						onPress={() => (navigation as any).navigate('Dashboard')}
+						activeOpacity={0.7}
+						style={{
+							padding: 6
+						}}
+					>
+						<Ionicons name="close" size={18} color="white" />
+					</TouchableOpacity>
 				</View>
 			</View>
 

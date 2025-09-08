@@ -56,6 +56,8 @@ export type MemoriesState = {
 	deleteProfile: (profileId: string, userId: string) => Promise<void>;
 	setCurrentProfile: (profile: FirebaseChildProfile | null) => void;
 	clearProfileError: () => void;
+	// Avatar operations for child profiles
+	createChildAvatar: (profileId: string, userId: string, photoData: string) => Promise<void>;
 };
 
 const generateId = () => Math.random().toString(36).slice(2);
@@ -199,6 +201,47 @@ export const useMemoriesStore = create<MemoriesState>()(
 			
 			clearProfileError: () => {
 				set({ profileError: null });
+			},
+			
+			createChildAvatar: async (profileId: string, userId: string, photoData: string) => {
+				set({ profileLoading: true, profileError: null });
+				try {
+					// Import geminiService dynamically to avoid circular dependency
+					const { default: geminiService } = await import('../services/geminiService');
+					
+					// Get the current profile to extract name
+					const currentProfiles = get().profiles;
+					const targetProfile = currentProfiles.find(p => p.id === profileId);
+					if (!targetProfile) {
+						throw new Error('Profile not found');
+					}
+					
+					// Generate avatar using Gemini with exact likeness
+					const avatarResult = await geminiService.generateAvatar({
+						photoData: photoData,
+						characterName: targetProfile.childName,
+						style: 'animated'
+					});
+					
+					// Handle both string and object return types
+					const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+					const visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+					
+					// Update the profile with avatar information
+					const updates: UpdateChildProfileData = {
+						avatarUrl: avatarUrl,
+						visualProfile: visualProfile
+					};
+					
+					await get().updateProfile(profileId, userId, updates);
+					
+					set({ profileLoading: false });
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Failed to create avatar';
+					set({ profileError: errorMessage, profileLoading: false });
+					console.error('Failed to create child avatar:', error);
+					throw error;
+				}
 			},
 		}),
 		{

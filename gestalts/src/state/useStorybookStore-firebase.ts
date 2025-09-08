@@ -312,7 +312,7 @@ export const useStorybookStore = create<StorybookState>()(
             set({ 
               generationProgress: {
                 status: 'generating',
-                message: `Creating Pixar-style avatar for ${name}...`,
+                message: `Creating animated avatar for ${name}...`,
                 progress: 30
               }
             });
@@ -320,7 +320,7 @@ export const useStorybookStore = create<StorybookState>()(
             // Generate avatar using Gemini with visual profile extraction
             avatarResult = await geminiService.generateAvatar({
               photoData: `data:image/jpeg;base64,${photoData}`,
-              style: 'pixar',
+              style: 'animated',
               characterName: name
             });
             
@@ -355,12 +355,12 @@ export const useStorybookStore = create<StorybookState>()(
             visualProfile: visualProfile ? {
               ...visualProfile,
               // Ensure all required fields are present for story generation
-              appearance: visualProfile.appearance || `${name} has warm, expressive Pixar-style features perfect for storytelling`,
+              appearance: visualProfile.appearance || `${name} has warm, expressive animated features perfect for storytelling`,
               style: visualProfile.style || 'Consistent, child-friendly design with memorable visual elements',
               personality: visualProfile.personality || 'Engaging, approachable personality that connects with children',
               keyFeatures: visualProfile.keyFeatures || ['Distinctive appearance', 'Expressive features', 'Consistent design', 'Child-friendly appeal']
             } : {
-              appearance: `${name} has warm, expressive Pixar-style features perfect for storytelling`,
+              appearance: `${name} has warm, expressive animated features perfect for storytelling`,
               style: 'Consistent, child-friendly design with memorable visual elements',
               personality: 'Engaging, approachable personality that connects with children',
               keyFeatures: ['Distinctive appearance', 'Expressive features', 'Consistent design', 'Child-friendly appeal']
@@ -592,7 +592,7 @@ export const useStorybookStore = create<StorybookState>()(
             set({ 
               generationProgress: {
                 status: 'generating',
-                message: `Creating Pixar-style illustration for page ${i + 1}... (${pageContext.pageRole})`,
+                message: `Creating animated illustration for page ${i + 1}... (${pageContext.pageRole})`,
                 progress: pageProgress,
                 currentPage: i + 1,
                 totalPages: storyTexts.length
@@ -636,7 +636,7 @@ export const useStorybookStore = create<StorybookState>()(
             // Generate illustration with comprehensive context and narrative understanding
             const imageUrl = await geminiService.generateStoryImage({
               prompt: `${narrativeContext.currentPageText} [Page Context: ${pageContext.pageRole} - ${pageContext.visualEmphasis}]`,
-              style: 'pixar',
+              style: 'animated',
               referenceImages,
               context: {
                 concept: request.concept,

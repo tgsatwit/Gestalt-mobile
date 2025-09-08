@@ -167,17 +167,15 @@ export default function ChildProfilesListScreen() {
 						</Text>
 					</View>
 					
-					{/* Add Profile Button */}
+					{/* Close Button */}
 					<TouchableOpacity
-						onPress={() => navigation.navigate('ChildProfile')}
+						onPress={() => navigation.navigate('Dashboard')}
+						activeOpacity={0.7}
 						style={{
-							backgroundColor: 'rgba(255,255,255,0.2)',
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.sm,
-							marginLeft: tokens.spacing.gap.md
+							padding: 6
 						}}
 					>
-						<Ionicons name="add" size={20} color="white" />
+						<Ionicons name="close" size={18} color="white" />
 					</TouchableOpacity>
 				</View>
 			</View>

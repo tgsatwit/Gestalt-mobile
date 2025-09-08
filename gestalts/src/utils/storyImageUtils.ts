@@ -3,7 +3,7 @@
  * Helper functions for creating consistent, narrative-driven images
  */
 
-import { Character } from '../types/storybook';
+import { Character, CharacterMapping } from '../types/storybook';
 
 export interface StoryImageContext {
   concept?: string;
@@ -37,9 +37,10 @@ export interface StoryImageContext {
 }
 
 /**
- * Build character profiles optimized for visual consistency
+ * Build character mappings optimized for Gemini 2.5 Flash (max 3 avatars)
+ * Priority: Primary character -> Secondary characters -> Supporting characters
  */
-export function buildCharacterProfiles(
+export function buildCharacterMappings(
   characters: Character[],
   characterIds: string[],
   childProfile?: {
@@ -47,14 +48,8 @@ export function buildCharacterProfiles(
     name: string;
     includeAsCharacter: boolean;
   }
-): Array<{
-  name: string;
-  appearance: string;
-  style: string;
-  keyFeatures: string[];
-  avatarUrl?: string;
-}> {
-  console.log('buildCharacterProfiles called with:');
+): CharacterMapping[] {
+  console.log('buildCharacterMappings called with:');
   console.log('  - Available characters:', characters.map(c => ({ id: c.id, name: c.name, type: c.type })));
   console.log('  - Character IDs to select:', characterIds);
   console.log('  - Child profile:', childProfile);
@@ -65,40 +60,77 @@ export function buildCharacterProfiles(
   
   console.log('  - Selected characters:', selectedCharacters.map(c => ({ id: c.id, name: c.name, type: c.type })));
 
-  const characterProfiles = selectedCharacters.map(char => ({
-    name: char.name,
-    appearance: char.visualProfile?.appearance || 
-      `${char.name} has distinctive Pixar-style features with warm, expressive characteristics suitable for children's storytelling`,
-    style: char.visualProfile?.style || 
-      'Child-friendly design with consistent visual identity that maintains recognition across all story pages',
-    keyFeatures: char.visualProfile?.keyFeatures || [
-      'Memorable facial features',
-      'Consistent color scheme',
-      'Expressive personality',
-      'Child-appropriate design'
-    ],
-    avatarUrl: char.avatarUrl
-  }));
+  // Start building character mappings with priority system
+  const characterMappings: CharacterMapping[] = [];
+  let avatarIndex = 0;
 
-  // Add child profile if included as character
-  if (childProfile?.includeAsCharacter) {
-    console.log('  - Adding child profile:', childProfile.name);
-    characterProfiles.push({
+  // Priority 1: Child profile (always primary if included)
+  if (childProfile?.includeAsCharacter && avatarIndex < 3) {
+    console.log('  - Adding child profile as primary character:', childProfile.name);
+    characterMappings.push({
+      characterId: childProfile.id,
       name: childProfile.name,
-      appearance: `${childProfile.name} has warm, child-friendly Pixar-style features that embody curiosity and joy`,
-      style: 'Age-appropriate design that appeals to children and represents the learning journey',
-      keyFeatures: [
-        'Bright, curious eyes',
-        'Friendly, approachable demeanor',
-        'Expressive gestures',
-        'Natural, engaging personality'
-      ],
-      avatarUrl: '' // Child profiles are generated from description
+      role: 'primary',
+      avatarIndex: avatarIndex++,
+      visualDescription: `${childProfile.name} has warm, child-friendly Pixar-style features that embody curiosity and joy`,
+      avatarUrl: undefined // Child profiles are description-based
     });
   }
+
+  // Priority 2: Characters with avatars (visual references available)
+  const charactersWithAvatars = selectedCharacters.filter(char => char.avatarUrl && char.avatarUrl.length > 0);
+  const charactersWithoutAvatars = selectedCharacters.filter(char => !char.avatarUrl || char.avatarUrl.length === 0);
+
+  // Add characters with avatars first (up to remaining slots)
+  for (const char of charactersWithAvatars) {
+    if (avatarIndex >= 3) break; // Gemini 2.5 Flash limit
+
+    const role = avatarIndex === 0 ? 'primary' : avatarIndex === 1 ? 'secondary' : 'supporting';
+    
+    characterMappings.push({
+      characterId: char.id,
+      name: char.name,
+      role,
+      avatarUrl: char.avatarUrl,
+      avatarIndex: avatarIndex++,
+      visualDescription: char.visualProfile?.appearance || 
+        `${char.name} has distinctive Pixar-style features with warm, expressive characteristics suitable for children's storytelling`
+    });
+  }
+
+  // Priority 3: Characters without avatars (description-based, remaining slots)
+  for (const char of charactersWithoutAvatars) {
+    if (avatarIndex >= 3) {
+      // Add as description-only characters (no avatar slot)
+      characterMappings.push({
+        characterId: char.id,
+        name: char.name,
+        role: 'supporting',
+        avatarIndex: -1, // No avatar reference
+        visualDescription: char.visualProfile?.appearance || 
+          `${char.name} should be generated as a Pixar-style character with distinctive, child-friendly features`
+      });
+    } else {
+      const role = avatarIndex === 0 ? 'primary' : avatarIndex === 1 ? 'secondary' : 'supporting';
+      characterMappings.push({
+        characterId: char.id,
+        name: char.name,
+        role,
+        avatarIndex: avatarIndex++,
+        visualDescription: char.visualProfile?.appearance || 
+          `${char.name} should be generated as a Pixar-style character with distinctive, child-friendly features`
+      });
+    }
+  }
   
-  console.log('  - Final character profiles:', characterProfiles.map(cp => ({ name: cp.name, hasAvatar: !!cp.avatarUrl })));
-  return characterProfiles;
+  console.log('  - Final character mappings:', characterMappings.map(cm => ({ 
+    name: cm.name, 
+    role: cm.role,
+    hasAvatar: !!cm.avatarUrl,
+    avatarIndex: cm.avatarIndex
+  })));
+  
+  return characterMappings;
 }
 
 /**
@@ -207,33 +239,96 @@ export function buildStoryContextDescription(
 }
 
 /**
- * Determine optimal reference image processing based on character count and avatar availability
+ * Build explicit character identification prompts for Gemini 2.5 Flash
  */
-export function optimizeReferenceImages(
-  characterProfiles: Array<{
-    name: string;
-    appearance: string;
-    style: string;
-    keyFeatures: string[];
-    avatarUrl?: string;
-  }>
+export function buildCharacterIdentificationPrompts(
+  characterMappings: CharacterMapping[],
+  isFirstPage: boolean = true
 ): {
-  charactersWithAvatars: typeof characterProfiles;
-  charactersWithoutAvatars: typeof characterProfiles;
-  totalReferencesAvailable: number;
+  avatarReferences: string[];
+  characterInstructions: string[];
+  totalAvatarInputs: number;
 } {
-  const charactersWithAvatars = characterProfiles.filter(char => 
-    char.avatarUrl && char.avatarUrl.length > 0
-  );
+  const avatarReferences: string[] = [];
+  const characterInstructions: string[] = [];
   
-  const charactersWithoutAvatars = characterProfiles.filter(char => 
-    !char.avatarUrl || char.avatarUrl.length === 0
-  );
+  // Get only characters with actual avatar references (≤3)
+  const charactersWithAvatars = characterMappings
+    .filter(cm => cm.avatarUrl && cm.avatarIndex >= 0)
+    .sort((a, b) => a.avatarIndex - b.avatarIndex); // Ensure correct order
+
+  charactersWithAvatars.forEach((char, index) => {
+    avatarReferences.push(`AVATAR REFERENCE ${index + 1}: ${char.name} (${char.role} character)`);
+    
+    if (isFirstPage) {
+      characterInstructions.push(
+        `- The ${char.role} character is ${char.name}: ${char.visualDescription}`
+      );
+    } else {
+      characterInstructions.push(
+        `- ${char.name} appears in the reference image as: ${char.positionInReference || 'the ' + char.role + ' character'}`
+      );
+    }
+  });
+
+  // Add description-only characters
+  const descriptionOnlyCharacters = characterMappings.filter(cm => cm.avatarIndex === -1);
+  descriptionOnlyCharacters.forEach(char => {
+    characterInstructions.push(
+      `- ${char.name} (${char.role} character, generate from description): ${char.visualDescription}`
+    );
+  });
 
   return {
-    charactersWithAvatars,
-    charactersWithoutAvatars,
-    totalReferencesAvailable: charactersWithAvatars.length
+    avatarReferences,
+    characterInstructions,
+    totalAvatarInputs: charactersWithAvatars.length
+  };
+}
+
+/**
+ * Create reference image context for subsequent page generation
+ */
+export function buildReferenceImageContext(
+  firstPageImageData: string,
+  characterMappings: CharacterMapping[]
+): {
+  referenceDescription: string;
+  characterPositionMappings: Record<string, string>;
+} {
+  // Update character mappings with positions from first image
+  const characterPositionMappings: Record<string, string> = {};
+  
+  characterMappings.forEach(char => {
+    // In production, this would be enhanced with actual character position detection
+    // For now, provide basic position guidance based on role
+    let position = '';
+    switch (char.role) {
+      case 'primary':
+        position = 'the main character in the center or prominent position';
+        break;
+      case 'secondary':
+        position = 'the secondary character, often positioned to the side or as a companion';
+        break;
+      case 'supporting':
+        position = 'the supporting character in the background or scene context';
+        break;
+    }
+    
+    characterPositionMappings[char.name] = position;
+    
+    // Update the character mapping for future use
+    char.positionInReference = position;
+  });
+
+  const referenceDescription = `This reference image from page 1 shows all characters in their established visual style. ` +
+    `Use this as the template for character consistency: ${characterMappings.map(cm => 
+      `${cm.name} (${cm.positionInReference})`
+    ).join(', ')}.`;
+
+  return {
+    referenceDescription,
+    characterPositionMappings
   };
 }
 

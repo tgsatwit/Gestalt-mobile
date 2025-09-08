@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth } from 'firebase/auth';
+import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore, initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Firebase config from Expo extra with fallback to defaults
@@ -35,9 +36,11 @@ export const initializeFirebase = () => {
       firebaseApp = getApp();
     }
 
-    // Initialize Auth
+    // Initialize Auth with AsyncStorage persistence
     try {
-      auth = initializeAuth(firebaseApp);
+      auth = initializeAuth(firebaseApp, {
+        persistence: getReactNativePersistence(AsyncStorage)
+      });
     } catch (error) {
       // If auth is already initialized, get the existing instance
       auth = getAuth(firebaseApp);

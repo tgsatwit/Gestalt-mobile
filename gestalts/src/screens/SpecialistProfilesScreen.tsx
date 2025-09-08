@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, Pressable } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpecialistStore } from '../state/useSpecialistStore';
@@ -14,7 +16,7 @@ import specialistService from '../services/specialistService';
 export default function SpecialistProfilesScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
-	const navigation = useNavigation();
+	const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
 	const { getCurrentUserId } = useAuth();
 	const { 
 		specialists, 
@@ -25,6 +27,8 @@ export default function SpecialistProfilesScreen() {
 	} = useSpecialistStore();
 	
 	const [refreshing, setRefreshing] = useState(false);
+	const [dropdownVisible, setDropdownVisible] = useState<string | null>(null);
+	const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
 
 	const loadData = async (showRefreshing = false) => {
 		const userId = getCurrentUserId();
@@ -134,17 +138,15 @@ export default function SpecialistProfilesScreen() {
 						</Text>
 					</View>
 					
-					{/* Add Specialist Button */}
+					{/* Close Button */}
 					<TouchableOpacity
-						onPress={handleAddSpecialist}
+						onPress={() => navigation.goBack()}
+						activeOpacity={0.7}
 						style={{
-							backgroundColor: 'rgba(255,255,255,0.2)',
-							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.sm,
-							marginLeft: tokens.spacing.gap.md
+							padding: 6
 						}}
 					>
-						<Ionicons name="add" size={20} color="white" />
+						<Ionicons name="close" size={18} color="white" />
 					</TouchableOpacity>
 				</View>
 			</View>
@@ -162,6 +164,7 @@ export default function SpecialistProfilesScreen() {
 						<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
 					}
 				>
+
 					{/* Error Display */}
 					{error && (
 						<View style={{
@@ -301,16 +304,10 @@ export default function SpecialistProfilesScreen() {
 
 								{/* Actions Menu */}
 								<TouchableOpacity
-									onPress={() => {
-										Alert.alert(
-											'Specialist Actions',
-											`What would you like to do with ${specialist.name}'s profile?`,
-											[
-												{ text: 'Cancel', style: 'cancel' },
-												{ text: 'Edit', onPress: () => handleEditSpecialist(specialist) },
-												{ text: 'Delete', style: 'destructive', onPress: () => handleDeleteSpecialist(specialist) }
-											]
-										);
+									onPress={(event) => {
+										const { pageY } = event.nativeEvent;
+										setDropdownPosition({ top: pageY + 10, right: 20 });
+										setDropdownVisible(specialist.id);
 									}}
 									style={{ padding: tokens.spacing.gap.xs }}
 								>
@@ -318,12 +315,14 @@ export default function SpecialistProfilesScreen() {
 								</TouchableOpacity>
 							</View>
 
-							{/* Details Card */}
-							<View style={{
-								backgroundColor: tokens.color.bg.muted,
-								borderRadius: tokens.radius.lg,
-								padding: tokens.spacing.gap.md
-							}}>
+							{/* Details - Only show if there's actual content */}
+							{(specialist.organization || specialist.email || specialist.phone || 
+							  (specialist.specialties && specialist.specialties.length > 0)) && (
+								<View style={{
+									backgroundColor: tokens.color.bg.muted,
+									borderRadius: tokens.radius.lg,
+									padding: tokens.spacing.gap.md
+								}}>
 								{/* Organization */}
 								{specialist.organization && (
 									<View style={{
@@ -373,8 +372,7 @@ export default function SpecialistProfilesScreen() {
 								{specialist.specialties && specialist.specialties.length > 0 && (
 									<View style={{
 										flexDirection: 'row',
-										alignItems: 'center',
-										marginBottom: tokens.spacing.gap.sm
+										alignItems: 'center'
 									}}>
 										<Ionicons 
 											name="star" 
@@ -392,52 +390,9 @@ export default function SpecialistProfilesScreen() {
 										</Text>
 									</View>
 								)}
-
-								{/* Updated Date */}
-								<View style={{
-									flexDirection: 'row',
-									alignItems: 'center'
-								}}>
-									<Ionicons 
-										name="time" 
-										size={16} 
-										color={tokens.color.text.secondary}
-										style={{ marginRight: tokens.spacing.gap.sm }}
-									/>
-									<Text style={{
-										fontSize: tokens.font.size.xs,
-										color: tokens.color.text.secondary
-									}}>
-										Updated {specialist.updatedAt.toLocaleDateString()}
-									</Text>
-								</View>
 							</View>
+						)}
 
-							{/* Quick Actions */}
-							<View style={{
-								flexDirection: 'row',
-								justifyContent: 'flex-end',
-								marginTop: tokens.spacing.gap.md,
-								gap: tokens.spacing.gap.sm
-							}}>
-								<TouchableOpacity
-									onPress={() => handleEditSpecialist(specialist)}
-									style={{
-										backgroundColor: tokens.color.brand.gradient.start,
-										borderRadius: tokens.radius.lg,
-										paddingHorizontal: tokens.spacing.gap.md,
-										paddingVertical: tokens.spacing.gap.sm
-									}}
-								>
-									<Text style={{
-										fontSize: tokens.font.size.sm,
-										color: 'white',
-										fontWeight: '500'
-									}}>
-										Edit Profile
-									</Text>
-								</TouchableOpacity>
-							</View>
 						</TouchableOpacity>
 					))}
 
@@ -514,6 +469,70 @@ export default function SpecialistProfilesScreen() {
 			</TouchableOpacity>
 
 			<BottomNavigation />
+
+			{/* Dropdown Menu Modal */}
+			<Modal
+				transparent
+				visible={dropdownVisible !== null}
+				animationType="fade"
+				onRequestClose={() => setDropdownVisible(null)}
+			>
+				<Pressable 
+					style={{ flex: 1 }} 
+					onPress={() => setDropdownVisible(null)}
+				>
+					<View style={{
+						position: 'absolute',
+						top: dropdownPosition.top,
+						right: dropdownPosition.right,
+						backgroundColor: 'white',
+						borderRadius: tokens.radius.lg,
+						shadowColor: '#000',
+						shadowOffset: { width: 0, height: 2 },
+						shadowOpacity: 0.25,
+						shadowRadius: 8,
+						elevation: 5,
+						minWidth: 150
+					}}>
+						<TouchableOpacity
+							onPress={() => {
+								const specialist = specialists.find(s => s.id === dropdownVisible);
+								if (specialist) {
+									handleEditSpecialist(specialist);
+								}
+								setDropdownVisible(null);
+							}}
+							style={{
+								paddingHorizontal: tokens.spacing.gap.md,
+								paddingVertical: tokens.spacing.gap.sm,
+								borderBottomWidth: 1,
+								borderBottomColor: tokens.color.border.default
+							}}
+						>
+							<Text style={{ fontSize: tokens.font.size.body, color: tokens.color.text.primary }}>
+								View/Edit
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => {
+								const specialist = specialists.find(s => s.id === dropdownVisible);
+								if (specialist) {
+									handleDeleteSpecialist(specialist);
+								}
+								setDropdownVisible(null);
+							}}
+							style={{
+								paddingHorizontal: tokens.spacing.gap.md,
+								paddingVertical: tokens.spacing.gap.sm
+							}}
+						>
+							<Text style={{ fontSize: tokens.font.size.body, color: '#EF4444' }}>
+								Delete
+							</Text>
+						</TouchableOpacity>
+					</View>
+				</Pressable>
+			</Modal>
 		</LinearGradient>
 	);
 }
