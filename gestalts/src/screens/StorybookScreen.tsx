@@ -896,7 +896,7 @@ export default function StorybookScreen() {
 				{/* Child Profiles Section */}
 				{profiles.length > 0 && (
 					<>
-						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.default }}>Child Profiles</Text>
+						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>Child Profiles</Text>
 						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
 							{profiles.map((childProfile) => (
 								<View key={childProfile.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
@@ -950,7 +950,7 @@ export default function StorybookScreen() {
 				{/* Custom Characters Section */}
 				{characters.length > 0 && (
 					<>
-						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.default }}>Custom Characters</Text>
+						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>Custom Characters</Text>
 						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
 							{characters.map((char: Character) => (
 								<View key={char.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
@@ -985,7 +985,6 @@ export default function StorybookScreen() {
 						justifyContent: 'center'
 					}}>
 						<Ionicons name="add" size={32} color={tokens.color.text.secondary} />
-						<Text size="xs" color="secondary" style={{ textAlign: 'center' }}>New Character</Text>
 					</TouchableOpacity>
 				</View>
 
@@ -1198,15 +1197,15 @@ export default function StorybookScreen() {
 								onPress={async () => { 
 									if (isMounted.current && characterName.trim() && generatedAvatar) {
 										try {
-											console.log('💾 Saving character to store:', characterName.trim());
-											console.log('🖼️ Using avatar URL:', generatedAvatar);
+											console.log('Saving character to store:', characterName.trim());
+											console.log('Using avatar URL:', generatedAvatar);
 											
 											// Check if this is for a child profile
 											const childProfileId = (global as any).currentChildProfileId;
 											
 											if (childProfileId) {
 												// This is for a child profile - save avatar to child profile
-												console.log('🧒 Saving avatar to child profile:', childProfileId);
+												console.log('Saving avatar to child profile:', childProfileId);
 												
 												// Get user ID (you may need to add this to your auth system)
 												const userId = 'current-user-id'; // TODO: Get from auth system
