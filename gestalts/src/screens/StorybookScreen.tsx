@@ -693,15 +693,16 @@ export default function StorybookScreen() {
 					return (
 						<View key={story.id} style={{
 							flexDirection: 'row',
-							alignItems: 'center',
+							alignItems: 'stretch',
 							backgroundColor: isGenerating ? 'rgba(124, 58, 237, 0.05)' : tokens.color.surface,
 							borderRadius: tokens.radius.lg,
-							padding: tokens.spacing.gap.md,
 							marginBottom: tokens.spacing.gap.sm,
 							borderColor: isGenerating ? tokens.color.primary.default : tokens.color.border.default,
 							borderWidth: isGenerating ? 1 : 1,
 							borderStyle: isGenerating ? 'dashed' : 'solid',
-							opacity: isGenerating ? 0.7 : 1
+							opacity: isGenerating ? 0.7 : 1,
+							overflow: 'hidden',
+							minHeight: 95
 						}}>
 							<TouchableOpacity 
 								onPress={() => { 
@@ -717,36 +718,133 @@ export default function StorybookScreen() {
 										);
 									}
 								}}
-								style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+								style={{ flexDirection: 'row', alignItems: 'stretch', flex: 1 }}
 								disabled={isGenerating}
 							>
 								{/* Cover Image or Placeholder */}
-								{isComplete && story.coverUrl ? (
-									<Image source={{ uri: story.coverUrl }} style={{ width: 80, height: 80, borderRadius: tokens.radius.md, marginRight: tokens.spacing.gap.md }} />
-								) : (
-									<View style={{
-										width: 80,
-										height: 80,
-										borderRadius: tokens.radius.md,
-										marginRight: tokens.spacing.gap.md,
-										backgroundColor: isGenerating ? 'rgba(124, 58, 237, 0.1)' : tokens.color.border.default,
-										alignItems: 'center',
-										justifyContent: 'center'
-									}}>
-										{isGenerating ? (
-											<ActivityIndicator size="small" color={tokens.color.primary.default} />
-										) : hasError ? (
-											<Ionicons name="alert-circle" size={32} color="#EF4444" />
-										) : (
-											<Ionicons name="image-outline" size={32} color={tokens.color.text.secondary} />
-										)}
-									</View>
-								)}
+								<View style={{ position: 'relative', width: 150, height: '100%' }}>
+									{isComplete && story.coverUrl ? (
+										<>
+											<Image 
+												source={{ uri: story.coverUrl }} 
+												style={{ 
+													width: 150, 
+													height: '100%', 
+													minHeight: 95,
+													borderTopLeftRadius: tokens.radius.lg,
+													borderBottomLeftRadius: tokens.radius.lg
+												}} 
+												resizeMode="cover"
+											/>
+											{/* Gradient overlay on right edge */}
+											<LinearGradient
+												colors={['transparent', 'rgba(255,255,255,0.3)']}
+												start={{ x: 0, y: 0 }}
+												end={{ x: 1, y: 0 }}
+												style={{
+													position: 'absolute',
+													top: 0,
+													right: 0,
+													width: 30,
+													height: '100%'
+												}}
+											/>
+										</>
+									) : (
+										<View style={{
+											width: 150,
+											height: '100%',
+											minHeight: 95,
+											borderTopLeftRadius: tokens.radius.lg,
+											borderBottomLeftRadius: tokens.radius.lg,
+											backgroundColor: isGenerating ? 'rgba(124, 58, 237, 0.1)' : tokens.color.border.default,
+											alignItems: 'center',
+											justifyContent: 'center'
+										}}>
+											{isGenerating ? (
+												<ActivityIndicator size="small" color={tokens.color.primary.default} />
+											) : hasError ? (
+												<Ionicons name="alert-circle" size={32} color="#EF4444" />
+											) : (
+												<Ionicons name="image-outline" size={32} color={tokens.color.text.secondary} />
+											)}
+										</View>
+									)}
+								</View>
 								
-								<View style={{ flex: 1 }}>
-									<Text weight="semibold" size="body" style={{ color: isGenerating ? tokens.color.primary.default : tokens.color.text.primary }}>
+								<View style={{ 
+									flex: 1, 
+									paddingHorizontal: tokens.spacing.gap.md, 
+									paddingVertical: tokens.spacing.gap.sm,
+									justifyContent: 'center'
+								}}>
+									<Text weight="semibold" size="body" style={{ 
+										color: isGenerating ? tokens.color.primary.default : tokens.color.text.primary,
+										marginBottom: tokens.spacing.gap.xs
+									}}>
 										{story.title}
 									</Text>
+									
+									{/* Character labels */}
+									{story.characterIds && story.characterIds.length > 0 && (
+										<View style={{ 
+											flexDirection: 'row', 
+											flexWrap: 'wrap', 
+											gap: 4, 
+											marginBottom: tokens.spacing.gap.xs 
+										}}>
+											{story.characterIds.slice(0, 3).map(characterId => {
+												const allCharacters = [...characters, ...gestaltsCharacters];
+												const character = allCharacters.find(c => c.id === characterId);
+												return character ? (
+													<View
+														key={characterId}
+														style={{
+															backgroundColor: '#F3E8FF',
+															borderRadius: 8,
+															paddingHorizontal: 6,
+															paddingVertical: 2,
+														}}
+													>
+														<Text 
+															size="xs" 
+															weight="medium" 
+															style={{ 
+																color: tokens.color.primary.default,
+																fontSize: 10
+															}}
+														>
+															{character.name}
+														</Text>
+													</View>
+												) : null;
+											})}
+											{story.characterIds.length > 3 && (
+												<View
+													style={{
+														backgroundColor: tokens.color.surface,
+														borderRadius: 8,
+														paddingHorizontal: 6,
+														paddingVertical: 2,
+														borderWidth: 1,
+														borderColor: tokens.color.border.default
+													}}
+												>
+													<Text 
+														size="xs" 
+														weight="medium" 
+														style={{ 
+															color: tokens.color.text.secondary,
+															fontSize: 10
+														}}
+													>
+														+{story.characterIds.length - 3}
+													</Text>
+												</View>
+											)}
+										</View>
+									)}
+									
 									<Text color="secondary" size="sm">
 										{isGenerating ? (
 											<View style={{ flexDirection: 'row', alignItems: 'center' }}>
