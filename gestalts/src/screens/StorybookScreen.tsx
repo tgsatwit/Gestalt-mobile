@@ -64,6 +64,7 @@ export default function StorybookScreen() {
 	const [isAvatarModalVisible, setAvatarModalVisible] = useState(false);
 	const [isStoryModalVisible, setStoryModalVisible] = useState(false);
 	const [isStoryViewerVisible, setStoryViewerVisible] = useState(false);
+	const [isStoryReaderVisible, setStoryReaderVisible] = useState(false);
 	const [isRefineModalVisible, setRefineModalVisible] = useState(false);
 	const [isRegenerateModalVisible, setRegenerateModalVisible] = useState(false);
 	const [isPageRegenerateModalVisible, setPageRegenerateModalVisible] = useState(false);
@@ -708,7 +709,7 @@ export default function StorybookScreen() {
 								onPress={() => { 
 									if (isComplete) {
 										setCurrentStory(story); 
-										setStoryViewerVisible(true);
+										setStoryReaderVisible(true);
 									} else if (isGenerating) {
 										// Show generating message
 										Alert.alert(
@@ -914,12 +915,33 @@ export default function StorybookScreen() {
 											minWidth: 120,
 											zIndex: 1000
 										}}>
+											{/* Read Story option */}
+											<TouchableOpacity 
+												onPress={() => {
+													setOpenMenuId(null);
+													setCurrentStory(story);
+													setStoryReaderVisible(true);
+												}}
+												style={{
+													flexDirection: 'row',
+													alignItems: 'center',
+													padding: 12,
+													gap: 8
+												}}
+											>
+												<Ionicons name="book-outline" size={16} color={tokens.color.text.primary} />
+												<Text>Read</Text>
+											</TouchableOpacity>
+											
+											{/* Separator */}
+											<View style={{ height: 1, backgroundColor: tokens.color.border.default, marginHorizontal: 8 }} />
+											
 											{/* Edit option */}
 											<TouchableOpacity 
 												onPress={() => {
 													setOpenMenuId(null);
-													// TODO: Implement edit functionality
-													Alert.alert('Edit Story', 'Edit functionality will be implemented soon.');
+													setCurrentStory(story);
+													setStoryViewerVisible(true);
 												}}
 												style={{
 													flexDirection: 'row',
@@ -2789,6 +2811,133 @@ export default function StorybookScreen() {
 		</Modal>
 	);
 
+	// Story Reader Modal - Simplified reading experience
+	const renderStoryReaderModal = () => {
+		const { width: screenWidth, height: screenHeight } = require('react-native').Dimensions.get('window');
+		
+		// Simple story page component for read-only viewing
+		const StoryReaderPageComponent = ({ item, index }: { item: any, index: number }) => {
+			const [imageLoading, setImageLoading] = useState(true);
+			const [imageError, setImageError] = useState(false);
+			
+			return (
+				<View style={{ width: screenWidth, height: screenHeight, backgroundColor: 'black' }}>
+					{/* Full screen image with proper aspect ratio */}
+					{item.imageUrl && !imageError ? (
+						<Image 
+							source={{ uri: item.imageUrl }} 
+							style={{ 
+								width: screenWidth, 
+								height: screenHeight * 0.75, // Leave space for text at bottom
+								resizeMode: 'contain' // Show full image with correct aspect ratio
+							}} 
+							onLoad={() => setImageLoading(false)}
+							onError={(error) => {
+								console.log('Image load error:', error);
+								setImageError(true);
+								setImageLoading(false);
+							}}
+						/>
+					) : (
+						<View style={{ 
+							width: screenWidth, 
+							height: screenHeight * 0.75, 
+							backgroundColor: '#333', 
+							alignItems: 'center', 
+							justifyContent: 'center' 
+						}}>
+							<Ionicons name="image-outline" size={100} color="#666" />
+							<Text style={{ color: '#666', marginTop: 20 }}>
+								{imageError ? 'Failed to load image' : 'No image available'}
+							</Text>
+						</View>
+					)}
+					
+					{imageLoading && (
+						<View style={{ 
+							position: 'absolute',
+							width: screenWidth, 
+							height: screenHeight * 0.75, 
+							backgroundColor: '#222', 
+							alignItems: 'center', 
+							justifyContent: 'center' 
+						}}>
+							<ActivityIndicator size="large" color="white" />
+							<Text style={{ color: 'white', marginTop: 20 }}>Loading image...</Text>
+						</View>
+					)}
+				
+					{/* Story Text at Bottom */}
+					<View style={{
+						position: 'absolute',
+						bottom: 0,
+						left: 0,
+						right: 0,
+						backgroundColor: 'rgba(0,0,0,0.9)',
+						paddingHorizontal: 24,
+						paddingVertical: 32,
+						minHeight: screenHeight * 0.25, // Use remaining 25% of screen
+						justifyContent: 'center'
+					}}>
+						<Text style={{ 
+							color: 'white', 
+							fontSize: 18, 
+							lineHeight: 28,
+							textAlign: 'center',
+							fontFamily: 'Inter',
+							fontWeight: '400'
+						}}>
+							{item.text}
+						</Text>
+					</View>
+				</View>
+			);
+		};
+		
+		return (
+			<Modal visible={isStoryReaderVisible} animationType="slide">
+				<View style={{ flex: 1, backgroundColor: 'black' }}>
+					{/* Header with close button only */}
+					<View style={{ 
+						position: 'absolute', 
+						top: 60, 
+						right: 20, 
+						zIndex: 10
+					}}>
+						<TouchableOpacity 
+							onPress={() => setStoryReaderVisible(false)} 
+							style={{ backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 15, padding: 8 }}
+						>
+							<Ionicons name="close" size={24} color="white" />
+						</TouchableOpacity>
+					</View>
+					
+					{currentStory && currentStory.pages && currentStory.pages.length > 0 ? (
+						<FlatList
+							data={currentStory.pages}
+							horizontal
+							pagingEnabled
+							showsHorizontalScrollIndicator={false}
+							keyExtractor={(_, index) => index.toString()}
+							style={{ flex: 1 }}
+							onMomentumScrollEnd={(event) => {
+								const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+								setCurrentPageIndex(index);
+							}}
+							renderItem={({ item, index }) => (
+								<StoryReaderPageComponent item={item} index={index} />
+							)}
+						/>
+					) : (
+						<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+							<Text style={{ color: 'white' }}>No story available</Text>
+						</View>
+					)}
+				</View>
+			</Modal>
+		);
+	};
+
 	const renderPageRegenerateModal = () => (
 		<Modal visible={isPageRegenerateModalVisible} animationType="fade" transparent>
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
@@ -2877,6 +3026,7 @@ export default function StorybookScreen() {
 			{renderAvatarCreationModal()}
 			{renderStoryCreationModal()}
 			{renderStoryViewerModal()}
+			{renderStoryReaderModal()}
 			{renderRefineModal()}
 			{renderRegenerateModal()}
 			{renderPageRegenerateModal()}
