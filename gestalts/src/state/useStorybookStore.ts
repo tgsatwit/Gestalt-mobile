@@ -27,7 +27,7 @@ interface StorybookState {
   // Actions - Characters
   loadCharacters: () => Promise<void>;
   loadGestaltsCharacters: () => Promise<void>;
-  createCharacterFromPhoto: (photoUri: string, name: string) => Promise<Character>;
+  createCharacterFromPhoto: (photoUri: string, name: string, mode?: 'animated' | 'real' | 'both') => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
   
   // Actions - Stories
@@ -122,7 +122,7 @@ export const useStorybookStore = create<StorybookState>()(
       },
 
       // Create a character from a photo
-      createCharacterFromPhoto: async (photoUri: string, name: string) => {
+      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' | 'both' = 'animated') => {
         set({ 
           generationProgress: {
             status: 'uploading',
@@ -133,12 +133,15 @@ export const useStorybookStore = create<StorybookState>()(
 
         try {
           let avatarUrl: string;
+          let realAvatarUrl: string | undefined;
+          let animatedAvatarUrl: string | undefined;
           let visualProfile: any = undefined;
           
           // Check if photoUri is already a URL (from avatar generation) or a local file URI
           if (photoUri.startsWith('http://') || photoUri.startsWith('https://') || photoUri.startsWith('data:')) {
             // Already have a generated avatar URL, just use it directly
             avatarUrl = photoUri;
+            animatedAvatarUrl = photoUri; // Assume it's animated since it's pre-generated
             console.log('Using provided avatar URL directly:', avatarUrl);
             
             set({ 
@@ -149,37 +152,91 @@ export const useStorybookStore = create<StorybookState>()(
               }
             });
           } else {
-            // Local file URI - need to generate avatar
+            // Local file URI - need to generate avatar(s)
             // Read photo as base64
             const photoData = await FileSystem.readAsStringAsync(photoUri, {
               encoding: FileSystem.EncodingType.Base64,
             });
 
-            set({ 
-              generationProgress: {
-                status: 'generating',
-                message: 'Creating avatar...',
-                progress: 30
+            // Generate avatars based on mode
+            if (mode === 'both') {
+              set({ 
+                generationProgress: {
+                  status: 'generating',
+                  message: 'Creating animated avatar...',
+                  progress: 20
+                }
+              });
+
+              // Generate animated avatar
+              const animatedResult = await geminiService.generateAvatar({
+                photoData: `data:image/jpeg;base64,${photoData}`,
+                style: 'animated',
+                mode: 'animated',
+                characterName: name
+              });
+
+              set({ 
+                generationProgress: {
+                  status: 'generating',
+                  message: 'Creating real-life avatar...',
+                  progress: 60
+                }
+              });
+
+              // Generate real-life avatar
+              const realResult = await geminiService.generateAvatar({
+                photoData: `data:image/jpeg;base64,${photoData}`,
+                style: 'real',
+                mode: 'real',
+                characterName: name
+              });
+
+              // Handle both string and object return types
+              animatedAvatarUrl = typeof animatedResult === 'string' ? animatedResult : animatedResult.imageUrl;
+              realAvatarUrl = typeof realResult === 'string' ? realResult : realResult.imageUrl;
+              avatarUrl = animatedAvatarUrl; // Default to animated for backwards compatibility
+              visualProfile = typeof animatedResult === 'object' ? animatedResult.visualProfile : undefined;
+            } else {
+              set({ 
+                generationProgress: {
+                  status: 'generating',
+                  message: `Creating ${mode} avatar...`,
+                  progress: 30
+                }
+              });
+
+              // Generate single avatar based on mode
+              const avatarResult = await geminiService.generateAvatar({
+                photoData: `data:image/jpeg;base64,${photoData}`,
+                style: mode === 'real' ? 'real' : 'animated',
+                mode: mode,
+                characterName: name
+              });
+
+              // Handle both string and object return types
+              const generatedUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+              avatarUrl = generatedUrl;
+              
+              if (mode === 'real') {
+                realAvatarUrl = generatedUrl;
+              } else {
+                animatedAvatarUrl = generatedUrl;
               }
-            });
-
-            // Generate avatar using Gemini
-            const avatarResult = await geminiService.generateAvatar({
-              photoData: `data:image/jpeg;base64,${photoData}`,
-              style: 'animated',
-              characterName: name
-            });
-
-            // Handle both string and object return types
-            avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-            visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+              
+              visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+            }
           }
 
-          // Create character object
+          // Create character object with dual avatar support
           const character: Character = {
             id: `char_${Date.now()}`,
             name,
-            avatarUrl: avatarUrl,
+            avatarUrl: avatarUrl, // Legacy field for backwards compatibility
+            avatars: {
+              animated: animatedAvatarUrl,
+              real: realAvatarUrl
+            },
             type: 'user', // User-created character
             visualProfile: visualProfile,
             createdAt: new Date(),
@@ -285,7 +342,8 @@ export const useStorybookStore = create<StorybookState>()(
             createdAt: new Date(),
             updatedAt: new Date(),
             theme: request.theme,
-            ageGroup: request.ageGroup
+            ageGroup: request.ageGroup,
+            storyMode: request.storyMode || 'animated'
           };
 
           // Generate images for each page (using placeholders for now)
@@ -301,10 +359,12 @@ export const useStorybookStore = create<StorybookState>()(
               }
             });
 
-            // Generate illustration
+            // Generate illustration with story mode support
+            const storyMode = request.storyMode || 'animated';
             const imageUrl = await geminiService.generateStoryImage({
               prompt: storyTexts[i],
-              style: 'animated'
+              style: storyMode === 'real' ? 'realistic' : 'animated',
+              storyMode: storyMode
             });
 
             pages.push({

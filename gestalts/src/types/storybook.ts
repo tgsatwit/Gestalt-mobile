@@ -1,14 +1,24 @@
 // Types for the Storybook feature
 
+// Story mode for real vs animated characters and backgrounds
+export type StoryMode = 'animated' | 'real';
+
 export interface Character {
   id: string;
   name: string;
-  avatarUrl: string;
+  avatarUrl: string; // Legacy field for backwards compatibility - points to animated avatar
   type: 'user' | 'gestalts'; // Distinguish between user-created and Gestalts characters
   originalPhotoUrl?: string; // Optional, for privacy we may not store this
   createdAt: Date;
   updatedAt: Date;
   aiAttributes?: string; // Any AI-generated descriptors
+  
+  // Dual avatar support for real-mode vs animated mode
+  avatars?: {
+    animated?: string; // Pixar/cartoon style avatar URL
+    real?: string; // Real-life photo with background removed URL
+  };
+  
   // Visual consistency fields for story generation
   visualProfile?: {
     appearance: string; // Detailed physical description for consistency
@@ -57,6 +67,9 @@ export interface Story {
   theme?: string; // Optional story theme/moral
   ageGroup?: string; // Target age group
   
+  // Story visual mode
+  storyMode?: StoryMode; // Real-life or animated story mode
+  
   // GLP-specific fields
   concept?: string; // The concept being taught
   childProfileId?: string; // Which child this story is for
@@ -91,8 +104,9 @@ export interface CharacterMapping {
 
 export interface AvatarGenerationRequest {
   photoData: string; // Base64 encoded photo
-  style?: 'animated' | 'stylized' | 'anime';
+  style?: 'animated' | 'stylized' | 'anime' | 'real';
   characterName?: string;
+  mode?: StoryMode; // Specifies if this is for real or animated avatar
 }
 
 export interface ImageRefinementRequest {
@@ -113,6 +127,9 @@ export interface ConceptLearningRequest {
   
   // Step 2: Mode Selection
   mode: 'simple' | 'advanced';
+  
+  // Step 2.5: Story Visual Mode Selection
+  storyMode?: StoryMode; // Real-life or animated story mode
   
   // Step 3: Advanced Options (if advanced mode)
   advanced?: {
@@ -164,6 +181,7 @@ export interface StoryGenerationRequest {
   pageCount?: number; // Default to 5-10 pages
   theme?: string;
   ageGroup?: string;
+  storyMode?: StoryMode; // Real-life or animated story mode
   
   // Concept learning information
   concept?: string; // The learning concept (e.g., "sharing", "emotions")
@@ -210,6 +228,7 @@ export type StoryWizardStep =
   | 'concept-selection'
   | 'child-concept' // Legacy support
   | 'mode-selection' 
+  | 'story-mode-selection' // Real vs animated story mode
   | 'advanced-options'
   | 'text-generation'
   | 'text-editing'

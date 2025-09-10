@@ -179,7 +179,8 @@ class GeminiService {
     try {
       this.checkInitialized();
       
-      console.log('Starting avatar generation with Gemini 2.5 Flash Image for:', request.characterName);
+      const mode = request.mode || 'animated';
+      console.log(`Starting avatar generation in ${mode} mode for:`, request.characterName);
       
       // Prepare the photo data for direct image editing
       // Remove data URL prefix to get clean base64 data
@@ -191,10 +192,43 @@ class GeminiService {
       };
       
       try {
-        console.log('Transforming photo to Pixar-style using Gemini 2.5 Flash Image...');
+        let imageEditPrompt: string;
+        let logMessage: string;
         
-        // Direct image editing prompt for Pixar-style transformation
-        const imageEditPrompt = `Transform this image into a high-quality Pixar-style 3D animated character while maintaining exact likeness and all distinctive features.
+        if (mode === 'real') {
+          console.log('Processing photo for real-mode with background removal...');
+          logMessage = '✅ Real-mode avatar generated successfully with background removal';
+          
+          // Real-mode prompt: remove background, keep person natural
+          imageEditPrompt = `Remove the background from this image while keeping the person exactly as they are in real life.
+
+CRITICAL REQUIREMENTS:
+- Keep the person EXACTLY as they appear in the original photo
+- Do NOT change facial features, proportions, or characteristics
+- Do NOT stylize or cartoon the person
+- Maintain realistic skin texture and appearance
+- Preserve all distinctive features (glasses, facial hair, accessories, clothing, etc.)
+- Keep natural hair color, style, and texture
+- Maintain natural eye color and shape
+- Keep realistic skin tone and texture
+
+BACKGROUND SPECIFICATIONS:
+- Remove all background completely
+- Replace with a clean, solid neutral background (white, light gray, or soft pastel)
+- Make sure the background is completely plain and uniform
+- No patterns, textures, or distracting elements
+- Character should be cleanly separated from background
+- Professional photo-style background removal
+
+${request.characterName ? `Character name: ${request.characterName}` : ''}
+
+Remove the background while keeping the person completely natural and realistic.`;
+        } else {
+          console.log('Transforming photo to Pixar-style using Gemini 2.5 Flash Image...');
+          logMessage = '✅ Pixar avatar generated successfully with Gemini 2.5 Flash Image';
+          
+          // Animated mode prompt: Pixar transformation
+          imageEditPrompt = `Transform this image into a high-quality Pixar-style 3D animated character while maintaining exact likeness and all distinctive features.
 
 CRITICAL REQUIREMENTS:
 - Keep EXACT facial features, proportions, and characteristics from the original photo
@@ -216,6 +250,7 @@ STYLE SPECIFICATIONS:
 ${request.characterName ? `Character name: ${request.characterName}` : ''}
 
 Transform this person into their Pixar animated version while keeping everything else exactly the same.`;
+        }
         
         console.log('Image editing prompt prepared');
         
@@ -233,22 +268,22 @@ Transform this person into their Pixar animated version while keeping everything
           if (candidate.content?.parts) {
             for (const part of candidate.content.parts) {
               if (part.inlineData?.data) {
-                console.log('Pixar avatar image data found!');
+                console.log(`${mode === 'real' ? 'Real-mode' : 'Pixar'} avatar image data found!`);
                 
                 // Convert base64 image data to usable data URL
                 const mimeType = part.inlineData.mimeType || 'image/png';
                 const imageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
                 
-                console.log('✅ Pixar avatar generated successfully with Gemini 2.5 Flash Image');
+                console.log(logMessage);
                 
                 // Return successful result with visual profile metadata
                 return {
                   imageUrl: imageUrl,
                   visualProfile: {
-                    appearance: 'Pixar-style transformation of original photo',
-                    style: 'Pixar 3D Animation',
+                    appearance: mode === 'real' ? 'Real-life photo with background removed' : 'Pixar-style transformation of original photo',
+                    style: mode === 'real' ? 'Real Photography' : 'Pixar 3D Animation',
                     personality: 'Friendly and approachable',
-                    keyFeatures: ['Exact likeness preserved', 'Pixar animation style', 'Child-friendly design']
+                    keyFeatures: mode === 'real' ? ['Exact likeness preserved', 'Background removed', 'Natural appearance'] : ['Exact likeness preserved', 'Pixar animation style', 'Child-friendly design']
                   }
                 };
               }
@@ -278,6 +313,7 @@ Transform this person into their Pixar animated version while keeping everything
    * Implements two-stage pipeline: First page (character initialization) + Subsequent pages (reference-based)
    */
   async generateStoryImage(request: ImageGenerationRequest & {
+    storyMode?: 'animated' | 'real'; // Story visual mode
     context?: {
       concept?: string;
       characterNames?: string[];
@@ -332,6 +368,7 @@ Transform this person into their Pixar animated version while keeping everything
    * Generate first page with explicit character labeling (Gemini 2.5 Flash optimized)
    */
   private async generateFirstPageWithCharacterInitialization(request: ImageGenerationRequest & {
+    storyMode?: 'animated' | 'real';
     context?: any;
   }): Promise<string> {
     try {
@@ -347,8 +384,14 @@ Transform this person into their Pixar animated version while keeping everything
       console.log(`   - Avatar inputs: ${totalAvatarInputs}/3 (Gemini limit)`);
       console.log(`   - Total characters: ${characterMappings.length}`);
 
+      // Determine visual style based on story mode
+      const storyMode = request.storyMode || 'animated';
+      const isRealMode = storyMode === 'real';
+      
+      console.log(`   - Story mode: ${storyMode}`);
+      
       // Build hyper-specific prompt for character consistency
-      let enhancedPrompt = `Create a high-quality Pixar 3D animation style children's storybook illustration.
+      let enhancedPrompt = `Create a high-quality ${isRealMode ? 'photorealistic' : 'Pixar 3D animation style'} children's storybook illustration.
 
 SCENE TO ILLUSTRATE: ${request.prompt}
 
@@ -359,10 +402,16 @@ CHARACTER IDENTIFICATION AND CONSISTENCY:
 ${characterInstructions.join('\n')}
 
 VISUAL STYLE REQUIREMENTS:
-- Professional Pixar 3D animation aesthetic (Toy Story, Finding Nemo quality level)
+${isRealMode ? 
+  `- Photorealistic style with natural lighting and textures
+- Real-life photography aesthetic with proper depth of field
+- Natural skin textures, hair, and clothing materials
+- Realistic environmental details and backgrounds
+- Professional photography composition and lighting` :
+  `- Professional Pixar 3D animation aesthetic (Toy Story, Finding Nemo quality level)
 - Vibrant, saturated colors with soft directional lighting from upper left
 - Rounded, child-friendly character designs with smooth surfaces
-- Rich environmental details supporting the narrative
+- Rich environmental details supporting the narrative`}
 - Clear focal hierarchy with ${mainCharacter} as the primary focus
 
 CONSISTENCY ESTABLISHMENT (CRITICAL FOR SUBSEQUENT PAGES):
@@ -500,6 +549,7 @@ STORY CONTEXT:
    * Generate subsequent pages with reference image for character consistency
    */
   private async generateSubsequentPageWithReference(request: ImageGenerationRequest & {
+    storyMode?: 'animated' | 'real';
     context?: any;
   }): Promise<string> {
     try {
@@ -516,8 +566,14 @@ STORY CONTEXT:
       console.log(`   - Total characters: ${characterMappings.length}`);
       console.log(`   - Has reference page image: ${!!request.referencePageImage}`);
 
+      // Determine visual style based on story mode
+      const storyMode = request.storyMode || 'animated';
+      const isRealMode = storyMode === 'real';
+      
+      console.log(`   - Story mode: ${storyMode}`);
+      
       // Build hyper-specific prompt for character consistency with reference
-      let enhancedPrompt = `Create a high-quality Pixar 3D animation style children's storybook illustration that maintains perfect character consistency with the provided reference page.
+      let enhancedPrompt = `Create a high-quality ${isRealMode ? 'photorealistic' : 'Pixar 3D animation style'} children's storybook illustration that maintains perfect character consistency with the provided reference page.
 
 SCENE TO ILLUSTRATE: ${request.prompt}
 
@@ -532,10 +588,16 @@ CHARACTER IDENTIFICATION AND CONSISTENCY:
 ${characterInstructions.join('\n')}
 
 VISUAL STYLE REQUIREMENTS:
-- Exact same Pixar 3D animation aesthetic as the reference page
+${isRealMode ? 
+  `- Exact same photorealistic aesthetic as the reference page
+- Match natural lighting direction, intensity, and color temperature from reference
+- Consistent realistic environmental style and textures
+- Same level of photographic detail and quality
+- Natural depth of field and composition` :
+  `- Exact same Pixar 3D animation aesthetic as the reference page
 - Match lighting direction, intensity, and color temperature from reference
 - Consistent environmental style and color palette
-- Same level of detail and rendering quality
+- Same level of detail and rendering quality`}
 - Clear focal hierarchy with ${mainCharacter} as the primary focus
 
 REFERENCE CONSISTENCY (CRITICAL):
