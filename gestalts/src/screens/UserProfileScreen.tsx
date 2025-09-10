@@ -8,7 +8,8 @@ import { GradientButton } from '../components/GradientButton';
 import { useNavigation } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
-import userProfileService from '../services/userProfileService';
+// Use Firebase-enabled service to save to 'users' collection
+import userProfileService from '../services/userProfileServiceFirebase';
 import { UserProfile, CreateUserProfileData, UpdateUserProfileData } from '../types/userProfile';
 
 export default function UserProfileScreen() {
@@ -98,14 +99,14 @@ export default function UserProfileScreen() {
 		setLastName(profile.lastName || '');
 		setEmail(profile.email || '');
 		setPhoneNumber(profile.phoneNumber || '');
-		setEmailNotifications(profile.emailNotifications);
-		setPushNotifications(profile.pushNotifications);
-		setReminderNotifications(profile.reminderNotifications);
-		setWeeklyReports(profile.weeklyReports);
-		setInteractionStyle(profile.coachingPreferences.preferredInteractionStyle);
-		setReminderFrequency(profile.coachingPreferences.reminderFrequency);
-		setReportFormat(profile.coachingPreferences.reportFormat);
-		setProfileVisibility(profile.profileVisibility);
+		setEmailNotifications(profile.emailNotifications ?? true);
+		setPushNotifications(profile.pushNotifications ?? true);
+		setReminderNotifications(profile.reminderNotifications ?? true);
+		setWeeklyReports(profile.weeklyReports ?? true);
+		setInteractionStyle(profile.preferredInteractionStyle || 'supportive');
+		setReminderFrequency(profile.reminderFrequency || 'weekly');
+		setReportFormat(profile.reportFormat || 'detailed');
+		setProfileVisibility(profile.profileVisibility || 'private');
 	};
 
 	const handleSave = async () => {
@@ -126,28 +127,24 @@ export default function UserProfileScreen() {
 		try {
 			const updates: UpdateUserProfileData = {
 				name: name.trim(),
-				firstName: firstName.trim() || undefined,
-				lastName: lastName.trim() || undefined,
-				email: email.trim() || undefined,
-				phoneNumber: phoneNumber.trim() || undefined,
+				firstName: firstName.trim(), // Send empty string if empty
+				lastName: lastName.trim(), // Send empty string if empty
+				email: email.trim(),
+				phoneNumber: phoneNumber.trim(),
 				emailNotifications,
 				pushNotifications,
 				reminderNotifications,
 				weeklyReports,
-				coachingPreferences: {
-					preferredInteractionStyle: interactionStyle,
-					reminderFrequency,
-					reportFormat
-				},
+				preferredInteractionStyle: interactionStyle,
+				reminderFrequency,
+				reportFormat,
 				profileVisibility
 			};
 
 			await userProfileService.updateProfile(userId, updates);
 			
-			// Update auth context name if changed
-			if (name.trim() !== user?.name) {
-				await updateUserName(name.trim());
-			}
+			// Reload profile to update auth context with fresh data
+			// This ensures the local user object stays in sync with Firestore
 
 			Alert.alert('Success', 'Profile updated successfully!');
 			await loadUserProfile(); // Reload to get fresh data

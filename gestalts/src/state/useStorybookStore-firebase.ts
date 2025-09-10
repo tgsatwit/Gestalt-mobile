@@ -30,7 +30,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import authService from '../services/authService';
 import {
-  buildCharacterProfiles,
+  buildCharacterMappings,
   buildSceneContext,
   buildNarrativeContext,
   buildStoryContextDescription,
@@ -609,7 +609,7 @@ export const useStorybookStore = create<StorybookState>()(
             console.log(`Page ${i + 1} - Reference images:`, referenceImages.length);
             
             // Build optimized character profiles using utility functions
-            const characterProfiles = buildCharacterProfiles(
+            const characterProfiles = buildCharacterMappings(
               allAvailableCharacters,
               request.characterIds,
               request.childProfile
@@ -635,9 +635,12 @@ export const useStorybookStore = create<StorybookState>()(
 
             // Generate illustration with comprehensive context and narrative understanding
             const imageUrl = await geminiService.generateStoryImage({
-              prompt: `${narrativeContext.currentPageText} [Page Context: ${pageContext.pageRole} - ${pageContext.visualEmphasis}]`,
+              prompt: `${narrativeContext.currentPageText}`,
               style: 'animated',
               referenceImages,
+              isFirstPage: i === 0, // First page flag for proper generation method
+              characterMappings: characterProfiles, // Pass character mappings with avatar info
+              referencePageImage: i > 0 && pages.length > 0 ? pages[0].imageUrl : undefined, // Use first page as reference
               context: {
                 concept: request.concept,
                 characterNames: allCharacterNames,
@@ -661,7 +664,7 @@ export const useStorybookStore = create<StorybookState>()(
             console.log(`  - Text: "${narrativeContext.currentPageText.substring(0, 50)}..."`);
             console.log(`  - Characters: ${allCharacterNames.join(', ')}`);
             console.log(`  - Concept: ${request.concept}`);
-            console.log(`  - Image URL: ${imageUrl}`);
+            console.log(`  - Image URL: ${imageUrl.startsWith('data:') ? `${imageUrl.substring(0, 50)}... [base64 data truncated]` : imageUrl}`);
             console.log(`  - Character profiles count: ${characterProfiles.length}`);
             console.log(`  - Reference images count: ${referenceImages.length}`);
 

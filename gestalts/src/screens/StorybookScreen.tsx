@@ -4,13 +4,15 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GradientButton } from '../components/GradientButton';
-import { useStorybookStore } from '../state/useStorybookStore';
+// Use Firebase-enabled store for stories and characters
+import { useStorybookStore } from '../state/useStorybookStore-firebase';
 import { useMemoriesStore } from '../state/useStore';
 import { Character, ConceptLearningRequest, StoryWizardStep } from '../types/storybook';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
 import type { MainStackParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuth } from '../contexts/AuthContext';
 
 // Real data now comes from Zustand store
 
@@ -21,6 +23,7 @@ export default function StorybookScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
 	const navigation = useNavigation<StorybookScreenNavigationProp>();
+	const { getCurrentUserId } = useAuth();
 	
 	// Add mounting ref to prevent state updates on unmounted component
 	const isMounted = useRef(true);
@@ -45,6 +48,7 @@ export default function StorybookScreen() {
 		createCharacterFromPhoto,
 		createStory,
 		deleteStory,
+		deleteCharacter,
 		refineStoryImage,
 		pickImageFromGallery,
 		takePhoto,
@@ -63,12 +67,14 @@ export default function StorybookScreen() {
 	const [isRefineModalVisible, setRefineModalVisible] = useState(false);
 	const [isRegenerateModalVisible, setRegenerateModalVisible] = useState(false);
 	const [isPageRegenerateModalVisible, setPageRegenerateModalVisible] = useState(false);
+	const [isCharacterManagementModalVisible, setCharacterManagementModalVisible] = useState(false);
+	const [selectedCharacterForManagement, setSelectedCharacterForManagement] = useState<Character | null>(null);
 
 	// Wizard states
 	const [avatarStep, setAvatarStep] = useState('upload'); // upload, generating, review
 	const [storyWizardStep, setStoryWizardStep] = useState<StoryWizardStep>('child-concept');
 	// Get user's child profile from memories store
-	const { profile, profiles, createChildAvatar, profileLoading } = useMemoriesStore();
+	const { profile, profiles, createChildAvatar, profileLoading, loadUserProfiles } = useMemoriesStore();
 	
 	// Form states for GLP workflow
 	const [conceptLearning, setConceptLearning] = useState<ConceptLearningRequest>({
@@ -254,7 +260,7 @@ export default function StorybookScreen() {
 			
 			// Handle the result (could be string URL or object with imageUrl)
 			const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-			console.log('🖼️ Avatar URL generated:', avatarUrl);
+			console.log('🖼️ Avatar URL generated:', avatarUrl.startsWith('data:') ? `${avatarUrl.substring(0, 50)}... [base64 data truncated]` : avatarUrl);
 			
 			setGeneratedAvatar(avatarUrl);
 			setAvatarStep('review');
@@ -284,8 +290,15 @@ export default function StorybookScreen() {
 
 	// --- Effects ---
 	useEffect(() => {
+		// Load Firebase-backed profiles first
+		const userId = getCurrentUserId();
+		if (userId) {
+			console.log('Loading user profiles from Firebase for user:', userId);
+			loadUserProfiles(userId);
+		}
+		
 		// Load data when component mounts
-		loadCharacters();
+		loadCharacters(); // Note: This should be migrated to Firebase
 		loadGestaltsCharacters();
 		loadStories();
 	}, []);
@@ -940,23 +953,38 @@ export default function StorybookScreen() {
 										</TouchableOpacity>
 									)}
 									<Text weight="medium" size="sm">{childProfile.childName}</Text>
-									<Text size="xs" color="secondary">Child Profile</Text>
 								</View>
 							))}
 						</View>
 					</>
 				)}
 				
-				{/* Custom Characters Section */}
-				{characters.length > 0 && (
+				{/* All Characters Section */}
+				{(characters.length > 0 || profiles.some(p => p.avatarUrl)) && (
 					<>
-						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>Custom Characters</Text>
+						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>All My Characters</Text>
 						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
-							{characters.map((char: Character) => (
-								<View key={char.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+							{/* Show Firebase child profile avatars and local custom characters */}
+							{[...profiles.filter(p => p.avatarUrl).map(p => ({
+								id: `profile-${p.id}`,
+								name: p.childName,
+								avatarUrl: p.avatarUrl!,
+								type: 'profile' as const,
+								createdAt: p.createdAt,
+								updatedAt: p.updatedAt
+							})), ...characters].map((char: Character | any) => (
+								<TouchableOpacity 
+									key={char.id} 
+									style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}
+									onPress={() => {
+										setSelectedCharacterForManagement(char);
+										setCharacterManagementModalVisible(true);
+									}}
+									activeOpacity={0.7}
+								>
 									<Image source={{ uri: char.avatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
 									<Text weight="medium">{char.name}</Text>
-								</View>
+								</TouchableOpacity>
 							))}
 						</View>
 					</>
@@ -1198,7 +1226,7 @@ export default function StorybookScreen() {
 									if (isMounted.current && characterName.trim() && generatedAvatar) {
 										try {
 											console.log('Saving character to store:', characterName.trim());
-											console.log('Using avatar URL:', generatedAvatar);
+											console.log('Using avatar URL:', generatedAvatar.startsWith('data:') ? `${generatedAvatar.substring(0, 50)}... [base64 data truncated]` : generatedAvatar);
 											
 											// Check if this is for a child profile
 											const childProfileId = (global as any).currentChildProfileId;
@@ -1207,11 +1235,18 @@ export default function StorybookScreen() {
 												// This is for a child profile - save avatar to child profile
 												console.log('Saving avatar to child profile:', childProfileId);
 												
-												// Get user ID (you may need to add this to your auth system)
-												const userId = 'current-user-id'; // TODO: Get from auth system
+												// Get user ID from auth context
+												const userId = getCurrentUserId();
+												if (!userId) {
+													throw new Error('User not authenticated');
+												}
 												
 												await createChildAvatar(childProfileId, userId, generatedAvatar);
 												console.log('✅ Child profile avatar saved successfully');
+												
+												// Reload profiles to show the updated avatar
+												await loadUserProfiles(userId);
+												console.log('✅ Profiles reloaded successfully');
 												
 												Alert.alert(
 													'Avatar Created!', 
@@ -1219,18 +1254,40 @@ export default function StorybookScreen() {
 													[{ text: 'Great!' }]
 												);
 											} else {
-												// This is for a custom character
-												const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
-												console.log('✅ Character created successfully:', newCharacter.name);
+												// Check if this is a regeneration of an existing character
+												const regeneratingCharacterId = (global as any).currentRegeneratingCharacterId;
 												
-												// Reload characters to show the new one
-												await loadCharacters();
-												
-												Alert.alert(
-													'Character Created!', 
-													`${newCharacter.name} is now ready to appear in your stories!`,
-													[{ text: 'Great!' }]
-												);
+												if (regeneratingCharacterId) {
+													// This is a character regeneration - delete old and create new
+													console.log('🔄 Regenerating character:', regeneratingCharacterId);
+													await deleteCharacter(regeneratingCharacterId);
+													
+													// Create new character with same name but new avatar
+													const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+													console.log('✅ Character regenerated successfully:', newCharacter.name);
+													
+													// Reload characters to show the updated one
+													await loadCharacters();
+													
+													Alert.alert(
+														'Character Regenerated!', 
+														`${newCharacter.name} has been updated with a new look!`,
+														[{ text: 'Great!' }]
+													);
+												} else {
+													// This is for a new custom character
+													const newCharacter = await createCharacterFromPhoto(generatedAvatar, characterName.trim());
+													console.log('✅ Character created successfully:', newCharacter.name);
+													
+													// Reload characters to show the new one
+													await loadCharacters();
+													
+													Alert.alert(
+														'Character Created!', 
+														`${newCharacter.name} is now ready to appear in your stories!`,
+														[{ text: 'Great!' }]
+													);
+												}
 											}
 											
 											// Reset state and close modal
@@ -1239,8 +1296,9 @@ export default function StorybookScreen() {
 											setCharacterName('');
 											setSelectedPhoto(null);
 											setGeneratedAvatar(null);
-											// Clear the child profile ID
+											// Clear the IDs
 											(global as any).currentChildProfileId = undefined;
+											(global as any).currentRegeneratingCharacterId = undefined;
 											
 										} catch (error) {
 											console.error('❌ Failed to save character:', error);
@@ -1915,7 +1973,15 @@ export default function StorybookScreen() {
 								<Text color="secondary" size="sm" style={{ marginBottom: 16 }}>Add family members or friends to make the story more personal</Text>
 								
 								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 30 }}>
-									{characters.map((char: Character) => {
+									{/* Combine Firebase child profile avatars with local characters */}
+									{[...profiles.filter(p => p.avatarUrl).map(p => ({
+										id: `profile-${p.id}`,
+										name: p.childName,
+										avatarUrl: p.avatarUrl!,
+										type: 'profile' as const,
+										createdAt: p.createdAt,
+										updatedAt: p.updatedAt
+									})), ...characters].map((char: Character | any) => {
 										const isSelected = conceptLearning.characterIds.includes(char.id);
 										return (
 											<TouchableOpacity 
@@ -2521,6 +2587,110 @@ export default function StorybookScreen() {
 		</Modal>
 	);
 
+	const renderCharacterManagementModal = () => (
+		<Modal visible={isCharacterManagementModalVisible} animationType="slide" transparent>
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+				<View style={{ width: '90%', backgroundColor: 'white', borderRadius: tokens.radius.xl, padding: tokens.spacing.gap.lg, maxWidth: 400 }}>
+					<TouchableOpacity onPress={() => {
+						setCharacterManagementModalVisible(false);
+						setSelectedCharacterForManagement(null);
+					}} style={{ alignSelf: 'flex-end', marginBottom: tokens.spacing.gap.sm }}>
+						<Ionicons name="close-circle" size={24} color={tokens.color.text.secondary} />
+					</TouchableOpacity>
+					
+					{selectedCharacterForManagement && (
+						<>
+							<RNText style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: tokens.spacing.gap.md, color: tokens.color.text.primary }}>
+								{selectedCharacterForManagement.name}
+							</RNText>
+							
+							{/* Character Image */}
+							<View style={{ alignItems: 'center', marginBottom: tokens.spacing.gap.lg }}>
+								<Image 
+									source={{ uri: selectedCharacterForManagement.avatarUrl }} 
+									style={{ 
+										width: 120, 
+										height: 120, 
+										borderRadius: 60,
+										borderWidth: 3,
+										borderColor: tokens.color.primary.default
+									}} 
+								/>
+							</View>
+							
+							{/* Action Buttons */}
+							<View style={{ gap: tokens.spacing.gap.md }}>
+								<GradientButton 
+									title="Regenerate Character" 
+									onPress={() => {
+										// Close character management modal
+										setCharacterManagementModalVisible(false);
+										
+										// Set up for regeneration
+										setCharacterName(selectedCharacterForManagement.name);
+										setSelectedPhoto(null);
+										setGeneratedAvatar(null);
+										setAvatarStep('upload');
+										
+										// Store character ID for regeneration
+										(global as any).currentRegeneratingCharacterId = selectedCharacterForManagement.id;
+										(global as any).currentChildProfileId = undefined; // Ensure this is not set
+										
+										// Open avatar creation modal
+										setAvatarModalVisible(true);
+										setSelectedCharacterForManagement(null);
+									}}
+									style={{ marginBottom: tokens.spacing.gap.sm }}
+								/>
+								
+								<TouchableOpacity 
+									onPress={() => {
+										Alert.alert(
+											'Delete Character',
+											`Are you sure you want to delete "${selectedCharacterForManagement.name}"? This action cannot be undone.`,
+											[
+												{ text: 'Cancel', style: 'cancel' },
+												{ 
+													text: 'Delete', 
+													style: 'destructive',
+													onPress: async () => {
+														try {
+															await deleteCharacter(selectedCharacterForManagement.id);
+															await loadCharacters(); // Reload to update UI
+															setCharacterManagementModalVisible(false);
+															setSelectedCharacterForManagement(null);
+															Alert.alert('Success', `${selectedCharacterForManagement.name} has been deleted.`);
+														} catch (error) {
+															console.error('Failed to delete character:', error);
+															Alert.alert('Error', 'Failed to delete character. Please try again.');
+														}
+													}
+												}
+											]
+										);
+									}}
+									style={{
+										backgroundColor: '#FEF2F2',
+										borderWidth: 1,
+										borderColor: '#FCA5A5',
+										borderRadius: tokens.radius.md,
+										padding: 16,
+										alignItems: 'center'
+									}}
+								>
+									<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+										<Ionicons name="trash-outline" size={20} color="#EF4444" />
+										<Text style={{ color: '#EF4444', fontWeight: '600' }}>Delete Character</Text>
+									</View>
+								</TouchableOpacity>
+							</View>
+						</>
+					)}
+				</View>
+			</View>
+		</Modal>
+	);
+
 	const renderPageRegenerateModal = () => (
 		<Modal visible={isPageRegenerateModalVisible} animationType="fade" transparent>
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
@@ -2612,6 +2782,7 @@ export default function StorybookScreen() {
 			{renderRefineModal()}
 			{renderRegenerateModal()}
 			{renderPageRegenerateModal()}
+			{renderCharacterManagementModal()}
 		</LinearGradient>
 	);
 }

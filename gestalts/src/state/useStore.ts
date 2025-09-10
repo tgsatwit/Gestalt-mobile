@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
-import childProfileService from '../services/childProfileService';
+// Use Firebase-enabled service instead of stub
+import childProfileService from '../services/childProfileServiceFirebase';
 import { ChildProfile as FirebaseChildProfile, CreateChildProfileData, UpdateChildProfileData } from '../types/profile';
 
 export type JournalEntry = { id: string; content: string; createdAtISO: string; mood?: 'good' | 'tough' | 'neutral'; type?: 'personal' | 'child'; childName?: string };

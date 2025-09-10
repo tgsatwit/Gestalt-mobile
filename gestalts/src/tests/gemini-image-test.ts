@@ -39,7 +39,7 @@ export async function testGeminiImageGeneration(): Promise<boolean> {
     const result = await GeminiService.generateStoryImage(testRequest);
     
     console.log('✅ Image generation test completed');
-    console.log('📄 Result:', result);
+    console.log('📄 Result:', result.startsWith('data:') ? `${result.substring(0, 50)}... [base64 data truncated]` : result);
     
     // Check if we got a real file path vs placeholder
     const isRealImage = result.includes('documentDirectory') || result.includes('storybook_images');

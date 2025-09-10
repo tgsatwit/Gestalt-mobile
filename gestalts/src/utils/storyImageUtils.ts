@@ -127,6 +127,7 @@ export function buildCharacterMappings(
     name: cm.name, 
     role: cm.role,
     hasAvatar: !!cm.avatarUrl,
+    avatarUrl: cm.avatarUrl ? 'URL_PROVIDED' : 'NO_URL',
     avatarIndex: cm.avatarIndex
   })));
   

@@ -7,7 +7,7 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
-import childProfileService from '../services/childProfileService';
+import { useMemoriesStore } from '../state/useStore';
 import { ChildProfile } from '../types/profile';
 
 export default function ChildProfilesListScreen() {
@@ -16,36 +16,38 @@ export default function ChildProfilesListScreen() {
 	const navigation = useNavigation();
 	const { getCurrentUserId } = useAuth();
 	
-	const [profiles, setProfiles] = useState<ChildProfile[]>([]);
-	const [loading, setLoading] = useState(true);
+	// Use centralized store instead of local state
+	const { 
+		profiles, 
+		profileLoading: loading, 
+		profileError: error,
+		loadUserProfiles,
+		deleteProfile,
+		clearProfileError
+	} = useMemoriesStore();
+	
 	const [refreshing, setRefreshing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	const loadProfiles = async (showRefreshing = false) => {
 		const userId = getCurrentUserId();
 		if (!userId) {
-			setError('User not authenticated');
-			setLoading(false);
+			console.error('User not authenticated');
 			return;
 		}
 
 		try {
 			if (showRefreshing) {
 				setRefreshing(true);
-			} else {
-				setLoading(true);
 			}
-			setError(null);
+			clearProfileError();
 			
-			const userProfiles = await childProfileService.getUserProfiles(userId);
-			setProfiles(userProfiles);
-
-			// Note: Removed auto-navigation to allow user to see empty state and choose to create profile
+			console.log('Loading user profiles from Firebase for user:', userId);
+			await loadUserProfiles(userId);
+			console.log('✅ User profiles loaded from Firebase');
+			
 		} catch (err) {
 			console.error('Failed to load child profiles:', err);
-			setError('Failed to load child profiles');
 		} finally {
-			setLoading(false);
 			setRefreshing(false);
 		}
 	};
@@ -84,9 +86,8 @@ export default function ChildProfilesListScreen() {
 					style: 'destructive',
 					onPress: async () => {
 						try {
-							await childProfileService.deleteProfile(profile.id, userId);
+							await deleteProfile(profile.id, userId);
 							Alert.alert('Success', 'Profile deleted successfully');
-							loadProfiles(); // Refresh list
 						} catch (err) {
 							console.error('Failed to delete profile:', err);
 							Alert.alert('Error', 'Failed to delete profile. Please try again.');
