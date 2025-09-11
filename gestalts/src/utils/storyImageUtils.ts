@@ -47,6 +47,7 @@ export function buildCharacterMappings(
     id: string;
     name: string;
     includeAsCharacter: boolean;
+    avatarUrl?: string; // Add avatar URL support for child profiles
   }
 ): CharacterMapping[] {
   console.log('buildCharacterMappings called with:');
@@ -67,13 +68,14 @@ export function buildCharacterMappings(
   // Priority 1: Child profile (always primary if included)
   if (childProfile?.includeAsCharacter && avatarIndex < 3) {
     console.log('  - Adding child profile as primary character:', childProfile.name);
+    console.log('  - Child profile avatar URL:', childProfile.avatarUrl ? 'PROVIDED' : 'NOT PROVIDED');
     characterMappings.push({
       characterId: childProfile.id,
       name: childProfile.name,
       role: 'primary',
-      avatarIndex: avatarIndex++,
+      avatarIndex: childProfile.avatarUrl ? avatarIndex++ : -1, // Only use avatar slot if URL provided
       visualDescription: `${childProfile.name} has warm, child-friendly Pixar-style features that embody curiosity and joy`,
-      avatarUrl: undefined // Child profiles are description-based
+      avatarUrl: childProfile.avatarUrl // Use the child's avatar if available
     });
   }
 

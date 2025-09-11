@@ -17,19 +17,36 @@ service firebase.storage {
              request.resource.size < 10 * 1024 * 1024; // 10MB limit
     }
     
-    // Users can access their own files
+    // Users can access their own files under user-specific namespaces
     match /users/{userId}/{allPaths=**} {
       allow read, write, create, delete: if isOwner(userId);
     }
-    
-    // User avatar images (for storybook characters) - allow read/write/create/delete
-    match /users/{userId}/avatars/{fileName} {
-      allow read, write, create, delete: if isOwner(userId);
+
+    // New avatar upload paths used by mobile app (REST streaming)
+    match /avatars/profiles/{userId}/{childProfileId}/{fileName} {
+      allow read: if true; // avatars are public to read
+      allow write, create, delete: if isOwner(userId) && isValidImageFile();
     }
-    
-    // User story images (for storybook stories) - allow read/write/create/delete
+
+    match /avatars/characters/{userId}/{characterId}/{fileName} {
+      allow read: if true;
+      allow write, create, delete: if isOwner(userId) && isValidImageFile();
+    }
+
+    match /avatars/temp/{userId}/{fileName} {
+      allow read: if true;
+      allow write, create, delete: if isOwner(userId) && isValidImageFile();
+    }
+
+    // Backward-compatible legacy paths still in use
+    match /users/{userId}/avatars/{fileName} {
+      allow read: if true;
+      allow write, create, delete: if isOwner(userId) && isValidImageFile();
+    }
+
     match /users/{userId}/stories/{storyId}/{fileName} {
-      allow read, write, create, delete: if isOwner(userId);
+      allow read: if true;
+      allow write, create, delete: if isOwner(userId) && isValidImageFile();
     }
     
     // Support legacy/fallback paths for story images
@@ -39,7 +56,8 @@ service firebase.storage {
     
     // Support character avatars in different path structure
     match /characterAvatars/{userId}/{fileName} {
-      allow read, write, create, delete: if isOwner(userId);
+      allow read: if true;
+      allow write, create, delete: if isOwner(userId) && isValidImageFile();
     }
     
     // Public assets (if needed for app functionality)

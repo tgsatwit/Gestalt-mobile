@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
 // Use Firebase-enabled service instead of stub
 import childProfileService from '../services/childProfileServiceFirebase';
+import avatarStorageService from '../services/avatarStorageService';
 import { ChildProfile as FirebaseChildProfile, CreateChildProfileData, UpdateChildProfileData } from '../types/profile';
 
 export type JournalEntry = { id: string; content: string; createdAtISO: string; mood?: 'good' | 'tough' | 'neutral'; type?: 'personal' | 'child'; childName?: string };
@@ -58,7 +59,8 @@ export type MemoriesState = {
 	setCurrentProfile: (profile: FirebaseChildProfile | null) => void;
 	clearProfileError: () => void;
 	// Avatar operations for child profiles
-	createChildAvatar: (profileId: string, userId: string, photoData: string) => Promise<void>;
+	createChildAvatar: (profileId: string, userId: string, avatarDataUrl: string, mode?: 'animated' | 'real') => Promise<void>;
+	removeChildAvatar: (profileId: string, userId: string, mode: 'animated' | 'real') => Promise<void>;
 };
 
 const generateId = () => Math.random().toString(36).slice(2);
@@ -204,12 +206,9 @@ export const useMemoriesStore = create<MemoriesState>()(
 				set({ profileError: null });
 			},
 			
-			createChildAvatar: async (profileId: string, userId: string, photoData: string) => {
+			createChildAvatar: async (profileId: string, userId: string, avatarDataUrl: string, mode: 'animated' | 'real' = 'animated') => {
 				set({ profileLoading: true, profileError: null });
 				try {
-					// Import geminiService dynamically to avoid circular dependency
-					const { default: geminiService } = await import('../services/geminiService');
-					
 					// Get the current profile to extract name
 					const currentProfiles = get().profiles;
 					const targetProfile = currentProfiles.find(p => p.id === profileId);
@@ -217,22 +216,39 @@ export const useMemoriesStore = create<MemoriesState>()(
 						throw new Error('Profile not found');
 					}
 					
-					// Generate avatar using Gemini with exact likeness
-					const avatarResult = await geminiService.generateAvatar({
-						photoData: photoData,
-						characterName: targetProfile.childName,
-						style: 'animated'
-					});
+					let animatedAvatarUrl: string | undefined;
+					let realAvatarUrl: string | undefined;
 					
-					// Handle both string and object return types
-					const avatarUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-					const visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+					// The avatarDataUrl is already generated, just upload it to Firebase Storage
+					if (avatarDataUrl) {
+						const upload = await avatarStorageService.uploadAvatar(avatarDataUrl, {
+							userId,
+							type: mode as 'animated' | 'real',
+							characterName: targetProfile.childName,
+							childProfileId: profileId,
+							createdAt: new Date().toISOString()
+						});
+						
+						if (mode === 'real') {
+							realAvatarUrl = upload.url;
+						} else {
+							animatedAvatarUrl = upload.url;
+						}
+					}
 					
 					// Update the profile with avatar information
 					const updates: UpdateChildProfileData = {
-						avatarUrl: avatarUrl,
-						visualProfile: visualProfile
+						avatarUrl: animatedAvatarUrl || realAvatarUrl // Legacy field - default to animated or real
 					};
+					
+					// Add dual avatar URLs to the updates if they exist
+					if (animatedAvatarUrl || realAvatarUrl) {
+						(updates as any).avatars = {
+							...(targetProfile as any).avatars,
+							...(animatedAvatarUrl ? { animated: animatedAvatarUrl } : {}),
+							...(realAvatarUrl ? { real: realAvatarUrl } : {})
+						};
+					}
 					
 					await get().updateProfile(profileId, userId, updates);
 					
@@ -241,6 +257,27 @@ export const useMemoriesStore = create<MemoriesState>()(
 					const errorMessage = error instanceof Error ? error.message : 'Failed to create avatar';
 					set({ profileError: errorMessage, profileLoading: false });
 					console.error('Failed to create child avatar:', error);
+					throw error;
+				}
+			},
+
+			removeChildAvatar: async (profileId: string, userId: string, mode: 'animated' | 'real') => {
+				set({ profileLoading: true, profileError: null });
+				try {
+					const profiles = get().profiles;
+					const targetProfile = profiles.find(p => p.id === profileId);
+					if (!targetProfile) throw new Error('Profile not found');
+					const avatars = { ...(targetProfile as any).avatars };
+					delete avatars[mode];
+					const updates: UpdateChildProfileData = {
+						avatarUrl: avatars.animated || avatars.real,
+					} as any;
+					(updates as any).avatars = avatars;
+					await get().updateProfile(profileId, userId, updates);
+					set({ profileLoading: false });
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Failed to remove avatar';
+					set({ profileError: errorMessage, profileLoading: false });
 					throw error;
 				}
 			},

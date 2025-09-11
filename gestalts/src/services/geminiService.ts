@@ -199,8 +199,8 @@ class GeminiService {
           console.log('Processing photo for real-mode with background removal...');
           logMessage = '✅ Real-mode avatar generated successfully with background removal';
           
-          // Real-mode prompt: remove background, keep person natural
-          imageEditPrompt = `Remove the background from this image while keeping the person exactly as they are in real life.
+          // Real-mode prompt: remove background, keep person natural, enhance with studio lighting
+          imageEditPrompt = `Remove the background from this image while keeping the person exactly as they are in real life, and enhance with professional studio lighting.
 
 CRITICAL REQUIREMENTS:
 - Keep the person EXACTLY as they appear in the original photo
@@ -220,9 +220,19 @@ BACKGROUND SPECIFICATIONS:
 - Character should be cleanly separated from background
 - Professional photo-style background removal
 
+LIGHTING ENHANCEMENTS:
+- Apply professional studio lighting to enhance the photo quality
+- Add soft, even key lighting from the front to eliminate harsh shadows
+- Include subtle fill lighting to brighten any darker areas naturally
+- Add a gentle rim light or hair light to create depth and separation
+- Ensure lighting looks natural and professional, as if taken in a high-end portrait studio
+- Maintain natural skin tone while improving overall illumination
+- Create a polished, professional headshot appearance
+- Keep lighting consistent with the person's natural features and skin tone
+
 ${request.characterName ? `Character name: ${request.characterName}` : ''}
 
-Remove the background while keeping the person completely natural and realistic.`;
+Remove the background and enhance with studio-quality lighting while keeping the person completely natural and realistic.`;
         } else {
           console.log('Transforming photo to Pixar-style using Gemini 2.5 Flash Image...');
           logMessage = '✅ Pixar avatar generated successfully with Gemini 2.5 Flash Image';

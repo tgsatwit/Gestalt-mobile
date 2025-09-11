@@ -189,7 +189,19 @@ export interface StoryGenerationRequest {
     id: string;
     name: string;
     includeAsCharacter: boolean;
+    avatarUrl?: string; // Optional avatar URL for the child
   };
+  
+  // Child profiles array for handling profile-based characters
+  childProfiles?: Array<{
+    id: string;
+    name: string;
+    avatarUrl?: string;
+    avatars?: {
+      animated?: string;
+      real?: string;
+    };
+  }>;
   
   // Advanced story settings
   advanced?: {

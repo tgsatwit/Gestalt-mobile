@@ -22,10 +22,11 @@ import {
   orderBy as fsOrderBy,
   serverTimestamp
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, getDownloadURL, deleteObject } from 'firebase/storage';
 // import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 // import storage from '@react-native-firebase/storage';
 import geminiService from '../services/geminiService';
+import avatarStorageService from '../services/avatarStorageService';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import authService from '../services/authService';
@@ -51,8 +52,10 @@ interface StorybookState {
   // Actions - Characters
   loadCharacters: () => Promise<void>;
   loadGestaltsCharacters: () => void;
-  createCharacterFromPhoto: (photoUri: string, name: string, mode?: 'animated' | 'real' | 'both') => Promise<Character>;
+  createCharacterFromPhoto: (photoUri: string, name: string, mode?: 'animated' | 'real', userId?: string) => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
+  updateCharacterAvatar: (characterId: string, mode: 'animated' | 'real', dataUrl: string, userId?: string) => Promise<Character>;
+  updateCharacterName: (characterId: string, newName: string) => Promise<void>;
   
   // Actions - Stories
   loadStories: () => Promise<void>;
@@ -105,47 +108,8 @@ const getCharacterAvatarUrl = (characterId: string, fallbackUrl: string): string
   return firebaseUrl; // Change this to fallbackUrl if you want to use DiceBear as primary
 };
 
-// Helper to upload image to Firebase Storage
-const uploadImageToStorage = async (imageUri: string, path: string): Promise<string> => {
-  const { initialized, storage } = getFirebaseServices();
-  if (!initialized || !storage) {
-    console.warn('Firebase Storage not initialized, using original URI');
-    return imageUri;
-  }
-
-  try {
-    // Read the image as blob/buffer
-    let response: Response;
-    if (imageUri.startsWith('data:')) {
-      // Handle base64 data URLs
-      response = await fetch(imageUri);
-    } else if (imageUri.startsWith('file://')) {
-      // Handle local file URIs
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      response = await fetch(`data:image/jpeg;base64,${base64}`);
-    } else {
-      // Handle HTTP URLs
-      response = await fetch(imageUri);
-    }
-    
-    const blob = await response.blob();
-    
-    // Create storage reference and upload
-    const imageRef = storageRef(storage, path);
-    const snapshot = await uploadBytes(imageRef, blob);
-    
-    // Get download URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    
-    console.log('Successfully uploaded to Firebase Storage:', downloadURL);
-    return downloadURL;
-  } catch (error) {
-    console.warn('Firebase Storage upload failed, using original URI:', error);
-    return imageUri; // Fallback to original URI
-  }
-};
+// NOTE: uploadImageToStorage function removed - now using avatarStorageService exclusively
+// This eliminates all ArrayBuffer/blob issues in React Native production builds
 
 // Helper to delete image from Firebase Storage
 const deleteImageFromStorage = async (imageUrl: string) => {
@@ -281,7 +245,7 @@ export const useStorybookStore = create<StorybookState>()(
       },
 
       // Create a character from a photo or existing avatar URL
-      createCharacterFromPhoto: async (photoUriOrAvatarUrl: string, name: string, mode: 'animated' | 'real' | 'both' = 'animated') => {
+      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' = 'animated', userId?: string) => {
         set({ 
           generationProgress: {
             status: 'uploading',
@@ -291,161 +255,164 @@ export const useStorybookStore = create<StorybookState>()(
         });
 
         try {
-          let avatarResult: any;
           let avatarUrl: string;
           let realAvatarUrl: string | undefined;
           let animatedAvatarUrl: string | undefined;
+          let visualProfile: any = undefined;
 
-          // Check if this is already a generated avatar URL (starts with http or https) or a file URI
-          if (photoUriOrAvatarUrl.startsWith('http') || photoUriOrAvatarUrl.startsWith('https')) {
-            // This is already a generated avatar URL, skip generation
-            console.log('🖼️ Using existing avatar URL:', photoUriOrAvatarUrl);
-            avatarUrl = photoUriOrAvatarUrl;
-            animatedAvatarUrl = photoUriOrAvatarUrl; // Assume it's animated since it's pre-generated
+          // Check if this is already a generated avatar URL (starts with http or https) or needs to be uploaded
+          if (photoUri.startsWith('http://') || photoUri.startsWith('https://')) {
+            // This is already a public URL, just use it directly
+            avatarUrl = photoUri;
+            animatedAvatarUrl = photoUri; // Assume it's animated since it's pre-generated
+            console.log('Using existing public URL directly:', avatarUrl);
             
-            // Skip the generation step and go straight to processing
             set({ 
               generationProgress: {
-                status: 'processing',
-                message: `Saving ${name} to your characters...`,
+                status: 'generating',
+                message: 'Saving avatar...',
+                progress: 80
+              }
+            });
+          } else if (photoUri.startsWith('data:')) {
+            // This is a generated data URL that needs to be uploaded to Firebase Storage
+            console.log('📤 Uploading generated avatar data URL to Firebase Storage');
+            
+            set({ 
+              generationProgress: {
+                status: 'uploading',
+                message: 'Uploading avatar to cloud storage...',
                 progress: 60
               }
             });
+
+            if (userId) {
+              const characterId = `char_${Date.now()}`;
+              
+              const upload = await avatarStorageService.uploadAvatar(photoUri, {
+                userId,
+                type: mode as 'animated' | 'real',
+                characterName: name,
+                characterId,
+                createdAt: new Date().toISOString()
+              });
+
+              avatarUrl = upload.url;
+              
+              if (mode === 'real') {
+                realAvatarUrl = upload.url;
+              } else {
+                animatedAvatarUrl = upload.url;
+              }
+            } else {
+              // Fallback to data URL if no userId
+              avatarUrl = photoUri;
+              if (mode === 'real') {
+                realAvatarUrl = photoUri;
+              } else {
+                animatedAvatarUrl = photoUri;
+              }
+            }
           } else {
-            // This is a photo file URI, need to generate avatar(s)
-            console.log('📸 Processing photo file for avatar generation:', photoUriOrAvatarUrl);
+            // This is a photo file URI, need to generate avatar
+            console.log('📸 Processing photo file for avatar generation:', photoUri);
             
             // Read photo as base64
-            const photoData = await FileSystem.readAsStringAsync(photoUriOrAvatarUrl, {
+            const photoData = await FileSystem.readAsStringAsync(photoUri, {
               encoding: FileSystem.EncodingType.Base64,
             });
 
-            // Generate avatars based on mode
-            if (mode === 'both') {
+            // Generate single avatar based on mode
+            set({ 
+              generationProgress: {
+                status: 'generating',
+                message: `Creating ${mode} avatar for ${name}...`,
+                progress: 30
+              }
+            });
+
+            const avatarResult = await geminiService.generateAvatar({
+              photoData: `data:image/jpeg;base64,${photoData}`,
+              style: mode === 'real' ? 'real' : 'animated',
+              mode: mode,
+              characterName: name
+            });
+
+            // Handle both string and object return types
+            const generatedDataUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+            visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+            
+            // Upload avatar to Firebase Storage if userId is provided
+            if (userId && generatedDataUrl) {
               set({ 
                 generationProgress: {
-                  status: 'generating',
-                  message: `Creating animated avatar for ${name}...`,
-                  progress: 20
+                  status: 'uploading',
+                  message: 'Uploading avatar to cloud storage...',
+                  progress: 60
                 }
               });
 
-              // Generate animated avatar
-              const animatedResult = await geminiService.generateAvatar({
-                photoData: `data:image/jpeg;base64,${photoData}`,
-                style: 'animated',
-                mode: 'animated',
-                characterName: name
+              const characterId = `char_${Date.now()}`;
+              
+              const upload = await avatarStorageService.uploadAvatar(generatedDataUrl, {
+                userId,
+                type: mode as 'animated' | 'real',
+                characterName: name,
+                characterId,
+                createdAt: new Date().toISOString()
               });
 
-              set({ 
-                generationProgress: {
-                  status: 'generating',
-                  message: `Creating real-life avatar for ${name}...`,
-                  progress: 50
-                }
-              });
-
-              // Generate real-life avatar
-              const realResult = await geminiService.generateAvatar({
-                photoData: `data:image/jpeg;base64,${photoData}`,
-                style: 'real',
-                mode: 'real',
-                characterName: name
-              });
-
-              // Handle both string and object return types
-              animatedAvatarUrl = typeof animatedResult === 'string' ? animatedResult : animatedResult.imageUrl;
-              realAvatarUrl = typeof realResult === 'string' ? realResult : realResult.imageUrl;
-              avatarUrl = animatedAvatarUrl; // Default to animated for backwards compatibility
-              avatarResult = animatedResult; // Use animated result for visual profile
-            } else {
-              set({ 
-                generationProgress: {
-                  status: 'generating',
-                  message: `Creating ${mode} avatar for ${name}...`,
-                  progress: 30
-                }
-              });
-
-              // Generate single avatar based on mode
-              avatarResult = await geminiService.generateAvatar({
-                photoData: `data:image/jpeg;base64,${photoData}`,
-                style: mode === 'real' ? 'real' : 'animated',
-                mode: mode,
-                characterName: name
-              });
-
-              // Handle both string and object return types
-              const generatedUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-              avatarUrl = generatedUrl;
+              avatarUrl = upload.url;
               
               if (mode === 'real') {
-                realAvatarUrl = generatedUrl;
+                realAvatarUrl = upload.url;
               } else {
-                animatedAvatarUrl = generatedUrl;
+                animatedAvatarUrl = upload.url;
+              }
+            } else {
+              // Fallback to data URL if no userId or upload fails
+              avatarUrl = generatedDataUrl;
+              
+              if (mode === 'real') {
+                realAvatarUrl = generatedDataUrl;
+              } else {
+                animatedAvatarUrl = generatedDataUrl;
               }
             }
           }
 
-          // Upload to Firebase Storage if configured, otherwise use generated URL
-          let finalAvatarUrl = avatarUrl;
-          const { initialized } = getFirebaseServices();
-          if (initialized && avatarUrl) {
-            try {
-              const userId = getUserId();
-              const timestamp = Date.now();
-              const path = `users/${userId}/avatars/${timestamp}_${name.replace(/\s+/g, '_')}.jpg`;
-              finalAvatarUrl = await uploadImageToStorage(avatarUrl, path);
-              console.log('☁️ Avatar uploaded to Firebase Storage:', finalAvatarUrl);
-            } catch (error) {
-              console.warn('Failed to upload avatar to Firebase Storage, using generated URL:', error);
-              finalAvatarUrl = avatarUrl;
-            }
-          }
+          // Create character object with dual avatar support (omit undefined avatar fields)
+          const characterAvatars: any = {};
+          if (animatedAvatarUrl) characterAvatars.animated = animatedAvatarUrl;
+          if (realAvatarUrl) characterAvatars.real = realAvatarUrl;
 
-          // Create character object with enhanced visual profile for story consistency
-          const visualProfile = typeof avatarResult === 'string' ? undefined : avatarResult.visualProfile;
           const character: Character = {
             id: `char_${Date.now()}`,
             name,
-            type: 'user',
-            avatarUrl: finalAvatarUrl, // Legacy field for backwards compatibility
-            avatars: {
-              animated: animatedAvatarUrl,
-              real: realAvatarUrl
-            },
+            avatarUrl: avatarUrl, // Legacy field for backwards compatibility
+            avatars: characterAvatars,
+            type: 'user', // User-created character
+            visualProfile: visualProfile,
             createdAt: new Date(),
-            updatedAt: new Date(),
-            visualProfile: visualProfile ? {
-              ...visualProfile,
-              // Ensure all required fields are present for story generation
-              appearance: visualProfile.appearance || `${name} has warm, expressive animated features perfect for storytelling`,
-              style: visualProfile.style || 'Consistent, child-friendly design with memorable visual elements',
-              personality: visualProfile.personality || 'Engaging, approachable personality that connects with children',
-              keyFeatures: visualProfile.keyFeatures || ['Distinctive appearance', 'Expressive features', 'Consistent design', 'Child-friendly appeal']
-            } : {
-              appearance: `${name} has warm, expressive animated features perfect for storytelling`,
-              style: 'Consistent, child-friendly design with memorable visual elements',
-              personality: 'Engaging, approachable personality that connects with children',
-              keyFeatures: ['Distinctive appearance', 'Expressive features', 'Consistent design', 'Child-friendly appeal']
-            }
+            updatedAt: new Date()
           };
-          
-          console.log(`Created character ${name} with visual profile for story consistency:`, character.visualProfile);
 
           // Save to Firebase Firestore
-          const { db } = getFirebaseServices();
+          const { initialized, db } = getFirebaseServices();
           if (initialized && db) {
-            const userId = getUserId();
-            await setDoc(doc(db, 'users', userId, 'characters', character.id), {
+            const currentUserId = userId || getUserId();
+            const docData: any = {
               name: character.name,
               type: character.type,
               avatarUrl: character.avatarUrl,
               visualProfile: character.visualProfile,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
-            });
+            };
+            if (character.avatars && Object.keys(character.avatars).length > 0) {
+              docData.avatars = character.avatars;
+            }
+            await setDoc(doc(db, 'users', currentUserId, 'characters', character.id), docData);
           }
 
           // Update local state
@@ -453,7 +420,7 @@ export const useStorybookStore = create<StorybookState>()(
             characters: [...state.characters, character],
             generationProgress: {
               status: 'complete',
-              message: `${name} is ready for storytelling!`,
+              message: 'Avatar created successfully!',
               progress: 100
             }
           }));
@@ -499,6 +466,77 @@ export const useStorybookStore = create<StorybookState>()(
           }));
         } catch (error) {
           console.error('Failed to delete character:', error);
+          throw error;
+        }
+      },
+
+      // Update or add an avatar mode for an existing character
+      updateCharacterAvatar: async (characterId: string, mode: 'animated' | 'real', dataUrl: string, userId?: string) => {
+        try {
+          const { initialized, db } = getFirebaseServices();
+          const uid = userId || getUserId();
+          if (!uid) throw new Error('User not authenticated');
+
+          // Upload to Storage if dataUrl is data: scheme
+          let finalUrl = dataUrl;
+          if (dataUrl.startsWith('data:')) {
+            const upload = await avatarStorageService.uploadAvatar(dataUrl, {
+              userId: uid,
+              type: mode,
+              characterName: characterId,
+              characterId,
+              createdAt: new Date().toISOString()
+            });
+            finalUrl = upload.url;
+          }
+
+          // Update Firestore
+          if (initialized && db) {
+            const char = get().characters.find(c => c.id === characterId);
+            const avatars: any = { ...(char?.avatars || {}) };
+            avatars[mode] = finalUrl;
+            const update: any = { avatars, updatedAt: serverTimestamp() };
+            if (!char?.avatarUrl) {
+              update.avatarUrl = finalUrl; // maintain legacy field if missing
+            }
+            await updateDoc(doc(db, 'users', uid, 'characters', characterId), update);
+          }
+
+          // Update local state
+          const updated = get().characters.map(c => 
+            c.id === characterId ? ({
+              ...c,
+              avatars: { ...(c.avatars || {}), [mode]: finalUrl },
+              avatarUrl: c.avatarUrl || finalUrl,
+              updatedAt: new Date()
+            }) as Character : c
+          );
+          set({ characters: updated });
+          const updatedChar = updated.find(c => c.id === characterId)!;
+          return updatedChar;
+        } catch (error) {
+          console.error('Failed to update character avatar:', error);
+          throw error;
+        }
+      },
+
+      // Rename an existing character
+      updateCharacterName: async (characterId: string, newName: string) => {
+        try {
+          const { initialized, db } = getFirebaseServices();
+          const uid = getUserId();
+          if (!uid) throw new Error('User not authenticated');
+          if (initialized && db) {
+            await updateDoc(doc(db, 'users', uid, 'characters', characterId), {
+              name: newName,
+              updatedAt: serverTimestamp()
+            });
+          }
+          set(state => ({
+            characters: state.characters.map(c => c.id === characterId ? { ...c, name: newName, updatedAt: new Date() } : c)
+          }));
+        } catch (error) {
+          console.error('Failed to rename character:', error);
           throw error;
         }
       },
@@ -585,8 +623,46 @@ export const useStorybookStore = create<StorybookState>()(
           console.log('All available characters:', allAvailableCharacters.map(c => ({ id: c.id, name: c.name })));
           console.log('Requested character IDs:', request.characterIds);
           
+          // Handle profile-based character IDs specially
+          const profileCharacterIds = request.characterIds.filter(id => id.startsWith('profile-'));
+          const regularCharacterIds = request.characterIds.filter(id => !id.startsWith('profile-'));
+          
+          // Create temporary Character objects for child profiles
+          const profileCharacters: Character[] = [];
+          if (profileCharacterIds.length > 0 && request.childProfiles) {
+            for (const profileId of profileCharacterIds) {
+              const childProfileId = profileId.replace('profile-', '');
+              const childProfile = request.childProfiles.find(p => p.id === childProfileId);
+              if (childProfile) {
+                // Get the appropriate avatar URL based on story mode
+                const storyMode = request.storyMode || 'animated';
+                let avatarUrl: string | undefined;
+                
+                if (childProfile.avatars) {
+                  avatarUrl = storyMode === 'real' ? 
+                    (childProfile.avatars.real || childProfile.avatars.animated || childProfile.avatarUrl) :
+                    (childProfile.avatars.animated || childProfile.avatars.real || childProfile.avatarUrl);
+                } else {
+                  avatarUrl = childProfile.avatarUrl;
+                }
+                
+                profileCharacters.push({
+                  id: profileId,
+                  name: childProfile.name,
+                  type: 'user',
+                  avatarUrl: avatarUrl || '', // Default to empty string if no avatar
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                });
+              }
+            }
+          }
+          
+          // Combine all characters for selection
+          const allCharactersWithProfiles = [...allAvailableCharacters, ...profileCharacters];
+          
           // Filter selected characters
-          const selectedCharacters = allAvailableCharacters.filter(c => 
+          const selectedCharacters = allCharactersWithProfiles.filter(c => 
             request.characterIds.includes(c.id)
           );
           console.log('Selected characters:', selectedCharacters.map(c => ({ id: c.id, name: c.name })));
@@ -676,8 +752,9 @@ export const useStorybookStore = create<StorybookState>()(
             console.log(`Page ${i + 1} - Reference images:`, referenceImages.length);
             
             // Build optimized character profiles using utility functions
+            // Pass the combined characters list that includes profile characters
             const characterProfiles = buildCharacterMappings(
-              allAvailableCharacters,
+              allCharactersWithProfiles,
               request.characterIds,
               request.childProfile
             );
@@ -739,7 +816,7 @@ export const useStorybookStore = create<StorybookState>()(
             // Upload to Firebase Storage if configured, otherwise use generated URL
             let finalImageUrl = imageUrl;
             const { initialized } = getFirebaseServices();
-            if (initialized) {
+            if (initialized && imageUrl.startsWith('data:')) {
               try {
                 set({ 
                   generationProgress: {
@@ -752,8 +829,17 @@ export const useStorybookStore = create<StorybookState>()(
                 });
                 
                 const userId = getUserId();
-                const path = `users/${userId}/stories/${story.id}/page_${String(i + 1).padStart(2, '0')}.jpg`;
-                finalImageUrl = await uploadImageToStorage(imageUrl, path);
+                
+                // Use avatarStorageService for safe upload without ArrayBuffer issues
+                const upload = await avatarStorageService.uploadAvatar(imageUrl, {
+                  userId,
+                  type: 'animated', // Story images are considered animated type
+                  characterName: story.title,
+                  characterId: `story_${story.id}_page_${i + 1}`,
+                  createdAt: new Date().toISOString()
+                });
+                
+                finalImageUrl = upload.url;
                 console.log(`Successfully uploaded page ${i + 1} image to Firebase Storage`);
               } catch (error) {
                 console.warn(`Failed to upload page ${i + 1} to Firebase Storage, using generated URL:`, error);
@@ -893,13 +979,22 @@ export const useStorybookStore = create<StorybookState>()(
 
           // Upload refined image to Firebase Storage if configured
           let finalImageUrl = refinedImageUrl;
-          if (refinedImageUrl !== page.imageUrl) {
+          if (refinedImageUrl !== page.imageUrl && refinedImageUrl.startsWith('data:')) {
             const { initialized } = getFirebaseServices();
             if (initialized) {
               try {
                 const userId = getUserId();
-                const path = `users/${userId}/stories/${storyId}/page_${pageIndex + 1}_refined_${Date.now()}.jpg`;
-                finalImageUrl = await uploadImageToStorage(refinedImageUrl, path);
+                
+                // Use avatarStorageService for safe upload without ArrayBuffer issues
+                const upload = await avatarStorageService.uploadAvatar(refinedImageUrl, {
+                  userId,
+                  type: 'animated', // Story images are considered animated type
+                  characterName: `refined_${story.title}`,
+                  characterId: `story_${storyId}_page_${pageIndex + 1}_refined_${Date.now()}`,
+                  createdAt: new Date().toISOString()
+                });
+                
+                finalImageUrl = upload.url;
               } catch (error) {
                 console.warn('Failed to upload refined image to Firebase Storage, using generated URL:', error);
                 finalImageUrl = refinedImageUrl;

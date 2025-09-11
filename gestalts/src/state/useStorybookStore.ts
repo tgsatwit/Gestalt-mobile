@@ -10,6 +10,7 @@ import {
   AvatarGenerationRequest
 } from '../types/storybook';
 import geminiService from '../services/geminiService';
+import avatarStorageService from '../services/avatarStorageService';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
@@ -122,7 +123,7 @@ export const useStorybookStore = create<StorybookState>()(
       },
 
       // Create a character from a photo
-      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' | 'both' = 'animated') => {
+      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' = 'animated', userId?: string) => {
         set({ 
           generationProgress: {
             status: 'uploading',
@@ -158,46 +159,7 @@ export const useStorybookStore = create<StorybookState>()(
               encoding: FileSystem.EncodingType.Base64,
             });
 
-            // Generate avatars based on mode
-            if (mode === 'both') {
-              set({ 
-                generationProgress: {
-                  status: 'generating',
-                  message: 'Creating animated avatar...',
-                  progress: 20
-                }
-              });
-
-              // Generate animated avatar
-              const animatedResult = await geminiService.generateAvatar({
-                photoData: `data:image/jpeg;base64,${photoData}`,
-                style: 'animated',
-                mode: 'animated',
-                characterName: name
-              });
-
-              set({ 
-                generationProgress: {
-                  status: 'generating',
-                  message: 'Creating real-life avatar...',
-                  progress: 60
-                }
-              });
-
-              // Generate real-life avatar
-              const realResult = await geminiService.generateAvatar({
-                photoData: `data:image/jpeg;base64,${photoData}`,
-                style: 'real',
-                mode: 'real',
-                characterName: name
-              });
-
-              // Handle both string and object return types
-              animatedAvatarUrl = typeof animatedResult === 'string' ? animatedResult : animatedResult.imageUrl;
-              realAvatarUrl = typeof realResult === 'string' ? realResult : realResult.imageUrl;
-              avatarUrl = animatedAvatarUrl; // Default to animated for backwards compatibility
-              visualProfile = typeof animatedResult === 'object' ? animatedResult.visualProfile : undefined;
-            } else {
+            // Generate single avatar based on mode
               set({ 
                 generationProgress: {
                   status: 'generating',
@@ -206,25 +168,53 @@ export const useStorybookStore = create<StorybookState>()(
                 }
               });
 
-              // Generate single avatar based on mode
-              const avatarResult = await geminiService.generateAvatar({
-                photoData: `data:image/jpeg;base64,${photoData}`,
-                style: mode === 'real' ? 'real' : 'animated',
-                mode: mode,
-                characterName: name
+            const avatarResult = await geminiService.generateAvatar({
+              photoData: `data:image/jpeg;base64,${photoData}`,
+              style: mode === 'real' ? 'real' : 'animated',
+              mode: mode,
+              characterName: name
+            });
+
+            // Handle both string and object return types
+            const generatedDataUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+            visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+            
+            // Upload avatar to Firebase Storage if userId is provided
+            if (userId && generatedDataUrl) {
+              set({ 
+                generationProgress: {
+                  status: 'uploading',
+                  message: 'Uploading avatar to cloud storage...',
+                  progress: 60
+                }
               });
 
-              // Handle both string and object return types
-              const generatedUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-              avatarUrl = generatedUrl;
+              const characterId = `char_${Date.now()}`;
+              
+              const upload = await avatarStorageService.uploadAvatar(generatedDataUrl, {
+                userId,
+                type: mode as 'animated' | 'real',
+                characterName: name,
+                characterId,
+                createdAt: new Date().toISOString()
+              });
+
+              avatarUrl = upload.url;
               
               if (mode === 'real') {
-                realAvatarUrl = generatedUrl;
+                realAvatarUrl = upload.url;
               } else {
-                animatedAvatarUrl = generatedUrl;
+                animatedAvatarUrl = upload.url;
               }
+            } else {
+              // Fallback to data URL if no userId or upload fails
+              avatarUrl = generatedDataUrl;
               
-              visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+              if (mode === 'real') {
+                realAvatarUrl = generatedDataUrl;
+              } else {
+                animatedAvatarUrl = generatedDataUrl;
+              }
             }
           }
 
@@ -243,7 +233,7 @@ export const useStorybookStore = create<StorybookState>()(
             updatedAt: new Date()
           };
 
-          // Update local state (no Firebase for now)
+          // Update local state
           set(state => ({
             characters: [...state.characters, character],
             generationProgress: {
@@ -260,8 +250,14 @@ export const useStorybookStore = create<StorybookState>()(
 
           return character;
         } catch (error: any) {
+          console.error('Failed to create character from photo:', error);
           set({ 
-            error: error,
+            error: {
+              code: 'CHARACTER_CREATION_ERROR',
+              message: error?.message || 'Failed to create avatar',
+              details: error,
+              retryable: true
+            },
             generationProgress: {
               status: 'error',
               message: 'Failed to create avatar',

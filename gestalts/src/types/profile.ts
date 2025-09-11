@@ -11,7 +11,11 @@ export interface ChildProfile {
   createdAt: Date;
   updatedAt: Date;
   // Avatar information
-  avatarUrl?: string;
+  avatarUrl?: string; // Legacy field for backwards compatibility
+  avatars?: {
+    animated?: string; // Animated/cartoon style avatar URL
+    real?: string; // Real-life photo with background removed URL
+  };
   visualProfile?: {
     appearance: string;
     style: string;
@@ -29,7 +33,11 @@ export interface CreateChildProfileData {
   challenges?: string;
   strengths?: string;
   // Avatar information
-  avatarUrl?: string;
+  avatarUrl?: string; // Legacy field for backwards compatibility
+  avatars?: {
+    animated?: string; // Animated/cartoon style avatar URL
+    real?: string; // Real-life photo with background removed URL
+  };
   visualProfile?: {
     appearance: string;
     style: string;
