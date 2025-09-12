@@ -34,7 +34,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   isChildProfile = false
 }) => {
   const themeContext = useTheme();
-  const { pickImageFromGallery, takePhoto, updateCharacterAvatar, updateCharacterName, deleteCharacter, createCharacterFromPhoto } = useStorybookStore();
+  const { pickImageFromGallery, takePhoto, updateCharacterAvatar, updateCharacterName, updateCharacterMetadata, deleteCharacter, createCharacterFromPhoto } = useStorybookStore();
   const { createChildAvatar } = useMemoriesStore();
   const { getCurrentUserId } = useAuth();
   
@@ -63,6 +63,11 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   const [newName, setNewName] = useState(profile.childName || profile.name);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentAvatarType, setCurrentAvatarType] = useState(avatarType);
+  
+  // Character metadata editing (only for custom characters, not child profiles)
+  const [isEditingMetadata, setIsEditingMetadata] = useState(false);
+  const [newRole, setNewRole] = useState<'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend'>(profile.role || 'Friend');
+  const [newAge, setNewAge] = useState(profile.age || '');
   
   // Get current avatar URL based on type - no fallback to other type
   const getCurrentAvatarUrl = () => {
@@ -100,6 +105,33 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
     } catch (error) {
       console.error('Failed to rename character:', error);
       Alert.alert('Error', 'Failed to update name. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateMetadata = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Update character metadata in Firebase
+      await updateCharacterMetadata(profile.id, newRole, newAge.trim() || undefined);
+      
+      // Update the profile locally
+      const updatedProfile = {
+        ...profile,
+        role: newRole,
+        age: newAge.trim() || undefined,
+        updatedAt: new Date()
+      };
+      
+      onProfileUpdate?.(updatedProfile);
+      setIsEditingMetadata(false);
+      
+      Alert.alert('Success', 'Character details updated successfully');
+    } catch (error) {
+      console.error('Failed to update character metadata:', error);
+      Alert.alert('Error', 'Failed to update character details. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -239,7 +271,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
         { 
           text: 'Choose from Gallery', 
           onPress: async () => {
-            const photoUri = await pickImage();
+            const photoUri = await pickImageFromGallery();
             if (photoUri) {
               await processPhotoForAvatar(photoUri);
             }
@@ -516,6 +548,129 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
                 />
                 <Text weight="medium">Rename</Text>
               </TouchableOpacity>
+            )}
+
+            {/* Edit Character Details - Only for custom characters (not child profiles) */}
+            {!isChildProfile && (
+              <>
+                {isEditingMetadata ? (
+                  <View style={{
+                    padding: padding.md,
+                    backgroundColor: 'white',
+                    borderRadius: tokens.radius.md,
+                    borderWidth: 1,
+                    borderColor: tokens.color.border.default,
+                    gap: tokens.spacing.gap.md
+                  }}>
+                    {/* Relationship Selection */}
+                    <View>
+                      <Text weight="semibold" style={{ marginBottom: 8 }}>Relationship</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {(['Mum', 'Dad', 'Brother', 'Sister', 'Grandparent', 'Friend'] as const).map((role) => (
+                          <TouchableOpacity
+                            key={role}
+                            onPress={() => setNewRole(role)}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: tokens.radius.md,
+                              borderWidth: 1,
+                              borderColor: newRole === role ? tokens.color.primary.default : tokens.color.border.default,
+                              backgroundColor: newRole === role ? "#F3E8FF" : 'transparent'
+                            }}
+                          >
+                            <Text size="sm" style={{ 
+                              color: newRole === role ? tokens.color.primary.default : tokens.color.text.primary,
+                              textTransform: 'capitalize'
+                            }}>
+                              {role}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                    
+                    {/* Age Input */}
+                    <View>
+                      <Text weight="semibold" style={{ marginBottom: 8 }}>Age</Text>
+                      <TextInput
+                        value={newAge}
+                        onChangeText={setNewAge}
+                        placeholder="Enter age (e.g., 35, 8 years old)"
+                        style={{
+                          borderWidth: 1,
+                          borderColor: tokens.color.border.default,
+                          borderRadius: tokens.radius.md,
+                          paddingHorizontal: padding.md,
+                          paddingVertical: padding.sm,
+                          fontSize: 16,
+                          color: tokens.color.text.primary
+                        }}
+                      />
+                    </View>
+                    
+                    {/* Action Buttons */}
+                    <View style={{
+                      flexDirection: 'row',
+                      gap: tokens.spacing.gap.sm,
+                      justifyContent: 'flex-end'
+                    }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setIsEditingMetadata(false);
+                          setNewRole(profile.role || 'friend');
+                          setNewAge(profile.age || '');
+                        }}
+                        style={{
+                          paddingHorizontal: padding.md,
+                          paddingVertical: padding.sm
+                        }}
+                      >
+                        <Text color="secondary">Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleUpdateMetadata}
+                        disabled={isProcessing}
+                        style={{
+                          backgroundColor: tokens.color.primary.default,
+                          paddingHorizontal: padding.md,
+                          paddingVertical: padding.sm,
+                          borderRadius: tokens.radius.md
+                        }}
+                      >
+                        <Text color="white" weight="medium">Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setIsEditingMetadata(true)}
+                    disabled={isProcessing}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: padding.md,
+                      backgroundColor: 'white',
+                      borderRadius: tokens.radius.md,
+                      borderWidth: 1,
+                      borderColor: tokens.color.border.default
+                    }}
+                  >
+                    <Ionicons 
+                      name="person" 
+                      size={20} 
+                      color={tokens.color.primary.default} 
+                      style={{ marginRight: tokens.spacing.gap.sm }} 
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text weight="medium">Edit Details</Text>
+                      <Text size="sm" color="secondary">
+                        {profile.role ? `${profile.role}${profile.age ? `, ${profile.age}` : ''}` : 'Add relationship and age'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </>
             )}
 
             {/* Select New Photo */}

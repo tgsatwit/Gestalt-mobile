@@ -123,7 +123,7 @@ export const useStorybookStore = create<StorybookState>()(
       },
 
       // Create a character from a photo
-      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' = 'animated', userId?: string) => {
+      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' | 'both' = 'animated', userId?: string) => {
         set({ 
           generationProgress: {
             status: 'uploading',
@@ -159,7 +159,86 @@ export const useStorybookStore = create<StorybookState>()(
               encoding: FileSystem.EncodingType.Base64,
             });
 
-            // Generate single avatar based on mode
+            if (mode === 'both') {
+              // Generate both animated and real avatars
+              set({ 
+                generationProgress: {
+                  status: 'generating',
+                  message: 'Creating animated avatar...',
+                  progress: 30
+                }
+              });
+
+              // Generate animated avatar
+              const animatedResult = await geminiService.generateAvatar({
+                photoData: `data:image/jpeg;base64,${photoData}`,
+                style: 'animated',
+                mode: 'animated',
+                characterName: name
+              });
+
+              const animatedDataUrl = typeof animatedResult === 'string' ? animatedResult : animatedResult.imageUrl;
+              visualProfile = typeof animatedResult === 'object' ? animatedResult.visualProfile : undefined;
+
+              set({ 
+                generationProgress: {
+                  status: 'generating',
+                  message: 'Creating real avatar...',
+                  progress: 50
+                }
+              });
+
+              // Generate real avatar
+              const realResult = await geminiService.generateAvatar({
+                photoData: `data:image/jpeg;base64,${photoData}`,
+                style: 'real',
+                mode: 'real',
+                characterName: name
+              });
+
+              const realDataUrl = typeof realResult === 'string' ? realResult : realResult.imageUrl;
+
+              // Upload both avatars to Firebase Storage if userId is provided
+              if (userId && animatedDataUrl && realDataUrl) {
+                set({ 
+                  generationProgress: {
+                    status: 'uploading',
+                    message: 'Uploading avatars to cloud storage...',
+                    progress: 70
+                  }
+                });
+
+                const characterId = `char_${Date.now()}`;
+                
+                // Upload animated avatar
+                const animatedUpload = await avatarStorageService.uploadAvatar(animatedDataUrl, {
+                  userId,
+                  type: 'animated',
+                  characterName: name,
+                  characterId,
+                  createdAt: new Date().toISOString()
+                });
+
+                // Upload real avatar
+                const realUpload = await avatarStorageService.uploadAvatar(realDataUrl, {
+                  userId,
+                  type: 'real',
+                  characterName: name,
+                  characterId,
+                  createdAt: new Date().toISOString()
+                });
+
+                animatedAvatarUrl = animatedUpload.url;
+                realAvatarUrl = realUpload.url;
+                avatarUrl = animatedAvatarUrl; // Default to animated for legacy compatibility
+              } else {
+                // Fallback to data URLs if no userId or upload fails
+                animatedAvatarUrl = animatedDataUrl;
+                realAvatarUrl = realDataUrl;
+                avatarUrl = animatedAvatarUrl; // Default to animated for legacy compatibility
+              }
+            } else {
+              // Generate single avatar based on mode
               set({ 
                 generationProgress: {
                   status: 'generating',
@@ -168,52 +247,53 @@ export const useStorybookStore = create<StorybookState>()(
                 }
               });
 
-            const avatarResult = await geminiService.generateAvatar({
-              photoData: `data:image/jpeg;base64,${photoData}`,
-              style: mode === 'real' ? 'real' : 'animated',
-              mode: mode,
-              characterName: name
-            });
+              const avatarResult = await geminiService.generateAvatar({
+                photoData: `data:image/jpeg;base64,${photoData}`,
+                style: mode === 'real' ? 'real' : 'animated',
+                mode: mode,
+                characterName: name
+              });
 
-            // Handle both string and object return types
-            const generatedDataUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
-            visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
-            
-            // Upload avatar to Firebase Storage if userId is provided
-            if (userId && generatedDataUrl) {
-              set({ 
-                generationProgress: {
-                  status: 'uploading',
-                  message: 'Uploading avatar to cloud storage...',
-                  progress: 60
+              // Handle both string and object return types
+              const generatedDataUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+              visualProfile = typeof avatarResult === 'object' ? avatarResult.visualProfile : undefined;
+              
+              // Upload avatar to Firebase Storage if userId is provided
+              if (userId && generatedDataUrl) {
+                set({ 
+                  generationProgress: {
+                    status: 'uploading',
+                    message: 'Uploading avatar to cloud storage...',
+                    progress: 60
+                  }
+                });
+
+                const characterId = `char_${Date.now()}`;
+                
+                const upload = await avatarStorageService.uploadAvatar(generatedDataUrl, {
+                  userId,
+                  type: mode as 'animated' | 'real',
+                  characterName: name,
+                  characterId,
+                  createdAt: new Date().toISOString()
+                });
+
+                avatarUrl = upload.url;
+                
+                if (mode === 'real') {
+                  realAvatarUrl = upload.url;
+                } else {
+                  animatedAvatarUrl = upload.url;
                 }
-              });
-
-              const characterId = `char_${Date.now()}`;
-              
-              const upload = await avatarStorageService.uploadAvatar(generatedDataUrl, {
-                userId,
-                type: mode as 'animated' | 'real',
-                characterName: name,
-                characterId,
-                createdAt: new Date().toISOString()
-              });
-
-              avatarUrl = upload.url;
-              
-              if (mode === 'real') {
-                realAvatarUrl = upload.url;
               } else {
-                animatedAvatarUrl = upload.url;
-              }
-            } else {
-              // Fallback to data URL if no userId or upload fails
-              avatarUrl = generatedDataUrl;
-              
-              if (mode === 'real') {
-                realAvatarUrl = generatedDataUrl;
-              } else {
-                animatedAvatarUrl = generatedDataUrl;
+                // Fallback to data URL if no userId or upload fails
+                avatarUrl = generatedDataUrl;
+                
+                if (mode === 'real') {
+                  realAvatarUrl = generatedDataUrl;
+                } else {
+                  animatedAvatarUrl = generatedDataUrl;
+                }
               }
             }
           }
@@ -364,9 +444,11 @@ export const useStorybookStore = create<StorybookState>()(
             });
 
             pages.push({
+              id: `page_${story.id}_${i + 1}`,
               pageNumber: i + 1,
               text: storyTexts[i],
-              imageUrl: imageUrl
+              imageUrl: imageUrl,
+              generationStatus: 'completed' as const
             });
           }
 

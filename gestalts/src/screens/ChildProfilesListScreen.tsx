@@ -5,15 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useMemoriesStore } from '../state/useStore';
 import { ChildProfile } from '../types/profile';
+import type { MainStackParamList } from '../navigation/types';
+
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export default function ChildProfilesListScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
-	const navigation = useNavigation();
+	const navigation = useNavigation<NavigationProp>();
 	const { getCurrentUserId } = useAuth();
 	
 	// Use centralized store instead of local state

@@ -71,7 +71,7 @@ export default function AddGestaltScreen() {
 			setSource(existingGestalt.source);
 			setSourceType(existingGestalt.sourceType || '');
 			setSelectedChild(existingGestalt.childName || '');
-			setDateStarted(new Date(existingGestalt.dateStartedISO || existingGestalt.dateStarted));
+			setDateStarted(new Date(existingGestalt.dateStartedISO || new Date()));
 		}
 	}, [existingGestalt]);
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import memoriesService from '../services/memoriesService';
+import memoriesService, { Milestone } from '../services/memoriesService';
 import { getFirebaseServices } from '../services/firebaseConfig';
 import dayjs from 'dayjs';
 

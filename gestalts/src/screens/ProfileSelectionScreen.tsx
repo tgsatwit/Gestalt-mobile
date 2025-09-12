@@ -7,13 +7,17 @@ import { useDrawer } from '../navigation/SimpleDrawer';
 import { GradientButton } from '../components/GradientButton';
 import { useMemoriesStore } from '../state/useStore';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
+import { MainStackParamList } from '../navigation/types';
+
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export default function ProfileSelectionScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
-	const navigation = useNavigation();
+	const navigation = useNavigation<NavigationProp>();
 	const { getCurrentUserId } = useAuth();
 	const { 
 		profiles, 

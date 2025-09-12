@@ -52,10 +52,11 @@ interface StorybookState {
   // Actions - Characters
   loadCharacters: () => Promise<void>;
   loadGestaltsCharacters: () => void;
-  createCharacterFromPhoto: (photoUri: string, name: string, mode?: 'animated' | 'real', userId?: string) => Promise<Character>;
+  createCharacterFromPhoto: (photoUri: string, name: string, mode?: 'animated' | 'real', userId?: string, role?: 'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend', age?: string) => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
   updateCharacterAvatar: (characterId: string, mode: 'animated' | 'real', dataUrl: string, userId?: string) => Promise<Character>;
   updateCharacterName: (characterId: string, newName: string) => Promise<void>;
+  updateCharacterMetadata: (characterId: string, role?: 'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend', age?: string) => Promise<void>;
   
   // Actions - Stories
   loadStories: () => Promise<void>;
@@ -253,8 +254,8 @@ export const useStorybookStore = create<StorybookState>()(
         name: string, 
         mode: 'animated' | 'real' = 'animated', 
         userId?: string, 
-        role?: 'mother' | 'father' | 'sister' | 'brother' | 'grandmother' | 'grandfather' | 'aunt' | 'uncle' | 'teacher' | 'friend' | 'other',
-        age?: number
+        role?: 'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend',
+        age?: string
       ) => {
         set({ 
           generationProgress: {
@@ -664,6 +665,49 @@ export const useStorybookStore = create<StorybookState>()(
         }
       },
 
+      // Update character metadata (role and age)
+      updateCharacterMetadata: async (characterId: string, role?: 'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend', age?: string) => {
+        try {
+          const { initialized, db } = getFirebaseServices();
+          const uid = getUserId();
+          if (!uid) throw new Error('User not authenticated');
+          if (initialized && db) {
+            const updateData: any = {
+              updatedAt: serverTimestamp()
+            };
+            
+            // Only update role if provided
+            if (role !== undefined) {
+              updateData.role = role;
+            }
+            
+            // Only update age if provided
+            if (age !== undefined) {
+              updateData.age = age;
+            }
+            
+            await updateDoc(doc(db, 'users', uid, 'characters', characterId), updateData);
+          }
+          
+          // Update local state
+          set(state => ({
+            characters: state.characters.map(c => 
+              c.id === characterId 
+                ? { 
+                    ...c, 
+                    role: role !== undefined ? role : c.role,
+                    age: age !== undefined ? age : c.age,
+                    updatedAt: new Date() 
+                  } 
+                : c
+            )
+          }));
+        } catch (error) {
+          console.error('Failed to update character metadata:', error);
+          throw error;
+        }
+      },
+
       // Load stories from Firebase
       loadStories: async () => {
         try {
@@ -874,14 +918,23 @@ export const useStorybookStore = create<StorybookState>()(
             const referenceImages = selectedCharacters.map(c => c.avatarUrl).filter(url => url && url.length > 0);
             console.log(`Page ${i + 1} - Reference images:`, referenceImages.length);
             
-            // Build optimized character profiles using utility functions
+            // Build optimized character mappings using utility functions
             // Pass the combined characters list that includes profile characters
-            const characterProfiles = buildCharacterMappings(
+            const characterMappings = buildCharacterMappings(
               allCharactersWithProfiles,
               request.characterIds,
               request.childProfile
             );
-            console.log(`Page ${i + 1} - Character profiles:`, characterProfiles.map(cp => cp.name));
+            console.log(`Page ${i + 1} - Character mappings:`, characterMappings.map(cm => cm.name));
+            
+            // Convert character mappings to character profiles format for context
+            const characterProfiles = characterMappings.map(cm => ({
+              name: cm.name,
+              appearance: cm.visualDescription,
+              style: 'Child-friendly Pixar-style animation with distinctive features',
+              keyFeatures: ['Distinctive character design', 'Consistent visual appearance', 'Child-appropriate styling'],
+              avatarUrl: cm.avatarUrl
+            }));
             
             // Build scene context for visual continuity
             const sceneContext = buildSceneContext(
@@ -907,7 +960,7 @@ export const useStorybookStore = create<StorybookState>()(
               storyMode: storyMode,
               referenceImages,
               isFirstPage: i === 0, // First page flag for proper generation method
-              characterMappings: characterProfiles, // Pass character mappings with avatar info
+              characterMappings: characterMappings, // Pass character mappings with avatar info
               referencePageImage: i > 0 && pages.length > 0 ? pages[0].imageUrl : undefined, // Use first page as reference
               context: {
                 concept: request.concept,
@@ -933,6 +986,7 @@ export const useStorybookStore = create<StorybookState>()(
             console.log(`  - Characters: ${allCharacterNames.join(', ')}`);
             console.log(`  - Concept: ${request.concept}`);
             console.log(`  - Image URL: ${imageUrl.startsWith('data:') ? `${imageUrl.substring(0, 50)}... [base64 data truncated]` : imageUrl}`);
+            console.log(`  - Character mappings count: ${characterMappings.length}`);
             console.log(`  - Character profiles count: ${characterProfiles.length}`);
             console.log(`  - Reference images count: ${referenceImages.length}`);
 
@@ -971,9 +1025,11 @@ export const useStorybookStore = create<StorybookState>()(
             }
 
             pages.push({
+              id: `page_${story.id}_${i + 1}`,
               pageNumber: i + 1,
               text: storyTexts[i],
-              imageUrl: finalImageUrl
+              imageUrl: finalImageUrl,
+              generationStatus: 'completed' as const
             });
           }
 
@@ -1094,6 +1150,8 @@ export const useStorybookStore = create<StorybookState>()(
           if (!page) throw new Error('Page not found');
 
           // Refine the image
+          if (!page.imageUrl) throw new Error('Page has no image to refine');
+          
           const refinedImageUrl = await geminiService.refineImage({
             imageUrl: page.imageUrl,
             refinementPrompt,

@@ -5,12 +5,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
+
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export default function KnowledgeScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
-	const navigation = useNavigation();
+	const navigation = useNavigation<NavigationProp>();
 
 	const knowledgeCategories = [
 		{
@@ -291,7 +295,7 @@ export default function KnowledgeScreen() {
 										backgroundColor: '#10B981',
 										paddingHorizontal: 6,
 										paddingVertical: 2,
-										borderRadius: tokens.radius.xs,
+										borderRadius: tokens.radius.sm,
 										marginRight: tokens.spacing.gap.xs
 									}}>
 										<Text style={{ 

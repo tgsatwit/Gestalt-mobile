@@ -9,11 +9,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDrawer } from '../navigation/SimpleDrawer';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../navigation/types';
+
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export default function ReportScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
-	const navigation = useNavigation();
+	const navigation = useNavigation<NavigationProp>();
 	const { profile, journal, milestones, appointmentNotes } = useMemoriesStore();
 	const report = generateReport({ profile, journal, milestones, appointmentNotes });
 	

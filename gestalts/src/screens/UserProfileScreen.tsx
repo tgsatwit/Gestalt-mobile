@@ -103,9 +103,9 @@ export default function UserProfileScreen() {
 		setPushNotifications(profile.pushNotifications ?? true);
 		setReminderNotifications(profile.reminderNotifications ?? true);
 		setWeeklyReports(profile.weeklyReports ?? true);
-		setInteractionStyle(profile.preferredInteractionStyle || 'supportive');
-		setReminderFrequency(profile.reminderFrequency || 'weekly');
-		setReportFormat(profile.reportFormat || 'detailed');
+		setInteractionStyle(profile.coachingPreferences?.preferredInteractionStyle || 'supportive');
+		setReminderFrequency(profile.coachingPreferences?.reminderFrequency || 'weekly');
+		setReportFormat(profile.coachingPreferences?.reportFormat || 'detailed');
 		setProfileVisibility(profile.profileVisibility || 'private');
 	};
 
@@ -135,9 +135,11 @@ export default function UserProfileScreen() {
 				pushNotifications,
 				reminderNotifications,
 				weeklyReports,
-				preferredInteractionStyle: interactionStyle,
-				reminderFrequency,
-				reportFormat,
+				coachingPreferences: {
+					preferredInteractionStyle: interactionStyle,
+					reminderFrequency,
+					reportFormat
+				},
 				profileVisibility
 			};
 

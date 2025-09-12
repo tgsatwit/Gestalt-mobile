@@ -46,6 +46,10 @@ export interface Milestone {
   dateISO: string;
   notes?: string;
   childName?: string;
+  audioData?: {
+    uri: string;
+    recordedAt: string;
+  };
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

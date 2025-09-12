@@ -14,8 +14,8 @@ export interface Character {
   aiAttributes?: string; // Any AI-generated descriptors
   
   // Character metadata for story generation
-  role?: 'mother' | 'father' | 'sister' | 'brother' | 'grandmother' | 'grandfather' | 'aunt' | 'uncle' | 'teacher' | 'friend' | 'other';
-  age?: number; // Approximate age of the character
+  role?: 'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend';
+  age?: string; // Age as string to allow flexible input like "35" or "8 years old"
   
   // Dual avatar support for real-mode vs animated mode
   avatars?: {

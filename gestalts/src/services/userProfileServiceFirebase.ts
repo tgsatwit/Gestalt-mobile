@@ -31,7 +31,7 @@ class UserProfileServiceFirebase {
       // Basic info (may already exist from auth)
       id: userId,
       email: profileData.email,
-      displayName: profileData.name || profileData.displayName || '',
+      displayName: profileData.name || '',
       firstName: profileData.firstName || '',
       lastName: profileData.lastName || '',
       
@@ -47,9 +47,9 @@ class UserProfileServiceFirebase {
       
       // Coaching preferences
       coachingPreferences: {
-        preferredInteractionStyle: profileData.preferredInteractionStyle || 'supportive',
-        reminderFrequency: profileData.reminderFrequency || 'weekly',
-        reportFormat: profileData.reportFormat || 'detailed'
+        preferredInteractionStyle: profileData.coachingPreferences?.preferredInteractionStyle || 'supportive',
+        reminderFrequency: profileData.coachingPreferences?.reminderFrequency || 'weekly',
+        reportFormat: profileData.coachingPreferences?.reportFormat || 'detailed'
       },
       
       // Privacy settings
@@ -57,7 +57,7 @@ class UserProfileServiceFirebase {
       
       // Subscription info
       subscriptionStatus: profileData.subscriptionStatus || 'free',
-      subscriptionExpiryDate: profileData.subscriptionExpiryDate || null,
+      subscriptionExpiryDate: null,
       
       // Other preferences
       language: profileData.language || 'en',
@@ -124,19 +124,14 @@ class UserProfileServiceFirebase {
     if (updates.weeklyReports !== undefined) updateData.weeklyReports = updates.weeklyReports;
     
     // Coaching preferences - need to handle nested object
-    if (updates.preferredInteractionStyle !== undefined || 
-        updates.reminderFrequency !== undefined || 
-        updates.reportFormat !== undefined) {
-      
+    if (updates.coachingPreferences !== undefined) {
       // Get existing preferences first
       const existingDoc = await getDoc(doc(db, 'users', userId));
       const existingPrefs = existingDoc.data()?.coachingPreferences || {};
       
       updateData.coachingPreferences = {
         ...existingPrefs,
-        ...(updates.preferredInteractionStyle !== undefined && { preferredInteractionStyle: updates.preferredInteractionStyle }),
-        ...(updates.reminderFrequency !== undefined && { reminderFrequency: updates.reminderFrequency }),
-        ...(updates.reportFormat !== undefined && { reportFormat: updates.reportFormat })
+        ...updates.coachingPreferences
       };
     }
     
@@ -201,42 +196,44 @@ class UserProfileServiceFirebase {
     
     return {
       id: id,
+      userId: id, // Auth user ID
       email: data.email || '',
       name: data.name || data.displayName || '',
-      displayName: data.displayName || data.name || '',
       firstName: data.firstName || '',
       lastName: data.lastName || '',
       phoneNumber: data.phoneNumber || '',
+      profilePicture: data.profilePicture || '',
       
-      // Notification preferences
+      // Subscription & Account
+      subscriptionStatus: data.subscriptionStatus || 'free',
+      subscriptionExpiryDate: data.subscriptionExpiryDate instanceof Timestamp ? data.subscriptionExpiryDate.toDate() : (data.subscriptionExpiryDate ? new Date(data.subscriptionExpiryDate) : undefined),
+      accountCreatedDate: data.accountCreatedDate instanceof Timestamp ? data.accountCreatedDate.toDate() : (data.accountCreatedDate ? new Date(data.accountCreatedDate) : new Date()),
+      lastLoginDate: data.lastLoginDate instanceof Timestamp ? data.lastLoginDate.toDate() : (data.lastLoginDate ? new Date(data.lastLoginDate) : undefined),
+      
+      // Settings & Preferences
       emailNotifications: data.emailNotifications ?? true,
       pushNotifications: data.pushNotifications ?? true,
       reminderNotifications: data.reminderNotifications ?? true,
       weeklyReports: data.weeklyReports ?? true,
-      
-      // Coaching preferences
-      preferredInteractionStyle: data.coachingPreferences?.preferredInteractionStyle || 'supportive',
-      reminderFrequency: data.coachingPreferences?.reminderFrequency || 'weekly',
-      reportFormat: data.coachingPreferences?.reportFormat || 'detailed',
-      
-      // Privacy settings
-      profileVisibility: data.profileVisibility || 'private',
-      
-      // Subscription info
-      subscriptionStatus: data.subscriptionStatus || 'free',
-      subscriptionExpiryDate: data.subscriptionExpiryDate || null,
-      
-      // Other preferences
       language: data.language || 'en',
       timezone: data.timezone || 'UTC',
       
-      // Timestamps
+      // App-specific settings
+      defaultChildProfileId: data.defaultChildProfileId,
+      coachingPreferences: {
+        preferredInteractionStyle: data.coachingPreferences?.preferredInteractionStyle || 'supportive',
+        reminderFrequency: data.coachingPreferences?.reminderFrequency || 'weekly',
+        reportFormat: data.coachingPreferences?.reportFormat || 'detailed'
+      },
+      
+      // Privacy & Security
+      profileVisibility: data.profileVisibility || 'private',
+      dataExportRequested: data.dataExportRequested instanceof Timestamp ? data.dataExportRequested.toDate() : (data.dataExportRequested ? new Date(data.dataExportRequested) : undefined),
+      accountDeletionRequested: data.accountDeletionRequested instanceof Timestamp ? data.accountDeletionRequested.toDate() : (data.accountDeletionRequested ? new Date(data.accountDeletionRequested) : undefined),
+      
+      // Metadata
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()),
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now()),
-      lastLoginDate: data.lastLoginDate instanceof Timestamp ? data.lastLoginDate.toDate() : (data.lastLoginDate ? new Date(data.lastLoginDate) : null),
-      accountCreatedDate: data.accountCreatedDate instanceof Timestamp ? data.accountCreatedDate.toDate() : (data.accountCreatedDate ? new Date(data.accountCreatedDate) : null),
-      dataExportRequested: data.dataExportRequested instanceof Timestamp ? data.dataExportRequested.toDate() : (data.dataExportRequested ? new Date(data.dataExportRequested) : null),
-      accountDeletionRequested: data.accountDeletionRequested instanceof Timestamp ? data.accountDeletionRequested.toDate() : (data.accountDeletionRequested ? new Date(data.accountDeletionRequested) : null)
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())
     };
   }
 }

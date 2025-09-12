@@ -83,7 +83,7 @@ export default function CoachScreen() {
 	
 	// Refs
 	const scrollViewRef = useRef<ScrollView>(null);
-	const modeSelectorRef = useRef<TouchableOpacity>(null);
+	const modeSelectorRef = useRef<View>(null);
 	const historySlideAnim = useRef(new Animated.Value(300)).current; // Start off-screen
 	const historyOverlayOpacity = useRef(new Animated.Value(0)).current;
 	

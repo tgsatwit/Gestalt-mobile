@@ -27,7 +27,7 @@ export const testFirebaseIntegration = async () => {
         const entries = await memoriesService.getUserJournalEntries(currentUser.uid);
         console.log('✅ Journal entries loaded:', entries.length, 'entries');
       } catch (error) {
-        console.log('⚠️ Journal entries test failed (expected if no entries):', error.message);
+        console.log('⚠️ Journal entries test failed (expected if no entries):', error instanceof Error ? error.message : String(error));
       }
     }
     
