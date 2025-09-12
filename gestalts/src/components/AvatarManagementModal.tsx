@@ -13,6 +13,8 @@ import { useTheme } from '../theme';
 import { Text } from '../theme';
 import { ChildProfile } from '../types/profile';
 import { useStorybookStore } from '../state/useStorybookStore-firebase';
+import { useMemoriesStore } from '../state/useStore';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AvatarManagementModalProps {
   visible: boolean;
@@ -20,6 +22,7 @@ interface AvatarManagementModalProps {
   profile: ChildProfile | any; // Support both ChildProfile and Character
   avatarType: 'animated' | 'real';
   onProfileUpdate?: (updatedProfile: ChildProfile | any) => void;
+  isChildProfile?: boolean; // Flag to indicate if this is a child profile (not deletable)
 }
 
 export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
@@ -27,10 +30,13 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   onClose,
   profile,
   avatarType,
-  onProfileUpdate
+  onProfileUpdate,
+  isChildProfile = false
 }) => {
   const themeContext = useTheme();
-  const { pickImageFromGallery, takePhoto, updateCharacterAvatar, updateCharacterName } = useStorybookStore();
+  const { pickImageFromGallery, takePhoto, updateCharacterAvatar, updateCharacterName, deleteCharacter, createCharacterFromPhoto } = useStorybookStore();
+  const { createChildAvatar } = useMemoriesStore();
+  const { getCurrentUserId } = useAuth();
   
   // Provide fallback tokens matching the actual token structure
   const tokens = themeContext?.tokens || {
@@ -105,8 +111,8 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
       const photoUri = await pickImageFromGallery();
       
       if (photoUri) {
-        // Generate new avatar
-        await generateNewAvatar(photoUri);
+        // Process the photo through the avatar generation pipeline
+        await processPhotoForAvatar(photoUri);
       }
     } catch (error) {
       console.error('Failed to select photo:', error);
@@ -122,8 +128,8 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
       const photoUri = await takePhoto();
       
       if (photoUri) {
-        // Generate new avatar
-        await generateNewAvatar(photoUri);
+        // Process the photo through the avatar generation pipeline
+        await processPhotoForAvatar(photoUri);
       }
     } catch (error) {
       console.error('Failed to take photo:', error);
@@ -133,34 +139,80 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
     }
   };
 
-  const generateNewAvatar = async (photoUri: string) => {
+  const processPhotoForAvatar = async (photoUri: string) => {
     try {
-      setIsProcessing(true);
-      
-      // Update the character avatar
-      const updatedCharacter = await updateCharacterAvatar(
-        profile.id,
-        currentAvatarType,
-        photoUri
-      );
-      
-      // Convert character back to profile format
-      const updatedProfile: ChildProfile = {
-        ...profile,
-        avatars: updatedCharacter.avatars,
-        avatarUrl: updatedCharacter.avatarUrl || profile.avatarUrl,
-        updatedAt: new Date()
-      };
-      
-      onProfileUpdate?.(updatedProfile);
+      const userId = getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      if (isChildProfile) {
+        // For child profiles, we need to use a different approach
+        // The createChildAvatar expects a data URL, not a file URI
+        // We need to generate the avatar through the character pipeline first
+        
+        // Create a temporary character to generate the avatar
+        const tempCharacter = await createCharacterFromPhoto(
+          photoUri,
+          profile.childName || profile.name || 'Child',
+          currentAvatarType,
+          userId
+        );
+        
+        // Now update the child profile with the generated avatar URL
+        if (tempCharacter.avatars?.[currentAvatarType]) {
+          await createChildAvatar(
+            profile.id,
+            userId,
+            tempCharacter.avatars[currentAvatarType],
+            currentAvatarType
+          );
+        }
+        
+        // Update the local profile
+        const updatedProfile = {
+          ...profile,
+          avatars: {
+            ...(profile.avatars || {}),
+            [currentAvatarType]: tempCharacter.avatars?.[currentAvatarType]
+          },
+          avatarUrl: tempCharacter.avatars?.[currentAvatarType] || profile.avatarUrl,
+          updatedAt: new Date()
+        };
+        
+        onProfileUpdate?.(updatedProfile);
+      } else {
+        // For regular characters, use the existing flow
+        // This will handle the Gemini generation internally
+        const updatedCharacter = await updateCharacterAvatar(
+          profile.id,
+          currentAvatarType,
+          photoUri,
+          userId
+        );
+        
+        // Convert character back to profile format
+        const updatedProfile = {
+          ...profile,
+          avatars: updatedCharacter.avatars,
+          avatarUrl: updatedCharacter.avatarUrl || profile.avatarUrl,
+          updatedAt: new Date()
+        };
+        
+        onProfileUpdate?.(updatedProfile);
+      }
       
       Alert.alert('Success', 'Avatar updated successfully!');
     } catch (error) {
       console.error('Failed to generate avatar:', error);
       Alert.alert('Error', 'Failed to generate avatar. Please try again.');
-    } finally {
-      setIsProcessing(false);
     }
+  };
+
+  const generateNewAvatar = async (photoUri: string) => {
+    // This is now just a wrapper for processPhotoForAvatar
+    // Used by the regenerate function
+    await processPhotoForAvatar(photoUri);
   };
 
   const handleRegenerateAvatar = async () => {
@@ -172,12 +224,26 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
 
     Alert.alert(
       'Regenerate Avatar',
-      'This will create a new avatar based on the current image. Continue?',
+      'To regenerate the avatar, please take a new photo or select one from your gallery.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Regenerate', 
-          onPress: () => generateNewAvatar(currentAvatarUrl) 
+          text: 'Take Photo', 
+          onPress: async () => {
+            const photoUri = await takePhoto();
+            if (photoUri) {
+              await processPhotoForAvatar(photoUri);
+            }
+          }
+        },
+        { 
+          text: 'Choose from Gallery', 
+          onPress: async () => {
+            const photoUri = await pickImage();
+            if (photoUri) {
+              await processPhotoForAvatar(photoUri);
+            }
+          }
         }
       ]
     );
@@ -186,7 +252,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   const handleDeleteAvatar = () => {
     const avatarExists = currentAvatarType === 'real' 
       ? profile.avatars?.real 
-      : profile.avatars?.animated;
+      : (profile.avatars?.animated || profile.avatarUrl); // Check legacy field too
 
     if (!avatarExists) {
       Alert.alert('Error', 'No avatar found to delete');
@@ -236,7 +302,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   const currentAvatarUrl = getCurrentAvatarUrl();
   const hasCurrentAvatar = currentAvatarType === 'real' 
     ? profile.avatars?.real 
-    : profile.avatars?.animated;
+    : (profile.avatars?.animated || profile.avatarUrl); // Check legacy field too
 
   return (
     <Modal
@@ -498,56 +564,130 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
               <Text weight="medium">Take Photo</Text>
             </TouchableOpacity>
 
-            {/* Delete Current Photo (only if current avatar exists) */}
-            {hasCurrentAvatar && (
-              <TouchableOpacity
-                onPress={handleDeleteAvatar}
-                disabled={isProcessing}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  padding: padding.md,
-                  backgroundColor: 'white',
-                  borderRadius: tokens.radius.md,
-                  borderWidth: 1,
-                  borderColor: errorColor
-                }}
-              >
-                <Ionicons 
-                  name="trash" 
-                  size={20} 
-                  color={errorColor} 
-                  style={{ marginRight: tokens.spacing.gap.sm }} 
-                />
-                <Text weight="medium" style={{ color: errorColor }}>
-                  Delete Current Photo
-                </Text>
-              </TouchableOpacity>
-            )}
+            {/* Action Buttons Row - Small icon buttons */}
+            {(hasCurrentAvatar || !isChildProfile) && (
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: tokens.spacing.gap.md,
+                marginTop: tokens.spacing.gap.lg,
+                paddingTop: tokens.spacing.gap.md,
+                borderTopWidth: 1,
+                borderTopColor: tokens.color.border.default
+              }}>
+                {/* Regenerate Avatar - Far Left */}
+                {hasCurrentAvatar && (
+                  <View style={{ alignItems: 'center' }}>
+                    <TouchableOpacity
+                      onPress={handleRegenerateAvatar}
+                      disabled={isProcessing}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: tokens.color.bg.muted,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: tokens.color.border.default
+                      }}
+                    >
+                      <Ionicons 
+                        name="refresh" 
+                        size={20} 
+                        color={tokens.color.primary.default} 
+                      />
+                    </TouchableOpacity>
+                    <Text size="xs" color="secondary" style={{ marginTop: 4 }}>
+                      Regenerate
+                    </Text>
+                  </View>
+                )}
 
-            {/* Regenerate (only if current avatar exists) */}
-            {hasCurrentAvatar && (
-              <TouchableOpacity
-                onPress={handleRegenerateAvatar}
-                disabled={isProcessing}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  padding: padding.md,
-                  backgroundColor: 'white',
-                  borderRadius: tokens.radius.md,
-                  borderWidth: 1,
-                  borderColor: tokens.color.border.default
-                }}
-              >
-                <Ionicons 
-                  name="refresh" 
-                  size={20} 
-                  color={tokens.color.primary.default} 
-                  style={{ marginRight: tokens.spacing.gap.sm }} 
-                />
-                <Text weight="medium">Regenerate Avatar</Text>
-              </TouchableOpacity>
+                {/* Delete Current Avatar - No red badge */}
+                {hasCurrentAvatar && (
+                  <View style={{ alignItems: 'center' }}>
+                    <TouchableOpacity
+                      onPress={handleDeleteAvatar}
+                      disabled={isProcessing}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: tokens.color.bg.muted,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: tokens.color.border.default
+                      }}
+                    >
+                      <Ionicons 
+                        name="close-circle-outline" 
+                        size={20} 
+                        color={errorColor} 
+                      />
+                    </TouchableOpacity>
+                    <Text size="xs" color="secondary" style={{ marginTop: 4 }}>
+                      Remove
+                    </Text>
+                  </View>
+                )}
+
+                {/* Delete Character - Only show for non-child profiles */}
+                {!isChildProfile && (
+                  <View style={{ alignItems: 'center' }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Alert.alert(
+                          'Delete Character',
+                          `Are you sure you want to delete "${profile.childName || profile.name}"? This will remove the character and all associated avatars permanently.`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                              text: 'Delete', 
+                              style: 'destructive',
+                              onPress: async () => {
+                                try {
+                                  setIsProcessing(true);
+                                  await deleteCharacter(profile.id);
+                                  onClose();
+                                  Alert.alert('Success', 'Character deleted successfully');
+                                } catch (error) {
+                                  console.error('Failed to delete character:', error);
+                                  Alert.alert('Error', 'Failed to delete character. Please try again.');
+                                } finally {
+                                  setIsProcessing(false);
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                      disabled={isProcessing}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: tokens.color.bg.muted,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: errorColor
+                      }}
+                    >
+                      <Ionicons 
+                        name="trash-outline" 
+                        size={20} 
+                        color={errorColor} 
+                      />
+                    </TouchableOpacity>
+                    <Text size="xs" style={{ color: errorColor, marginTop: 4 }}>
+                      Delete
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
 
           </View>

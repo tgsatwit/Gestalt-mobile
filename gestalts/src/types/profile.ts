@@ -12,6 +12,7 @@ export interface ChildProfile {
   updatedAt: Date;
   // Avatar information
   avatarUrl?: string; // Legacy field for backwards compatibility
+  avatarMode?: 'animated' | 'real'; // Track which mode was last created/updated
   avatars?: {
     animated?: string; // Animated/cartoon style avatar URL
     real?: string; // Real-life photo with background removed URL
@@ -34,6 +35,7 @@ export interface CreateChildProfileData {
   strengths?: string;
   // Avatar information
   avatarUrl?: string; // Legacy field for backwards compatibility
+  avatarMode?: 'animated' | 'real'; // Track which mode was last created/updated
   avatars?: {
     animated?: string; // Animated/cartoon style avatar URL
     real?: string; // Real-life photo with background removed URL

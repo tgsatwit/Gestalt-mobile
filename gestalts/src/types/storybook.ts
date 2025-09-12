@@ -13,6 +13,10 @@ export interface Character {
   updatedAt: Date;
   aiAttributes?: string; // Any AI-generated descriptors
   
+  // Character metadata for story generation
+  role?: 'mother' | 'father' | 'sister' | 'brother' | 'grandmother' | 'grandfather' | 'aunt' | 'uncle' | 'teacher' | 'friend' | 'other';
+  age?: number; // Approximate age of the character
+  
   // Dual avatar support for real-mode vs animated mode
   avatars?: {
     animated?: string; // Pixar/cartoon style avatar URL

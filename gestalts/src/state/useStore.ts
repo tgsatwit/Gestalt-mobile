@@ -208,55 +208,73 @@ export const useMemoriesStore = create<MemoriesState>()(
 			
 			createChildAvatar: async (profileId: string, userId: string, avatarDataUrl: string, mode: 'animated' | 'real' = 'animated') => {
 				set({ profileLoading: true, profileError: null });
+				console.log(`🎭 Creating child avatar - Profile: ${profileId}, Mode: ${mode}`);
+				
 				try {
-					// Get the current profile to extract name
+					// Get the current profile to extract name and existing avatars
 					const currentProfiles = get().profiles;
 					const targetProfile = currentProfiles.find(p => p.id === profileId);
 					if (!targetProfile) {
 						throw new Error('Profile not found');
 					}
+					console.log(`📋 Target profile found: ${targetProfile.childName}`);
 					
-					let animatedAvatarUrl: string | undefined;
-					let realAvatarUrl: string | undefined;
-					
-					// The avatarDataUrl is already generated, just upload it to Firebase Storage
-					if (avatarDataUrl) {
-						const upload = await avatarStorageService.uploadAvatar(avatarDataUrl, {
-							userId,
-							type: mode as 'animated' | 'real',
-							characterName: targetProfile.childName,
-							childProfileId: profileId,
-							createdAt: new Date().toISOString()
-						});
-						
-						if (mode === 'real') {
-							realAvatarUrl = upload.url;
-						} else {
-							animatedAvatarUrl = upload.url;
-						}
+					// Upload the generated avatar to Firebase Storage
+					if (!avatarDataUrl) {
+						throw new Error('No avatar data provided');
 					}
 					
-					// Update the profile with avatar information
-					const updates: UpdateChildProfileData = {
-						avatarUrl: animatedAvatarUrl || realAvatarUrl // Legacy field - default to animated or real
+					console.log(`📤 Uploading ${mode} avatar to Firebase Storage...`);
+					const upload = await avatarStorageService.uploadAvatar(avatarDataUrl, {
+						userId,
+						type: mode as 'animated' | 'real',
+						characterName: targetProfile.childName,
+						childProfileId: profileId,
+						createdAt: new Date().toISOString()
+					});
+					console.log(`✅ Avatar uploaded successfully: ${upload.url}`);
+					
+					// Prepare the existing avatars object, ensuring we preserve other modes
+					const existingAvatars = (targetProfile as any).avatars || {};
+					const updatedAvatars = {
+						...existingAvatars,
+						[mode]: upload.url // Set/update the specific mode
 					};
 					
-					// Add dual avatar URLs to the updates if they exist
-					if (animatedAvatarUrl || realAvatarUrl) {
-						(updates as any).avatars = {
-							...(targetProfile as any).avatars,
-							...(animatedAvatarUrl ? { animated: animatedAvatarUrl } : {}),
-							...(realAvatarUrl ? { real: realAvatarUrl } : {})
-						};
-					}
+					// Determine the primary avatar URL (prefer animated, fallback to real)
+					const primaryAvatarUrl = updatedAvatars.animated || updatedAvatars.real || upload.url;
+					
+					// Update the profile with complete avatar information
+					const updates: UpdateChildProfileData = {
+						avatarUrl: primaryAvatarUrl, // Legacy field for backward compatibility
+						avatarMode: mode, // Track which mode was just created/updated
+					};
+					
+					// Add the complete avatars object
+					(updates as any).avatars = updatedAvatars;
+					
+					console.log(`💾 Updating profile with avatar metadata:`, {
+						avatarUrl: primaryAvatarUrl,
+						avatarMode: mode,
+						avatars: updatedAvatars
+					});
 					
 					await get().updateProfile(profileId, userId, updates);
+					console.log(`✅ Child avatar created successfully for ${targetProfile.childName} in ${mode} mode`);
 					
 					set({ profileLoading: false });
 				} catch (error) {
 					const errorMessage = error instanceof Error ? error.message : 'Failed to create avatar';
+					console.error('❌ Failed to create child avatar:', error);
+					console.error('❌ Error details:', {
+						profileId,
+						userId,
+						mode,
+						hasAvatarData: !!avatarDataUrl,
+						errorMessage
+					});
+					
 					set({ profileError: errorMessage, profileLoading: false });
-					console.error('Failed to create child avatar:', error);
 					throw error;
 				}
 			},

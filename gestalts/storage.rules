@@ -54,6 +54,12 @@ service firebase.storage {
       allow read, write, create, delete: if isOwner(userId);
     }
     
+    // Support story page images with nested structure
+    match /{storyPath}/{fileName} {
+      allow read: if storyPath.matches('story_.*_page_.*');
+      allow write, create, delete: if isAuthenticated() && isValidImageFile() && storyPath.matches('story_.*_page_.*');
+    }
+    
     // Support character avatars in different path structure
     match /characterAvatars/{userId}/{fileName} {
       allow read: if true;

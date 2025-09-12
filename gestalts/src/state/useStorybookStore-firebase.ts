@@ -168,6 +168,9 @@ export const useStorybookStore = create<StorybookState>()(
               name: data.name,
               type: data.type || 'user', // Default to 'user' for existing characters
               avatarUrl: data.avatarUrl,
+              avatars: data.avatars, // Load the dual avatar URLs
+              role: data.role,
+              age: data.age,
               createdAt,
               updatedAt,
               visualProfile: data.visualProfile
@@ -245,7 +248,14 @@ export const useStorybookStore = create<StorybookState>()(
       },
 
       // Create a character from a photo or existing avatar URL
-      createCharacterFromPhoto: async (photoUri: string, name: string, mode: 'animated' | 'real' = 'animated', userId?: string) => {
+      createCharacterFromPhoto: async (
+        photoUri: string, 
+        name: string, 
+        mode: 'animated' | 'real' = 'animated', 
+        userId?: string, 
+        role?: 'mother' | 'father' | 'sister' | 'brother' | 'grandmother' | 'grandfather' | 'aunt' | 'uncle' | 'teacher' | 'friend' | 'other',
+        age?: number
+      ) => {
         set({ 
           generationProgress: {
             status: 'uploading',
@@ -393,6 +403,8 @@ export const useStorybookStore = create<StorybookState>()(
             avatars: characterAvatars,
             type: 'user', // User-created character
             visualProfile: visualProfile,
+            role: role,
+            age: age,
             createdAt: new Date(),
             updatedAt: new Date()
           };
@@ -401,18 +413,54 @@ export const useStorybookStore = create<StorybookState>()(
           const { initialized, db } = getFirebaseServices();
           if (initialized && db) {
             const currentUserId = userId || getUserId();
+            console.log(`💾 Saving character to Firestore:`, {
+              characterId: character.id,
+              name: character.name,
+              userId: currentUserId,
+              avatarUrl: character.avatarUrl?.substring(0, 50) + '...',
+              avatarMode: mode,
+              hasAvatars: !!character.avatars
+            });
+            
+            // Build document data, excluding undefined fields
             const docData: any = {
               name: character.name,
               type: character.type,
-              avatarUrl: character.avatarUrl,
-              visualProfile: character.visualProfile,
+              userId: currentUserId, // CRITICAL: Add userId field for Firebase rules
+              avatarUrl: character.avatarUrl || '', // Ensure never undefined
+              avatarMode: mode, // Store which mode this character was created in
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             };
+            
+            // Only add optional fields if they have values (not undefined)
+            if (character.visualProfile !== undefined) {
+              docData.visualProfile = character.visualProfile;
+            }
+            if (character.role !== undefined) {
+              docData.role = character.role;
+            }
+            if (character.age !== undefined) {
+              docData.age = character.age;
+            }
+            
+            // Add avatar metadata if available
             if (character.avatars && Object.keys(character.avatars).length > 0) {
               docData.avatars = character.avatars;
+              console.log(`🎭 Character avatar modes stored:`, Object.keys(character.avatars));
             }
-            await setDoc(doc(db, 'users', currentUserId, 'characters', character.id), docData);
+            
+            try {
+              await setDoc(doc(db, 'users', currentUserId, 'characters', character.id), docData);
+              console.log(`✅ Character successfully saved to Firestore: ${character.name}`);
+            } catch (firestoreError) {
+              console.error('❌ Firestore write failed:', firestoreError);
+              console.error('❌ Document path:', `users/${currentUserId}/characters/${character.id}`);
+              console.error('❌ Document data:', docData);
+              throw new Error(`Failed to save character to database: ${firestoreError instanceof Error ? firestoreError.message : 'Unknown error'}`);
+            }
+          } else {
+            console.warn('⚠️ Firebase not initialized, character not saved to database');
           }
 
           // Update local state
@@ -477,9 +525,14 @@ export const useStorybookStore = create<StorybookState>()(
           const uid = userId || getUserId();
           if (!uid) throw new Error('User not authenticated');
 
-          // Upload to Storage if dataUrl is data: scheme
           let finalUrl = dataUrl;
-          if (dataUrl.startsWith('data:')) {
+          
+          // Handle different input types
+          if (dataUrl === '' || !dataUrl) {
+            // Deletion case - keep as empty
+            finalUrl = '';
+          } else if (dataUrl.startsWith('data:')) {
+            // Already a data URL - upload directly
             const upload = await avatarStorageService.uploadAvatar(dataUrl, {
               userId: uid,
               type: mode,
@@ -488,29 +541,99 @@ export const useStorybookStore = create<StorybookState>()(
               createdAt: new Date().toISOString()
             });
             finalUrl = upload.url;
+          } else if (dataUrl.startsWith('file://') || dataUrl.startsWith('/')) {
+            // File URI - need to generate avatar first
+            console.log('Processing file URI for avatar generation:', dataUrl);
+            
+            // Read the file as base64
+            const photoData = await FileSystem.readAsStringAsync(dataUrl, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            
+            // Generate avatar using Gemini
+            const avatarResult = await geminiService.generateAvatar({
+              photoData: `data:image/jpeg;base64,${photoData}`,
+              style: mode === 'real' ? 'real' : 'animated',
+              mode: mode,
+              characterName: characterId
+            });
+            
+            // Get the generated data URL
+            const generatedDataUrl = typeof avatarResult === 'string' ? avatarResult : avatarResult.imageUrl;
+            
+            // Upload to Firebase Storage
+            if (generatedDataUrl) {
+              const upload = await avatarStorageService.uploadAvatar(generatedDataUrl, {
+                userId: uid,
+                type: mode,
+                characterName: characterId,
+                characterId,
+                createdAt: new Date().toISOString()
+              });
+              finalUrl = upload.url;
+            }
+          } else if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
+            // Already a URL - use as is
+            finalUrl = dataUrl;
           }
 
           // Update Firestore
           if (initialized && db) {
             const char = get().characters.find(c => c.id === characterId);
             const avatars: any = { ...(char?.avatars || {}) };
-            avatars[mode] = finalUrl;
-            const update: any = { avatars, updatedAt: serverTimestamp() };
-            if (!char?.avatarUrl) {
-              update.avatarUrl = finalUrl; // maintain legacy field if missing
+            
+            // Handle deletion (empty string) vs update
+            if (finalUrl === '' || !finalUrl) {
+              delete avatars[mode];
+            } else {
+              avatars[mode] = finalUrl;
             }
+            
+            // Build update object - only include non-undefined values
+            const update: any = { updatedAt: serverTimestamp() };
+            
+            // Only add avatars field if it has valid entries
+            const validAvatars: any = {};
+            if (avatars.animated && avatars.animated !== '') validAvatars.animated = avatars.animated;
+            if (avatars.real && avatars.real !== '') validAvatars.real = avatars.real;
+            
+            if (Object.keys(validAvatars).length > 0) {
+              update.avatars = validAvatars;
+              // Update legacy field with first available avatar
+              update.avatarUrl = validAvatars.animated || validAvatars.real;
+            } else {
+              // No avatars left, clear the fields
+              update.avatars = {};
+              update.avatarUrl = '';
+            }
+            
             await updateDoc(doc(db, 'users', uid, 'characters', characterId), update);
           }
 
           // Update local state
-          const updated = get().characters.map(c => 
-            c.id === characterId ? ({
-              ...c,
-              avatars: { ...(c.avatars || {}), [mode]: finalUrl },
-              avatarUrl: c.avatarUrl || finalUrl,
-              updatedAt: new Date()
-            }) as Character : c
-          );
+          const updated = get().characters.map(c => {
+            if (c.id === characterId) {
+              const newAvatars = { ...(c.avatars || {}) };
+              
+              // Handle deletion vs update
+              if (finalUrl === '' || !finalUrl) {
+                delete newAvatars[mode];
+              } else {
+                newAvatars[mode] = finalUrl;
+              }
+              
+              // Determine the avatarUrl (legacy field)
+              const avatarUrl = newAvatars.animated || newAvatars.real || '';
+              
+              return {
+                ...c,
+                avatars: newAvatars,
+                avatarUrl,
+                updatedAt: new Date()
+              } as Character;
+            }
+            return c;
+          });
           set({ characters: updated });
           const updatedChar = updated.find(c => c.id === characterId)!;
           return updatedChar;

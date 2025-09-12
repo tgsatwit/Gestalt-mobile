@@ -44,6 +44,14 @@ service cloud.firestore {
                            request.auth.uid == resource.data.userId;
       allow create: if isAuthenticated() && 
                      request.auth.uid == request.resource.data.userId;
+      // Allow avatar-related field updates
+      allow update: if isAuthenticated() && 
+                     request.auth.uid == resource.data.userId &&
+                     // Allow updates that only modify avatar-related fields
+                     (!request.resource.data.diff(resource.data).affectedKeys()
+                      .hasAny(['childName', 'userId', 'createdAt']) ||
+                      request.resource.data.diff(resource.data).affectedKeys()
+                      .hasOnly(['avatarUrl', 'avatarMode', 'avatars', 'updatedAt', 'visualProfile']));
     }
     
 
@@ -125,7 +133,10 @@ service cloud.firestore {
     // Users can read and write their own characters (for storybook) - nested under users
     match /users/{userId}/characters/{characterId} {
       allow read, write, delete: if isOwner(userId);
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                     // Validate required fields for character creation
+                     request.resource.data.keys().hasAll(['name', 'userId', 'type']) &&
+                     request.resource.data.userId == request.auth.uid;
     }
     
     // Users can read and write their own stories (for storybook) - nested under users

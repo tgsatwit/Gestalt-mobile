@@ -107,6 +107,8 @@ export default function StorybookScreen() {
 	// Legacy form states (for existing functionality)
 	const [pageToRefine, setPageToRefine] = useState(0);
 	const [characterName, setCharacterName] = useState('');
+	const [characterRole, setCharacterRole] = useState<'mother' | 'father' | 'sister' | 'brother' | 'grandmother' | 'grandfather' | 'aunt' | 'uncle' | 'teacher' | 'friend' | 'other'>('other');
+	const [characterAge, setCharacterAge] = useState<string>('');
 	const [refinementPrompt, setRefinementPrompt] = useState('');
 	const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 	const [generatedAvatar, setGeneratedAvatar] = useState<string | null>(null);
@@ -1375,7 +1377,8 @@ export default function StorybookScreen() {
 						borderRadius: tokens.radius.xl, 
 						width: '100%',
 						maxWidth: 400,
-						maxHeight: '80%'
+						height: '85%',
+						flexDirection: 'column'
 					}}>
 						{/* Header */}
 						<View style={{ 
@@ -1403,7 +1406,15 @@ export default function StorybookScreen() {
 						</View>
 
 						{/* Content */}
-						<ScrollView style={{ maxHeight: 500 }} contentContainerStyle={{ padding: tokens.spacing.containerX }}>
+						<View style={{ flex: 1 }}>
+							<ScrollView 
+								style={{ flex: 1 }}
+								contentContainerStyle={{ 
+									padding: tokens.spacing.containerX,
+									paddingBottom: tokens.spacing.gap.lg
+								}}
+								showsVerticalScrollIndicator={false}
+							>
 							{avatarStep === 'upload' && (
 								<>
 									<Text color="secondary" style={{ textAlign: 'center', marginBottom: tokens.spacing.gap.md }}>
@@ -1536,7 +1547,7 @@ export default function StorybookScreen() {
 									
 									{/* Selected Photo Preview */}
 									{selectedPhoto && (
-										<View style={{ alignItems: 'center', marginBottom: tokens.spacing.gap.lg }}>
+										<View style={{ alignItems: 'center', marginBottom: tokens.spacing.gap.md }}>
 											<Image 
 												source={{ uri: selectedPhoto }} 
 												style={{ 
@@ -1551,27 +1562,6 @@ export default function StorybookScreen() {
 											<Text color="secondary" size="sm">Photo selected</Text>
 										</View>
 									)}
-									
-									<GradientButton 
-										title="Generate Avatar" 
-										disabled={!selectedPhoto}
-										onPress={async () => {
-											if (selectedPhoto) {
-												setAvatarStep('generating');
-												try {
-													await generateAvatarFromPhoto();
-												} catch (error: any) {
-													console.error('Avatar generation failed:', error);
-													setAvatarStep('upload');
-													Alert.alert(
-														'Avatar Generation Failed',
-														'Unable to generate your avatar. This might be a temporary issue with the AI service. Please try again.',
-														[{ text: 'Try Again' }]
-													);
-												}
-											}
-										}} 
-									/>
 								</>
 							)}
 
@@ -1678,13 +1668,31 @@ export default function StorybookScreen() {
 													
 												} catch (error: any) {
 													console.error('❌ Failed to save character:', error);
-													console.error('❌ Error details:', error?.message || 'Unknown error');
-													console.error('❌ Error stack:', error?.stack);
-													console.error('❌ Child profile ID:', (global as any).currentChildProfileId);
-													console.error('❌ Character name:', characterName.trim());
-													console.error('❌ Generated avatar exists:', !!generatedAvatar);
-													console.error('❌ Avatar creation mode:', avatarCreationMode);
-													Alert.alert('Save Failed', `Unable to save your character: ${error?.message || 'Unknown error'}. Please try again.`);
+													console.error('❌ Error details:', {
+														message: error?.message || 'Unknown error',
+														stack: error?.stack,
+														childProfileId: (global as any).currentChildProfileId,
+														characterName: characterName.trim(),
+														hasGeneratedAvatar: !!generatedAvatar,
+														avatarCreationMode: avatarCreationMode,
+														avatarDataLength: generatedAvatar?.length || 0,
+														isDataUrl: generatedAvatar?.startsWith('data:'),
+														errorType: error?.constructor?.name
+													});
+													
+													// Provide more specific error messages based on error type
+													let userMessage = 'Unable to save your character. Please try again.';
+													if (error?.message?.includes('not authenticated')) {
+														userMessage = 'You need to be logged in to save characters. Please sign in and try again.';
+													} else if (error?.message?.includes('Firebase')) {
+														userMessage = 'There was a problem connecting to our servers. Please check your internet connection and try again.';
+													} else if (error?.message?.includes('upload')) {
+														userMessage = 'There was a problem uploading your avatar. Please try again.';
+													} else if (error?.message?.includes('Profile not found')) {
+														userMessage = 'Child profile not found. Please refresh the page and try again.';
+													}
+													
+													Alert.alert('Save Failed', userMessage);
 												}
 											}
 										}} 
@@ -1711,7 +1719,39 @@ export default function StorybookScreen() {
 									</TouchableOpacity>
 								</>
 							)}
-						</ScrollView>
+							</ScrollView>
+							
+							{/* Fixed Button Area - Always Visible */}
+							{avatarStep === 'upload' && (
+								<View style={{ 
+									padding: tokens.spacing.containerX,
+									backgroundColor: 'white',
+									borderTopWidth: 1,
+									borderTopColor: tokens.color.border.default
+								}}>
+									<GradientButton 
+										title="Generate Avatar" 
+										disabled={!selectedPhoto}
+										onPress={async () => {
+											if (selectedPhoto) {
+												setAvatarStep('generating');
+												try {
+													await generateAvatarFromPhoto();
+												} catch (error: any) {
+													console.error('Avatar generation failed:', error);
+													setAvatarStep('upload');
+													Alert.alert(
+														'Avatar Generation Failed',
+														'Unable to generate your avatar. This might be a temporary issue with the AI service. Please try again.',
+														[{ text: 'Try Again' }]
+													);
+												}
+											}
+										}} 
+									/>
+								</View>
+							)}
+						</View>
 					</View>
 				</View>
 			</Modal>
@@ -1822,7 +1862,8 @@ export default function StorybookScreen() {
 								borderRadius: tokens.radius.xl, 
 								width: '100%',
 								maxWidth: 400,
-								maxHeight: '80%'
+								height: '85%',
+								flexDirection: 'column'
 							}}>
 								{/* Header */}
 								<View style={{ 
@@ -1837,6 +1878,8 @@ export default function StorybookScreen() {
 											setAvatarModalVisible(false);
 											setAvatarStep('upload');
 											setCharacterName('');
+											setCharacterRole('other');
+											setCharacterAge('');
 											setSelectedPhoto(null);
 											setGeneratedAvatar(null);
 										}} 
@@ -1850,7 +1893,15 @@ export default function StorybookScreen() {
 								</View>
 
 								{/* Content */}
-								<ScrollView style={{ maxHeight: 500 }} contentContainerStyle={{ padding: tokens.spacing.containerX }}>
+								<View style={{ flex: 1 }}>
+									<ScrollView 
+										style={{ flex: 1 }}
+										contentContainerStyle={{ 
+											padding: tokens.spacing.containerX,
+											paddingBottom: tokens.spacing.gap.lg
+										}}
+										showsVerticalScrollIndicator={false}
+									>
 							{avatarStep === 'upload' && (
 								<>
 									<Text color="secondary" style={{ textAlign: 'center', marginBottom: tokens.spacing.gap.md }}>
@@ -1983,7 +2034,7 @@ export default function StorybookScreen() {
 									
 									{/* Selected Photo Preview */}
 									{selectedPhoto && (
-										<View style={{ alignItems: 'center', marginBottom: tokens.spacing.gap.lg }}>
+										<View style={{ alignItems: 'center', marginBottom: tokens.spacing.gap.md }}>
 											<Image 
 												source={{ uri: selectedPhoto }} 
 												style={{ 
@@ -1998,27 +2049,6 @@ export default function StorybookScreen() {
 											<Text color="secondary" size="sm">Photo selected</Text>
 										</View>
 									)}
-									
-									<GradientButton 
-										title="Generate Avatar" 
-										disabled={!selectedPhoto}
-										onPress={async () => {
-											if (selectedPhoto) {
-												setAvatarStep('generating');
-												try {
-													await generateAvatarFromPhoto();
-												} catch (error: any) {
-													console.error('Avatar generation failed:', error);
-													setAvatarStep('upload');
-													Alert.alert(
-														'Avatar Generation Failed',
-														'Unable to generate your avatar. This might be a temporary issue with the AI service. Please try again.',
-														[{ text: 'Try Again' }]
-													);
-												}
-											}
-										}} 
-									/>
 								</>
 							)}
 
@@ -2125,13 +2155,31 @@ export default function StorybookScreen() {
 													
 												} catch (error: any) {
 													console.error('❌ Failed to save character:', error);
-													console.error('❌ Error details:', error?.message || 'Unknown error');
-													console.error('❌ Error stack:', error?.stack);
-													console.error('❌ Child profile ID:', (global as any).currentChildProfileId);
-													console.error('❌ Character name:', characterName.trim());
-													console.error('❌ Generated avatar exists:', !!generatedAvatar);
-													console.error('❌ Avatar creation mode:', avatarCreationMode);
-													Alert.alert('Save Failed', `Unable to save your character: ${error?.message || 'Unknown error'}. Please try again.`);
+													console.error('❌ Error details:', {
+														message: error?.message || 'Unknown error',
+														stack: error?.stack,
+														childProfileId: (global as any).currentChildProfileId,
+														characterName: characterName.trim(),
+														hasGeneratedAvatar: !!generatedAvatar,
+														avatarCreationMode: avatarCreationMode,
+														avatarDataLength: generatedAvatar?.length || 0,
+														isDataUrl: generatedAvatar?.startsWith('data:'),
+														errorType: error?.constructor?.name
+													});
+													
+													// Provide more specific error messages based on error type
+													let userMessage = 'Unable to save your character. Please try again.';
+													if (error?.message?.includes('not authenticated')) {
+														userMessage = 'You need to be logged in to save characters. Please sign in and try again.';
+													} else if (error?.message?.includes('Firebase')) {
+														userMessage = 'There was a problem connecting to our servers. Please check your internet connection and try again.';
+													} else if (error?.message?.includes('upload')) {
+														userMessage = 'There was a problem uploading your avatar. Please try again.';
+													} else if (error?.message?.includes('Profile not found')) {
+														userMessage = 'Child profile not found. Please refresh the page and try again.';
+													}
+													
+													Alert.alert('Save Failed', userMessage);
 												}
 											}
 										}} 
@@ -2159,6 +2207,38 @@ export default function StorybookScreen() {
 								</>
 							)}
 							</ScrollView>
+							
+							{/* Fixed Button Area - Always Visible */}
+							{avatarStep === 'upload' && (
+								<View style={{ 
+									padding: tokens.spacing.containerX,
+									backgroundColor: 'white',
+									borderTopWidth: 1,
+									borderTopColor: tokens.color.border.default
+								}}>
+									<GradientButton 
+										title="Generate Avatar" 
+										disabled={!selectedPhoto}
+										onPress={async () => {
+											if (selectedPhoto) {
+												setAvatarStep('generating');
+												try {
+													await generateAvatarFromPhoto();
+												} catch (error: any) {
+													console.error('Avatar generation failed:', error);
+													setAvatarStep('upload');
+													Alert.alert(
+														'Avatar Generation Failed',
+														'Unable to generate your avatar. This might be a temporary issue with the AI service. Please try again.',
+														[{ text: 'Try Again' }]
+													);
+												}
+											}
+										}} 
+									/>
+								</View>
+							)}
+						</View>
 						</View>
 					</View>
 				</Modal>
@@ -3749,6 +3829,12 @@ export default function StorybookScreen() {
 					}}
 					profile={selectedProfileForAvatarManagement}
 					avatarType={avatarManagementType}
+					isChildProfile={
+						// Check if it's a child profile by looking for specific fields
+						// Child profiles from useMemoriesStore have 'birthDateISO' or come from profiles array
+						!!(selectedProfileForAvatarManagement.birthDateISO || 
+						   profiles?.some(p => p.id === selectedProfileForAvatarManagement.id))
+					}
 					onProfileUpdate={(updatedProfile) => {
 						// Close the modal and refresh the data
 						setAvatarManagementModalVisible(false);

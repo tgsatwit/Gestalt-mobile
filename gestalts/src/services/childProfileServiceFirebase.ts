@@ -34,7 +34,7 @@ class ChildProfileServiceFirebase {
     const profileId = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Create the profile document with the correct Firebase Auth UID
-    await setDoc(doc(db, 'childProfiles', profileId), {
+    const docData: any = {
       id: profileId,
       userId: userId, // This is the Firebase Auth UID from getCurrentUserId()
       childName: profileData.childName,
@@ -42,11 +42,17 @@ class ChildProfileServiceFirebase {
       birthDate: profileData.birthDate || '',
       currentStage: profileData.currentStage || 1,
       interests: profileData.interests || [],
-      avatarUrl: profileData.avatarUrl || null,
-      visualProfile: profileData.visualProfile || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    };
+    
+    // Only add optional fields if they have values (not undefined or null)
+    if (profileData.avatarUrl) docData.avatarUrl = profileData.avatarUrl;
+    if ((profileData as any).avatarMode) docData.avatarMode = (profileData as any).avatarMode;
+    if ((profileData as any).avatars) docData.avatars = (profileData as any).avatars;
+    if (profileData.visualProfile) docData.visualProfile = profileData.visualProfile;
+    
+    await setDoc(doc(db, 'childProfiles', profileId), docData);
     
     return profileId;
   }
@@ -101,6 +107,7 @@ class ChildProfileServiceFirebase {
       updatedAt: serverTimestamp()
     };
     
+    // Only add fields that are defined to avoid Firestore errors
     if (updates.childName !== undefined) updateData.childName = updates.childName;
     if (updates.parentName !== undefined) updateData.parentName = updates.parentName;
     if (updates.birthDate !== undefined) updateData.birthDate = updates.birthDate;
@@ -108,6 +115,10 @@ class ChildProfileServiceFirebase {
     if (updates.interests !== undefined) updateData.interests = updates.interests;
     if (updates.avatarUrl !== undefined) updateData.avatarUrl = updates.avatarUrl;
     if (updates.visualProfile !== undefined) updateData.visualProfile = updates.visualProfile;
+    
+    // Add support for new avatar metadata fields
+    if ((updates as any).avatarMode !== undefined) updateData.avatarMode = (updates as any).avatarMode;
+    if ((updates as any).avatars !== undefined) updateData.avatars = (updates as any).avatars;
     
     await updateDoc(doc(db, 'childProfiles', profileId), updateData);
   }
@@ -143,6 +154,8 @@ class ChildProfileServiceFirebase {
       currentStage: data.currentStage || undefined,
       interests: data.interests || [],
       avatarUrl: data.avatarUrl || undefined,
+      avatarMode: data.avatarMode || undefined,
+      avatars: data.avatars || undefined,
       visualProfile: data.visualProfile || undefined,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()),
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())
