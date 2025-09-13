@@ -1,4 +1,4 @@
-package com.tgsatwit.gestalts
+package com.tg.gestalts
 
 import android.app.Application
 import android.content.res.Configuration

@@ -83,7 +83,6 @@ export default function AuthScreen() {
       await signUp({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        displayName: firstName.trim(), // Use first name as display name
         email: email.trim().toLowerCase(),
         password: password,
       });

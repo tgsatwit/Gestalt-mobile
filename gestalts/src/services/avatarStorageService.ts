@@ -51,7 +51,7 @@ class AvatarStorageService {
       return base64String;
     } catch (error) {
       console.error('❌ Data URL conversion error:', error);
-      throw new Error(`Data URL conversion failed: ${error.message}`);
+      throw new Error(`Data URL conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -158,7 +158,7 @@ class AvatarStorageService {
       }
     } catch (error) {
       console.error('❌ Failed to upload avatar to Firebase Storage (REST):', error);
-      throw new Error(`Failed to upload avatar: ${error.message}`);
+      throw new Error(`Failed to upload avatar: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

@@ -24,7 +24,7 @@ export type AppointmentNote = {
 };
 export type PlaySession = { id: string; activity: string; notes?: string; createdAtISO: string };
 export type ChildProfile = { id: string; childName: string; parentName?: string; birthDateISO?: string; stage?: string };
-export type UserProfile = { displayName?: string; firstName?: string; lastName?: string; email?: string; };
+export type UserProfile = { firstName?: string; lastName?: string; email?: string; };
 
 // Firebase-backed profile state
 export type ProfileState = {
@@ -47,9 +47,10 @@ export type MemoriesState = {
 	addAppointmentNoteFull: (data: Omit<AppointmentNote, 'id' | 'createdAtISO'> & { createdAtISO?: string }) => void;
 	updateAppointmentNote: (id: string, updates: Partial<AppointmentNote>) => void;
 	addPlaySession: (activity: string, notes?: string) => void;
-	setProfile: (profile: ChildProfile) => void; // Legacy - will be deprecated
+	setProfile: (profile: ChildProfile | null) => void; // Legacy - will be deprecated
 	updateUserProfile: (updates: Partial<UserProfile>) => void;
 	getUserProfile: () => UserProfile | null;
+	getUserDisplayName: () => string;
 } & ProfileState & {
 	// Firebase profile operations
 	loadUserProfiles: (userId: string) => Promise<void>;
@@ -114,6 +115,10 @@ export const useMemoriesStore = create<MemoriesState>()(
 			updateUserProfile: (updates) =>
 				set((state) => ({ userProfile: { ...state.userProfile, ...updates } })),
 			getUserProfile: () => get().userProfile,
+			getUserDisplayName: () => {
+				const userProfile = get().userProfile;
+				return userProfile?.firstName || 'there';
+			},
 			
 			// Firebase profile operations
 			loadUserProfiles: async (userId: string) => {

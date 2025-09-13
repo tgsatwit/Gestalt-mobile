@@ -4,6 +4,8 @@ import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProfileSetupNotificationProps {
@@ -14,7 +16,7 @@ const NOTIFICATION_DISMISSED_KEY = 'profile_setup_notification_dismissed';
 
 export function ProfileSetupNotification({ show }: ProfileSetupNotificationProps) {
   const { tokens } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const [isVisible, setIsVisible] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
 

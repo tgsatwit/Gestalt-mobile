@@ -23,6 +23,7 @@ export default function DashboardScreen() {
 	const journal = useMemoriesStore((s) => s.journal);
 	const milestones = useMemoriesStore((s) => s.milestones);
 	const appointmentNotes = useMemoriesStore((s) => s.appointmentNotes);
+	const getUserDisplayName = useMemoriesStore((s) => s.getUserDisplayName);
 	
 	// Firebase store for gestalts and appointment note updates
 	const { 
@@ -285,14 +286,14 @@ export default function DashboardScreen() {
 					minHeight: 100
 				}}>
 					<View style={{ marginBottom: 16 }}>
-						<Text style={{ 
+						<Text style={{
 							fontSize: 38,
 							fontWeight: '800',
 							color: '#111827',
 							letterSpacing: -1,
 							lineHeight: 44
 						}}>
-							Hey {currentProfile?.parentName?.split(' ')[0] || 'there'}!
+							Hey {getUserDisplayName()}!
 						</Text>
 					</View>
 					<Text style={{

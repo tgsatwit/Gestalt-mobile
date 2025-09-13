@@ -8,6 +8,7 @@ export const color = {
 	},
 	primary: {
 		default: '#5B21B6', // Using brand gradient start as primary
+		light: '#DDD6FE', // Light version of primary
 	},
 	surface: '#FFFFFF',
 	bg: { muted: '#F9FAFB' },

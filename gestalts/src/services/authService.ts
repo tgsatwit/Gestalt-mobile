@@ -23,7 +23,6 @@ export interface UserProfile {
   email: string;
   firstName: string;
   lastName: string;
-  displayName: string;
   name: string;
   signUpDate: Date;
   provider: 'email' | 'apple';
@@ -34,7 +33,6 @@ export interface SignUpData {
   password: string;
   firstName: string;
   lastName: string;
-  displayName: string;
 }
 
 export interface SignInData {
@@ -54,7 +52,7 @@ class AuthService {
       const { auth, db } = getFirebaseServices();
       if (!auth || !db) throw new Error('Firebase not initialized');
       
-      const { email, password, firstName, lastName, displayName } = signUpData;
+      const { email, password, firstName, lastName } = signUpData;
       
       // Create Firebase user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -62,7 +60,7 @@ class AuthService {
 
       // Update Firebase Auth profile
       await updateProfile(user, {
-        displayName: displayName
+        displayName: firstName
       });
 
       // Create user profile in Firestore
@@ -71,7 +69,7 @@ class AuthService {
         email,
         firstName,
         lastName,
-        displayName,
+        name: firstName,
         signUpDate: new Date(),
         provider: 'email'
       };
@@ -105,7 +103,7 @@ class AuthService {
           email: user.email || '',
           firstName: firstName || '',
           lastName: lastName || '',
-          displayName,
+          name: firstName || displayName,
           signUpDate: new Date(),
           provider: 'email'
         };
@@ -159,14 +157,13 @@ class AuthService {
         // Create new profile for Apple sign-in user
         const firstName = appleCredential.fullName?.givenName || '';
         const lastName = appleCredential.fullName?.familyName || '';
-        const displayName = user.displayName || `${firstName} ${lastName}`.trim() || user.email?.split('@')[0] || 'User';
         
         userProfile = {
           id: user.uid,
           email: user.email || appleCredential.email || '',
           firstName,
           lastName,
-          displayName,
+          name: firstName || 'User',
           signUpDate: new Date(),
           provider: 'apple'
         };
@@ -218,7 +215,7 @@ class AuthService {
           email: data.email,
           firstName: data.firstName,
           lastName: data.lastName,
-          displayName: data.displayName,
+          name: data.firstName || 'User',
           signUpDate: data.signUpDate?.toDate() || new Date(),
           provider: data.provider
         };

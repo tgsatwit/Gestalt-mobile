@@ -26,7 +26,6 @@ export default function ProfileScreen() {
 	const scrollViewRef = useRef<any>(null);
 	
 	// Form state
-	const [displayName, setDisplayName] = useState(user?.displayName || user?.name || '');
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
 	const [email, setEmail] = useState(user?.email || '');
@@ -40,7 +39,6 @@ export default function ProfileScreen() {
 	// Load user profile data from Firebase on mount
 	useEffect(() => {
 		const applyProfileToForm = (profile: any) => {
-			setDisplayName(profile.name || '');
 			setFirstName(profile.firstName || '');
 			setLastName(profile.lastName || '');
 			setEmail(profile.email || user?.email || '');
@@ -55,14 +53,15 @@ export default function ProfileScreen() {
 			try {
 				const userId = getCurrentUserId();
 				if (!userId) {
-					setDisplayName(user?.displayName || user?.name || '');
+					setFirstName(user?.firstName || '');
+					setLastName(user?.lastName || '');
 					setEmail(user?.email || '');
 					return;
 				}
 				const profile = await userProfileService.getProfile(userId);
 				if (!profile) {
 					await userProfileService.createProfile(userId, {
-						name: user?.name || user?.displayName || 'User',
+						name: user?.firstName || 'User',
 						email: user?.email,
 					});
 					const created = await userProfileService.getProfile(userId);
@@ -112,7 +111,7 @@ export default function ProfileScreen() {
 			}
 			setSaving(true);
 			await userProfileService.updateProfile(userId, {
-				name: displayName.trim(),
+				name: firstName.trim(),
 				firstName: firstName.trim(),
 				lastName: lastName.trim(),
 				email: email.trim(),
@@ -388,29 +387,6 @@ export default function ProfileScreen() {
 								Profile Details
 							</Text>
 
-							{/* Display Name */}
-							<View style={{ marginBottom: tokens.spacing.gap.md }}>
-								<Text style={{ 
-									fontSize: tokens.font.size.sm,
-									color: tokens.color.text.secondary,
-									marginBottom: tokens.spacing.gap.xs 
-								}}>
-									Display Name
-								</Text>
-								<TextInput
-									placeholder="Enter your display name"
-									value={displayName}
-									onChangeText={setDisplayName}
-									style={{
-										borderColor: tokens.color.border.default,
-										borderWidth: 1,
-										borderRadius: tokens.radius.lg,
-										padding: tokens.spacing.gap.md,
-										fontSize: tokens.font.size.body
-									}}
-								/>
-							</View>
-
 							{/* First and Last Name Row */}
 							<View style={{ flexDirection: 'row', gap: tokens.spacing.gap.sm, marginBottom: tokens.spacing.gap.md }}>
 								<View style={{ flex: 1 }}>
@@ -622,11 +598,11 @@ export default function ProfileScreen() {
 									}}>
 										Signed in as
 									</Text>
-									<Text style={{ 
-										fontSize: tokens.font.size.sm, 
+									<Text style={{
+										fontSize: tokens.font.size.sm,
 										color: tokens.color.text.secondary
 									}}>
-										{user.displayName}
+										{user.firstName} {user.lastName}
 									</Text>
 									<Text style={{ 
 										fontSize: tokens.font.size.sm, 

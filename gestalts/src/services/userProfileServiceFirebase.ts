@@ -31,7 +31,6 @@ class UserProfileServiceFirebase {
       // Basic info (may already exist from auth)
       id: userId,
       email: profileData.email,
-      displayName: profileData.name || '',
       firstName: profileData.firstName || '',
       lastName: profileData.lastName || '',
       
@@ -102,7 +101,6 @@ class UserProfileServiceFirebase {
     // Basic info - always update if provided (including empty strings)
     if (updates.name !== undefined) {
       updateData.name = updates.name;
-      updateData.displayName = updates.name; // Keep displayName in sync with name
     }
     if (updates.firstName !== undefined) {
       updateData.firstName = updates.firstName;
@@ -198,7 +196,7 @@ class UserProfileServiceFirebase {
       id: id,
       userId: id, // Auth user ID
       email: data.email || '',
-      name: data.name || data.displayName || '',
+      name: data.firstName || '',
       firstName: data.firstName || '',
       lastName: data.lastName || '',
       phoneNumber: data.phoneNumber || '',

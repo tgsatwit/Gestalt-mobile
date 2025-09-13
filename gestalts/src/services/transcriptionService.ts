@@ -1,8 +1,7 @@
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 
-                Constants.manifest?.extra?.apiUrl || 
-                process.env.EXPO_PUBLIC_API_URL || 
+const API_URL = Constants.expoConfig?.extra?.apiUrl ||
+                process.env.EXPO_PUBLIC_API_URL ||
                 'http://localhost:3000';
 
 export async function transcribeAudio(audioBlob: Blob, language: string = 'en'): Promise<string> {

@@ -196,7 +196,7 @@ FIREBASE_APP_ID=your_firebase_app_id
 
 After successful authentication, verify:
 - User document is created in Firestore `users` collection
-- Profile contains: firstName, lastName, displayName, email, signUpDate, provider
+- Profile contains: firstName, lastName, email, signUpDate, provider
 - User can navigate to the main app interface
 
 ## Troubleshooting

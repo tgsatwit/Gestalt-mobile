@@ -29,7 +29,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.tgsatwit.gestalts</string>
+          <string>com.tg.gestalts</string>
         </array>
       </dict>
       <dict>
@@ -52,8 +52,12 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app uses the microphone to record audio for AI voice interactions.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your photos</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

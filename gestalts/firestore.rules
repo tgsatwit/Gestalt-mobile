@@ -13,10 +13,10 @@ service cloud.firestore {
     }
     
     function isValidUserData() {
-      return request.resource.data.keys().hasAll(['id', 'email', 'displayName']) &&
+      return request.resource.data.keys().hasAll(['id', 'email', 'firstName']) &&
              request.resource.data.id == request.auth.uid &&
              request.resource.data.email is string &&
-             request.resource.data.displayName is string;
+             request.resource.data.firstName is string;
     }
     
     // Validate that required string fields are present and not empty

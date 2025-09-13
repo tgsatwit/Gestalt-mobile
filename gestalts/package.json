@@ -57,6 +57,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@livekit/react-native-expo-plugin": "^1.0.1",
+    "@types/node": "^24.3.3",
     "@types/react": "~19.0.14",
     "dotenv": "^17.2.1",
     "firebase-admin": "^12.7.0",

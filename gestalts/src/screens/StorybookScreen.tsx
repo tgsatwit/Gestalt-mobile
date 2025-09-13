@@ -118,6 +118,8 @@ export default function StorybookScreen() {
 	
 	// Story viewer state
 	const [currentPageIndex, setCurrentPageIndex] = useState(0);
+	const [isPreloadingImages, setIsPreloadingImages] = useState(false);
+	const [preloadProgress, setPreloadProgress] = useState({ loaded: 0, total: 0 });
 	
 	// Menu state for story options
 	const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -297,6 +299,43 @@ export default function StorybookScreen() {
 		} catch (error) {
 			console.error('Failed to convert image to base64:', error);
 			throw error;
+		}
+	};
+
+	// Image pre-loading function for smooth story reading
+	const preloadStoryImages = async (story: any) => {
+		if (!story?.pages) return;
+
+		const imageUrls = story.pages
+			.map((page: any) => page.imageUrl)
+			.filter((url: string) => url && url.trim());
+
+		if (imageUrls.length === 0) return;
+
+		setIsPreloadingImages(true);
+		setPreloadProgress({ loaded: 0, total: imageUrls.length });
+
+		try {
+			// Pre-load images with progress tracking
+			let loaded = 0;
+			const preloadPromises = imageUrls.map(async (url: string) => {
+				try {
+					await Image.prefetch(url);
+					loaded++;
+					setPreloadProgress({ loaded, total: imageUrls.length });
+				} catch (error) {
+					console.warn('Failed to preload image:', url, error);
+					loaded++;
+					setPreloadProgress({ loaded, total: imageUrls.length });
+				}
+			});
+
+			await Promise.allSettled(preloadPromises);
+			console.log(`✅ Pre-loaded ${loaded}/${imageUrls.length} story images`);
+		} catch (error) {
+			console.error('Image preloading failed:', error);
+		} finally {
+			setIsPreloadingImages(false);
 		}
 	};
 
@@ -781,11 +820,13 @@ export default function StorybookScreen() {
 							overflow: 'visible'
 						}}>
 							{/* Square Image at Top */}
-							<TouchableOpacity 
-								onPress={() => { 
+							<TouchableOpacity
+								onPress={async () => {
 									if (isComplete) {
-										setCurrentStory(story); 
+										setCurrentStory(story);
 										setStoryReaderVisible(true);
+										// Pre-load images for smooth reading experience
+										await preloadStoryImages(story);
 									} else if (isGenerating) {
 										Alert.alert(
 											'Story Still Creating', 
@@ -889,11 +930,13 @@ export default function StorybookScreen() {
 													minWidth: 120
 												}}>
 													{/* Read Story option */}
-													<TouchableOpacity 
-														onPress={() => {
+													<TouchableOpacity
+														onPress={async () => {
 															setOpenMenuId(null);
 															setCurrentStory(story);
 															setStoryReaderVisible(true);
+															// Pre-load images for smooth reading experience
+															await preloadStoryImages(story);
 														}}
 														style={{
 															flexDirection: 'row',
@@ -1768,6 +1811,7 @@ export default function StorybookScreen() {
 			'child-concept': 'Story Theme',
 			'concept-selection': 'Choose Learning Message',
 			'mode-selection': 'Select Mode',
+			'story-mode-selection': 'Story Style',
 			'advanced-options': 'Customize Options',
 			'character-selection': 'Add Characters',
 			'text-generation': 'Creating Story',
@@ -3481,55 +3525,38 @@ export default function StorybookScreen() {
 	const renderStoryReaderModal = () => {
 		const { width: screenWidth, height: screenHeight } = require('react-native').Dimensions.get('window');
 		
-		// Simple story page component for read-only viewing
+		// Simple story page component for read-only viewing - images are pre-loaded
 		const StoryReaderPageComponent = ({ item, index }: { item: any, index: number }) => {
-			const [imageLoading, setImageLoading] = useState(true);
 			const [imageError, setImageError] = useState(false);
-			
+
 			return (
 				<View style={{ width: screenWidth, height: screenHeight, backgroundColor: 'black' }}>
 					{/* Full screen image with proper aspect ratio */}
 					{item.imageUrl && !imageError ? (
-						<Image 
-							source={{ uri: item.imageUrl }} 
-							style={{ 
-								width: screenWidth, 
+						<Image
+							source={{ uri: item.imageUrl }}
+							style={{
+								width: screenWidth,
 								height: screenHeight * 0.75, // Leave space for text at bottom
 								resizeMode: 'contain' // Show full image with correct aspect ratio
-							}} 
-							onLoad={() => setImageLoading(false)}
+							}}
 							onError={(error) => {
 								console.log('Image load error:', error);
 								setImageError(true);
-								setImageLoading(false);
 							}}
 						/>
 					) : (
-						<View style={{ 
-							width: screenWidth, 
-							height: screenHeight * 0.75, 
-							backgroundColor: '#333', 
-							alignItems: 'center', 
-							justifyContent: 'center' 
+						<View style={{
+							width: screenWidth,
+							height: screenHeight * 0.75,
+							backgroundColor: '#333',
+							alignItems: 'center',
+							justifyContent: 'center'
 						}}>
 							<Ionicons name="image-outline" size={100} color="#666" />
 							<Text style={{ color: '#666', marginTop: 20 }}>
 								{imageError ? 'Failed to load image' : 'No image available'}
 							</Text>
-						</View>
-					)}
-					
-					{imageLoading && (
-						<View style={{ 
-							position: 'absolute',
-							width: screenWidth, 
-							height: screenHeight * 0.75, 
-							backgroundColor: '#222', 
-							alignItems: 'center', 
-							justifyContent: 'center' 
-						}}>
-							<ActivityIndicator size="large" color="white" />
-							<Text style={{ color: 'white', marginTop: 20 }}>Loading image...</Text>
 						</View>
 					)}
 				
@@ -3563,21 +3590,69 @@ export default function StorybookScreen() {
 		return (
 			<Modal visible={isStoryReaderVisible} animationType="slide">
 				<View style={{ flex: 1, backgroundColor: 'black' }}>
-					{/* Header with close button only */}
-					<View style={{ 
-						position: 'absolute', 
-						top: 60, 
-						right: 20, 
+					{/* Header with page counter and close button */}
+					<View style={{
+						position: 'absolute',
+						top: 60,
+						left: 20,
+						right: 20,
+						flexDirection: 'row',
+						justifyContent: 'space-between',
+						alignItems: 'center',
 						zIndex: 10
 					}}>
-						<TouchableOpacity 
-							onPress={() => setStoryReaderVisible(false)} 
+						{/* Page Counter */}
+						{currentStory && currentStory.pages && (
+							<View style={{ backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 15, padding: 8, paddingHorizontal: 12 }}>
+								<Text style={{ color: 'white', fontSize: 14, fontWeight: '500' }}>
+									{`${currentPageIndex + 1} / ${currentStory.pages.length}`}
+								</Text>
+							</View>
+						)}
+
+						{/* Close Button */}
+						<TouchableOpacity
+							onPress={() => setStoryReaderVisible(false)}
 							style={{ backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 15, padding: 8 }}
 						>
 							<Ionicons name="close" size={24} color="white" />
 						</TouchableOpacity>
 					</View>
-					
+
+					{/* Loading Overlay during image pre-loading */}
+					{isPreloadingImages && (
+						<View style={{
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0,
+							backgroundColor: 'rgba(0,0,0,0.9)',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 5
+						}}>
+							<ActivityIndicator size="large" color="white" style={{ marginBottom: 20 }} />
+							<Text style={{ color: 'white', fontSize: 18, marginBottom: 20 }}>
+								Loading story images...
+							</Text>
+							<View style={{
+								width: 200,
+								height: 4,
+								backgroundColor: '#333',
+								borderRadius: 2,
+								overflow: 'hidden'
+							}}>
+								<View style={{
+									width: `${preloadProgress.total > 0 ? (preloadProgress.loaded / preloadProgress.total) * 100 : 0}%`,
+									height: '100%',
+									backgroundColor: 'white',
+									borderRadius: 2
+								}} />
+							</View>
+						</View>
+					)}
+
 					{currentStory && currentStory.pages && currentStory.pages.length > 0 ? (
 						<FlatList
 							data={currentStory.pages}
