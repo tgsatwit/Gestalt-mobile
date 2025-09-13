@@ -15,7 +15,6 @@ import AddGestaltScreen from '../screens/AddGestaltScreen';
 import AppointmentNoteScreen from '../screens/AppointmentNoteScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
 import ChildProfilesListScreen from '../screens/ChildProfilesListScreen';
-import UserProfileScreen from '../screens/UserProfileScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SpecialistProfilesScreen from '../screens/SpecialistProfilesScreen';
 import AddEditSpecialistScreen from '../screens/AddEditSpecialistScreen';
@@ -98,11 +97,6 @@ const ChildProfilesListWithDrawer = () => (
   </DrawerProvider>
 );
 
-const UserProfileWithDrawer = () => (
-  <DrawerProvider>
-    <UserProfileScreen />
-  </DrawerProvider>
-);
 
 const ProfileWithDrawer = () => (
   <DrawerProvider>
@@ -177,7 +171,6 @@ export default function MainNavigator() {
       <Stack.Screen name="Profile" component={ProfileWithDrawer} />
       <Stack.Screen name="ChildProfile" component={ChildProfileWithDrawer} />
       <Stack.Screen name="ChildProfilesList" component={ChildProfilesListWithDrawer} />
-      <Stack.Screen name="UserProfile" component={UserProfileWithDrawer} />
       <Stack.Screen name="SpecialistProfiles" component={SpecialistProfilesWithDrawer} />
       <Stack.Screen name="AddEditSpecialist" component={AddEditSpecialistWithDrawer} />
       <Stack.Screen name="ProfileSelection" component={ProfileSelectionWithDrawer} />

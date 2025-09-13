@@ -309,7 +309,7 @@ export default function KnowledgeScreen() {
 								)}
 								<Text style={{ 
 									fontSize: tokens.font.size.xs,
-									color: tokens.color.text.tertiary 
+									color: tokens.color.text.secondary
 								}}>
 									{article.category}
 								</Text>

@@ -20,7 +20,6 @@ interface AvatarManagementModalProps {
   visible: boolean;
   onClose: () => void;
   profile: ChildProfile | any; // Support both ChildProfile and Character
-  avatarType: 'animated' | 'real';
   onProfileUpdate?: (updatedProfile: ChildProfile | any) => void;
   isChildProfile?: boolean; // Flag to indicate if this is a child profile (not deletable)
 }
@@ -29,7 +28,6 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   visible,
   onClose,
   profile,
-  avatarType,
   onProfileUpdate,
   isChildProfile = false
 }) => {
@@ -62,23 +60,19 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(profile.childName || profile.name);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentAvatarType, setCurrentAvatarType] = useState(avatarType);
+  const currentAvatarType = 'animated'; // Always use animated
   
   // Character metadata editing (only for custom characters, not child profiles)
   const [isEditingMetadata, setIsEditingMetadata] = useState(false);
   const [newRole, setNewRole] = useState<'Mum' | 'Dad' | 'Brother' | 'Sister' | 'Grandparent' | 'Friend'>(profile.role || 'Friend');
   const [newAge, setNewAge] = useState(profile.age || '');
   
-  // Get current avatar URL based on type - no fallback to other type
+  // Get current animated avatar URL
   const getCurrentAvatarUrl = () => {
     if (profile.avatars) {
-      if (currentAvatarType === 'real') {
-        return profile.avatars.real; // Only return real avatar, no fallback
-      } else {
-        return profile.avatars.animated || profile.avatarUrl; // Fallback to legacy avatarUrl for animated
-      }
+      return profile.avatars.animated || profile.avatarUrl; // Fallback to legacy avatarUrl for animated
     }
-    return currentAvatarType === 'animated' ? profile.avatarUrl : null;
+    return profile.avatarUrl;
   };
 
   const handleRename = async () => {
@@ -187,28 +181,28 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
         const tempCharacter = await createCharacterFromPhoto(
           photoUri,
           profile.childName || profile.name || 'Child',
-          currentAvatarType,
+          'animated',
           userId
         );
-        
+
         // Now update the child profile with the generated avatar URL
-        if (tempCharacter.avatars?.[currentAvatarType]) {
+        if (tempCharacter.avatars?.animated) {
           await createChildAvatar(
             profile.id,
             userId,
-            tempCharacter.avatars[currentAvatarType],
-            currentAvatarType
+            tempCharacter.avatars.animated,
+            'animated'
           );
         }
-        
+
         // Update the local profile
         const updatedProfile = {
           ...profile,
           avatars: {
             ...(profile.avatars || {}),
-            [currentAvatarType]: tempCharacter.avatars?.[currentAvatarType]
+            animated: tempCharacter.avatars?.animated
           },
-          avatarUrl: tempCharacter.avatars?.[currentAvatarType] || profile.avatarUrl,
+          avatarUrl: tempCharacter.avatars?.animated || profile.avatarUrl,
           updatedAt: new Date()
         };
         
@@ -218,7 +212,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
         // This will handle the Gemini generation internally
         const updatedCharacter = await updateCharacterAvatar(
           profile.id,
-          currentAvatarType,
+          'animated',
           photoUri,
           userId
         );
@@ -282,9 +276,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   };
 
   const handleDeleteAvatar = () => {
-    const avatarExists = currentAvatarType === 'real' 
-      ? profile.avatars?.real 
-      : (profile.avatars?.animated || profile.avatarUrl); // Check legacy field too
+    const avatarExists = profile.avatars?.animated || profile.avatarUrl; // Check legacy field too
 
     if (!avatarExists) {
       Alert.alert('Error', 'No avatar found to delete');
@@ -293,31 +285,31 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
 
     Alert.alert(
       'Delete Avatar',
-      `Are you sure you want to delete the ${currentAvatarType} avatar? This action cannot be undone.`,
+      `Are you sure you want to delete the animated avatar? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
               setIsProcessing(true);
-              
-              // Create updated avatars object without the deleted type
+
+              // Create updated avatars object without the animated avatar
               const updatedAvatars = { ...(profile.avatars || {}) };
-              delete updatedAvatars[currentAvatarType];
-              
+              delete updatedAvatars.animated;
+
               // Update character with null/empty URL to remove the avatar
-              await updateCharacterAvatar(profile.id, currentAvatarType, '');
-              
+              await updateCharacterAvatar(profile.id, 'animated', '');
+
               const updatedProfile: ChildProfile = {
                 ...profile,
                 avatars: updatedAvatars,
                 updatedAt: new Date()
               };
-              
+
               onProfileUpdate?.(updatedProfile);
-              
+
               Alert.alert('Success', 'Avatar deleted successfully');
             } catch (error) {
               console.error('Failed to delete avatar:', error);
@@ -332,9 +324,7 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
   };
 
   const currentAvatarUrl = getCurrentAvatarUrl();
-  const hasCurrentAvatar = currentAvatarType === 'real' 
-    ? profile.avatars?.real 
-    : (profile.avatars?.animated || profile.avatarUrl); // Check legacy field too
+  const hasCurrentAvatar = profile.avatars?.animated || profile.avatarUrl; // Check legacy field too
 
   return (
     <Modal
@@ -424,57 +414,6 @@ export const AvatarManagementModal: React.FC<AvatarManagementModalProps> = ({
               {profile.childName || profile.name}
             </Text>
             
-            {/* Avatar Type Toggle */}
-            <View style={{
-              flexDirection: 'row',
-              marginTop: tokens.spacing.gap.sm,
-              backgroundColor: tokens.color.bg.muted,
-              borderRadius: tokens.radius.lg,
-              padding: 4
-            }}>
-              <TouchableOpacity
-                onPress={() => setCurrentAvatarType('animated')}
-                style={{
-                  flex: 1,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: tokens.radius.md,
-                  backgroundColor: currentAvatarType === 'animated' ? tokens.color.primary.default : 'transparent',
-                  alignItems: 'center'
-                }}
-              >
-                <Text
-                  size="sm"
-                  weight="medium"
-                  style={{
-                    color: currentAvatarType === 'animated' ? 'white' : tokens.color.text.secondary
-                  }}
-                >
-                  Animated
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setCurrentAvatarType('real')}
-                style={{
-                  flex: 1,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: tokens.radius.md,
-                  backgroundColor: currentAvatarType === 'real' ? tokens.color.primary.default : 'transparent',
-                  alignItems: 'center'
-                }}
-              >
-                <Text
-                  size="sm"
-                  weight="medium"
-                  style={{
-                    color: currentAvatarType === 'real' ? 'white' : tokens.color.text.secondary
-                  }}
-                >
-                  Real-Life
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Actions */}

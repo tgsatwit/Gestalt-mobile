@@ -329,7 +329,7 @@ export function DrawerProvider({ children }: DrawerProviderProps) {
                   }}>
                     {/* My Profile */}
                     <TouchableOpacity
-                      onPress={() => handleNavigate('UserProfile')}
+                      onPress={() => handleNavigate('Profile')}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',

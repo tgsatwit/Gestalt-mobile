@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScrollView, TextInput, View, TouchableOpacity, Alert } from 'react-native';
+import { ScrollView, TextInput, View, TouchableOpacity, Alert, Switch } from 'react-native';
 import { Text, useTheme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,7 +9,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/types';
 import { BottomNavigation } from '../navigation/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext';
-import { useMemoriesStore } from '../state/useStore';
+import userProfileService from '../services/userProfileServiceFirebase';
 
 type ProfileTab = 'details' | 'notifications' | 'account';
 
@@ -18,33 +18,65 @@ type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 export default function ProfileScreen() {
 	const { tokens } = useTheme();
 	const { openDrawer } = useDrawer();
-	const { user, signOut } = useAuth();
+	const { user, signOut, getCurrentUserId } = useAuth();
 	const navigation = useNavigation<NavigationProp>();
-	const { userProfile, updateUserProfile } = useMemoriesStore();
 	const [activeTab, setActiveTab] = useState<ProfileTab>('details');
 	const [showLeftArrow, setShowLeftArrow] = useState(false);
 	const [showRightArrow, setShowRightArrow] = useState(true);
 	const scrollViewRef = useRef<any>(null);
 	
 	// Form state
-	const [displayName, setDisplayName] = useState(userProfile?.displayName || '');
-	const [firstName, setFirstName] = useState(userProfile?.firstName || '');
-	const [lastName, setLastName] = useState(userProfile?.lastName || '');
-	const [email, setEmail] = useState(userProfile?.email || user?.email || '');
+	const [displayName, setDisplayName] = useState(user?.displayName || user?.name || '');
+	const [firstName, setFirstName] = useState('');
+	const [lastName, setLastName] = useState('');
+	const [email, setEmail] = useState(user?.email || '');
+	const [emailNotifications, setEmailNotifications] = useState(true);
+	const [pushNotifications, setPushNotifications] = useState(true);
+	const [reminderNotifications, setReminderNotifications] = useState(true);
+	const [weeklyReports, setWeeklyReports] = useState(true);
+	const [subscriptionStatus, setSubscriptionStatus] = useState<'free' | 'premium' | 'trial'>('free');
+	const [saving, setSaving] = useState(false);
 	
-	// Load user profile data on mount
+	// Load user profile data from Firebase on mount
 	useEffect(() => {
-		if (userProfile) {
-			setDisplayName(userProfile.displayName || '');
-			setFirstName(userProfile.firstName || '');
-			setLastName(userProfile.lastName || '');
-			setEmail(userProfile.email || user?.email || '');
-		} else if (user) {
-			// Initialize from auth user if no profile exists
-			setDisplayName(user.displayName || '');
-			setEmail(user.email || '');
-		}
-	}, [userProfile, user]);
+		const applyProfileToForm = (profile: any) => {
+			setDisplayName(profile.name || '');
+			setFirstName(profile.firstName || '');
+			setLastName(profile.lastName || '');
+			setEmail(profile.email || user?.email || '');
+			setEmailNotifications(profile.emailNotifications ?? true);
+			setPushNotifications(profile.pushNotifications ?? true);
+			setReminderNotifications(profile.reminderNotifications ?? true);
+			setWeeklyReports(profile.weeklyReports ?? true);
+			setSubscriptionStatus(profile.subscriptionStatus || 'free');
+		};
+
+		const loadProfile = async () => {
+			try {
+				const userId = getCurrentUserId();
+				if (!userId) {
+					setDisplayName(user?.displayName || user?.name || '');
+					setEmail(user?.email || '');
+					return;
+				}
+				const profile = await userProfileService.getProfile(userId);
+				if (!profile) {
+					await userProfileService.createProfile(userId, {
+						name: user?.name || user?.displayName || 'User',
+						email: user?.email,
+					});
+					const created = await userProfileService.getProfile(userId);
+					if (created) applyProfileToForm(created);
+				} else {
+					applyProfileToForm(profile);
+				}
+			} catch (err) {
+				console.error('Failed to load profile:', err);
+			}
+		};
+
+		loadProfile();
+	}, [getCurrentUserId, user]);
 
 	const handleSignOut = () => {
 		Alert.alert(
@@ -71,20 +103,66 @@ export default function ProfileScreen() {
 		);
 	};
 	
-	const handleSaveChanges = () => {
+	const handleSaveChanges = async () => {
 		try {
-			updateUserProfile({
-				displayName: displayName.trim() || undefined,
-				firstName: firstName.trim() || undefined,
-				lastName: lastName.trim() || undefined,
-				email: email.trim() || undefined
+			const userId = getCurrentUserId();
+			if (!userId) {
+				Alert.alert('Error', 'User not authenticated');
+				return;
+			}
+			setSaving(true);
+			await userProfileService.updateProfile(userId, {
+				name: displayName.trim(),
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
+				email: email.trim(),
+				emailNotifications,
+				pushNotifications,
+				reminderNotifications,
+				weeklyReports
 			});
-			
 			Alert.alert('Success', 'Profile updated successfully!');
 		} catch (error) {
 			console.error('Failed to update profile:', error);
 			Alert.alert('Error', 'Failed to update profile. Please try again.');
+		} finally {
+			setSaving(false);
 		}
+	};
+
+	const handleDataExport = async () => {
+		try {
+			const userId = getCurrentUserId();
+			if (!userId) return;
+			await userProfileService.requestDataExport(userId);
+			Alert.alert('Data Export Requested', 'You will receive your data via email within 24-48 hours.');
+		} catch (err) {
+			Alert.alert('Error', 'Failed to request data export. Please try again.');
+		}
+	};
+
+	const handleAccountDeletion = () => {
+		Alert.alert(
+			'Delete Account',
+			'Are you sure you want to delete your account? This action cannot be undone.',
+			[
+				{ text: 'Cancel', style: 'cancel' },
+				{
+					text: 'Delete',
+					style: 'destructive',
+					onPress: async () => {
+						try {
+							const userId = getCurrentUserId();
+							if (!userId) return;
+							await userProfileService.markForDeletion(userId);
+							Alert.alert('Deletion Scheduled', 'Your account is scheduled for deletion within 30 days.');
+						} catch (err) {
+							Alert.alert('Error', 'Failed to schedule account deletion. Please try again.');
+						}
+					}
+				}
+			]
+		);
 	};
 
 	const tabs = [
@@ -420,7 +498,7 @@ export default function ProfileScreen() {
 									fontSize: tokens.font.size.body,
 									fontWeight: '600'
 								}}>
-									Save Changes
+									{saving ? 'Saving...' : 'Save Changes'}
 								</Text>
 							</TouchableOpacity>
 						</View>
@@ -439,10 +517,10 @@ export default function ProfileScreen() {
 
 							{/* Notification Settings */}
 							{[
-								{ label: 'Email Notifications', description: 'Receive updates via email' },
-								{ label: 'Push Notifications', description: 'Get notified on your device' },
-								{ label: 'Reminder Notifications', description: 'Helpful reminders about entries' },
-								{ label: 'Weekly Reports', description: 'Weekly summary of activities' }
+								{ label: 'Email Notifications', description: 'Receive updates via email', value: emailNotifications, setter: setEmailNotifications },
+								{ label: 'Push Notifications', description: 'Get notified on your device', value: pushNotifications, setter: setPushNotifications },
+								{ label: 'Reminder Notifications', description: 'Helpful reminders about entries', value: reminderNotifications, setter: setReminderNotifications },
+								{ label: 'Weekly Reports', description: 'Weekly summary of activities', value: weeklyReports, setter: setWeeklyReports }
 							].map((setting, index) => (
 								<View key={index} style={{
 									flexDirection: 'row',
@@ -468,13 +546,13 @@ export default function ProfileScreen() {
 											{setting.description}
 										</Text>
 									</View>
-									<View style={{
-										width: 44,
-										height: 24,
-										borderRadius: 12,
-										backgroundColor: tokens.color.bg.muted,
-										marginLeft: tokens.spacing.gap.md
-									}} />
+									<Switch
+										value={setting.value}
+										onValueChange={setting.setter}
+										trackColor={{ false: tokens.color.bg.muted, true: tokens.color.brand.gradient.start + '60' }}
+										thumbColor={setting.value ? tokens.color.brand.gradient.start : '#f4f3f4'}
+										style={{ marginLeft: tokens.spacing.gap.md }}
+									/>
 								</View>
 							))}
 						</View>
@@ -512,7 +590,7 @@ export default function ProfileScreen() {
 											color: tokens.color.text.secondary,
 											marginTop: 2
 										}}>
-											Free Plan
+											{subscriptionStatus.charAt(0).toUpperCase() + subscriptionStatus.slice(1)} Plan
 										</Text>
 									</View>
 									<TouchableOpacity style={{
@@ -562,9 +640,9 @@ export default function ProfileScreen() {
 							{/* Management Actions */}
 							{[
 								{ icon: 'key', label: 'Change Password' },
-								{ icon: 'download', label: 'Export Data' },
+								{ icon: 'download', label: 'Export Data', action: handleDataExport },
 								{ icon: 'log-out', label: 'Sign Out', action: handleSignOut },
-								{ icon: 'trash', label: 'Delete Account', destructive: true }
+								{ icon: 'trash', label: 'Delete Account', action: handleAccountDeletion, destructive: true }
 							].map((item, index) => (
 								<TouchableOpacity
 									key={index}

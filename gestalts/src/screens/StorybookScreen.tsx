@@ -63,7 +63,6 @@ export default function StorybookScreen() {
 
 	// --- Local UI State ---
 	const [activeTab, setActiveTab] = useState<'stories' | 'characters'>('stories');
-	const [characterDisplayMode, setCharacterDisplayMode] = useState<'animated' | 'real'>('animated');
 	
 	// Modal states for creation flows
 	const [isAvatarModalVisible, setAvatarModalVisible] = useState(false);
@@ -77,12 +76,11 @@ export default function StorybookScreen() {
 	const [selectedCharacterForManagement, setSelectedCharacterForManagement] = useState<Character | null>(null);
 	const [isAvatarManagementModalVisible, setAvatarManagementModalVisible] = useState(false);
 	const [selectedProfileForAvatarManagement, setSelectedProfileForAvatarManagement] = useState<any>(null);
-	const [avatarManagementType, setAvatarManagementType] = useState<'animated' | 'real'>('animated');
 
 	// Wizard states
 	const [avatarStep, setAvatarStep] = useState('upload'); // upload, generating, review
-	const [avatarCreationMode, setAvatarCreationMode] = useState<'animated' | 'real'>('animated');
-	const [storyWizardStep, setStoryWizardStep] = useState<StoryWizardStep>('story-mode-selection');
+	const [avatarCreationMode, setAvatarCreationMode] = useState<'animated'>('animated');
+	const [storyWizardStep, setStoryWizardStep] = useState<StoryWizardStep>('character-selection');
 	// Get user's child profile from memories store
 	const { profile, profiles, createChildAvatar, profileLoading, loadUserProfiles } = useMemoriesStore();
 	
@@ -266,8 +264,8 @@ export default function StorybookScreen() {
 			const avatarResult = await geminiService.generateAvatar({
 				photoData: base64Photo,
 				characterName: characterName || 'Character',
-				style: avatarCreationMode === 'real' ? 'real' : 'animated',
-				mode: avatarCreationMode
+				style: 'animated',
+				mode: 'animated'
 			});
 			
 			console.log('✅ Avatar generation completed:', typeof avatarResult);
@@ -1075,7 +1073,7 @@ export default function StorybookScreen() {
 							mode: 'simple',
 							characterIds: []
 						});
-						setStoryWizardStep('story-mode-selection');
+						setStoryWizardStep('character-selection');
 						setStoryModalVisible(true);
 					}}
 				/>
@@ -1092,234 +1090,182 @@ export default function StorybookScreen() {
 					Create and manage personalized avatars for your stories.
 				</Text>
 				
-				{/* Character Mode Toggle */}
-				<View style={{
-					flexDirection: 'row',
-					backgroundColor: tokens.color.surface,
-					borderRadius: tokens.radius.lg,
-					padding: 4,
-					marginBottom: tokens.spacing.gap.lg
-				}}>
-					<TouchableOpacity
-						onPress={() => setCharacterDisplayMode('animated')}
-						style={{
-							flex: 1,
-							paddingVertical: 12,
-							paddingHorizontal: 16,
-							borderRadius: tokens.radius.md,
-							backgroundColor: characterDisplayMode === 'animated' ? tokens.color.primary.default : 'transparent',
-							alignItems: 'center'
-						}}
-					>
-						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-							<Ionicons 
-								name="color-palette" 
-								size={16} 
-								color={characterDisplayMode === 'animated' ? 'white' : tokens.color.text.secondary} 
-								style={{ marginRight: 8 }} 
-							/>
-							<Text 
-								weight="medium" 
-								style={{ 
-									color: characterDisplayMode === 'animated' ? 'white' : tokens.color.text.secondary 
-								}}
-							>
-								Animated
-							</Text>
-						</View>
-					</TouchableOpacity>
-					<TouchableOpacity
-						onPress={() => setCharacterDisplayMode('real')}
-						style={{
-							flex: 1,
-							paddingVertical: 12,
-							paddingHorizontal: 16,
-							borderRadius: tokens.radius.md,
-							backgroundColor: characterDisplayMode === 'real' ? tokens.color.primary.default : 'transparent',
-							alignItems: 'center'
-						}}
-					>
-						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-							<Ionicons 
-								name="camera" 
-								size={16} 
-								color={characterDisplayMode === 'real' ? 'white' : tokens.color.text.secondary} 
-								style={{ marginRight: 8 }} 
-							/>
-							<Text 
-								weight="medium" 
-								style={{ 
-									color: characterDisplayMode === 'real' ? 'white' : tokens.color.text.secondary 
-								}}
-							>
-								Real-Life
-							</Text>
-						</View>
-					</TouchableOpacity>
-				</View>
 				
-				{/* Child Profiles Section */}
-				{profiles.length > 0 && (
-					<>
-						<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>Child Profiles</Text>
-						<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>Your child's personalized avatars for stories.</Text>
-						<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
-							{profiles.map((childProfile) => {
-								// Check if child profile has the avatar for current display mode
-								const hasCurrentModeAvatar = characterDisplayMode === 'real' ? 
-									(childProfile as any).avatars?.real :
-									((childProfile as any).avatars?.animated || childProfile.avatarUrl);
-								
-								// Get the appropriate avatar URL based on display mode
-								let displayAvatarUrl: string | undefined;
-								
-								if (hasCurrentModeAvatar) {
-									// Check for new dual avatar structure first, then fallback to legacy avatarUrl
-									if ((childProfile as any).avatars) {
-										const avatars = (childProfile as any).avatars;
-										displayAvatarUrl = characterDisplayMode === 'real' ? 
-											avatars.real :
-											(avatars.animated || childProfile.avatarUrl);
-									} else {
-										displayAvatarUrl = childProfile.avatarUrl;
-									}
-								}
-								
-								return (
-									<View key={childProfile.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
-										{hasCurrentModeAvatar && displayAvatarUrl ? (
-											<TouchableOpacity 
-												onPress={() => {
-													setSelectedProfileForAvatarManagement(childProfile);
-													setAvatarManagementType(characterDisplayMode);
-													setAvatarManagementModalVisible(true);
-												}}
-												style={{ alignItems: 'center' }}
-												activeOpacity={0.7}
-											>
-												<Image 
-													source={{ uri: displayAvatarUrl }} 
-													style={{ 
-														width: 100, 
-														height: 100, 
-														borderRadius: 50,
-														borderWidth: 3,
-														borderColor: tokens.color.primary.default 
-													}} 
-												/>
-											</TouchableOpacity>
-										) : (
-											<TouchableOpacity 
-												onPress={() => {
-													resetProgress();
-													setCharacterName(childProfile.childName);
-													setSelectedPhoto(null);
-													setGeneratedAvatar(null);
-													setAvatarStep('upload');
-													setAvatarCreationMode(characterDisplayMode); // Set the mode to current display mode
-													setAvatarModalVisible(true);
-													// Store the child profile ID for avatar creation
-													(global as any).currentChildProfileId = childProfile.id;
-												}}
-												style={{
-													width: 100,
-													height: 100,
-													borderRadius: 50,
-													backgroundColor: tokens.color.surface,
-													borderWidth: 2,
-													borderColor: tokens.color.primary.default,
-													borderStyle: 'dashed',
-													alignItems: 'center',
-													justifyContent: 'center'
-												}}
-											>
-												<Ionicons 
-													name={characterDisplayMode === 'real' ? "camera" : "color-palette"} 
-													size={24} 
-													color={tokens.color.primary.default} 
-												/>
-												<Text size="xs" color="primary" style={{ textAlign: 'center', marginTop: 4 }}>
-													Add {characterDisplayMode === 'real' ? 'Real' : 'Animated'}
-												</Text>
-											</TouchableOpacity>
-										)}
-										<Text weight="medium">{childProfile.childName}</Text>
-									</View>
-								);
-							})}
-						</View>
-					</>
-				)}
-				
-				{/* My Characters Section - Adult Characters */}
-				<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>My Characters</Text>
-				<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>Family members and custom characters you've created.</Text>
+				{/* All Characters Section - Consolidated */}
 				<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
-					{/* Show adult characters only (not child profiles) */}
-					{characters.filter((char: Character) => {
-						// Filter characters that have avatar for current display mode
-						if (characterDisplayMode === 'real') {
-							// For real mode, only show characters that have a real avatar
-							return char.avatars?.real;
-						} else {
-							// For animated mode, show characters that have animated avatar OR legacy avatarUrl
-							return char.avatars?.animated || char.avatarUrl;
+					{/* Child Profiles */}
+					{profiles.length > 0 && profiles.map((childProfile) => {
+						// Check if child profile has animated avatar
+						const hasAnimatedAvatar = (childProfile as any).avatars?.animated || childProfile.avatarUrl;
+
+						// Get the animated avatar URL
+						let displayAvatarUrl: string | undefined;
+
+						if (hasAnimatedAvatar) {
+							// Check for new dual avatar structure first, then fallback to legacy avatarUrl
+							if ((childProfile as any).avatars) {
+								const avatars = (childProfile as any).avatars;
+								displayAvatarUrl = avatars.animated || childProfile.avatarUrl;
+							} else {
+								displayAvatarUrl = childProfile.avatarUrl;
+							}
 						}
-					}).map((char: Character) => {
-						// Get the appropriate avatar URL based on display mode
-						let displayAvatarUrl = char.avatarUrl; // Fallback to legacy avatarUrl
-						
-						if (char.avatars) {
-							// For characters, select based on display mode
-							displayAvatarUrl = characterDisplayMode === 'real' ? 
-								(char.avatars.real || char.avatars.animated || char.avatarUrl) :
-								(char.avatars.animated || char.avatars.real || char.avatarUrl);
-						}
-						
+
 						return (
-							<TouchableOpacity 
-								key={char.id} 
-								style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}
-								onPress={() => {
-									setSelectedProfileForAvatarManagement(char);
-									setAvatarManagementType(characterDisplayMode);
-									setAvatarManagementModalVisible(true);
-								}}
-								activeOpacity={0.7}
-							>
-								<Image source={{ uri: displayAvatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+							<View key={`child-${childProfile.id}`} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+								{hasAnimatedAvatar && displayAvatarUrl ? (
+									<TouchableOpacity
+										onPress={() => {
+											setSelectedProfileForAvatarManagement(childProfile);
+											setAvatarManagementModalVisible(true);
+										}}
+										style={{ alignItems: 'center' }}
+										activeOpacity={0.7}
+									>
+										<Image
+											source={{ uri: displayAvatarUrl }}
+											style={{
+												width: 100,
+												height: 100,
+												borderRadius: 50,
+												borderWidth: 3,
+												borderColor: tokens.color.primary.default
+											}}
+										/>
+									</TouchableOpacity>
+								) : (
+									<TouchableOpacity
+										onPress={() => {
+											resetProgress();
+											setCharacterName(childProfile.childName);
+											setSelectedPhoto(null);
+											setGeneratedAvatar(null);
+											setAvatarStep('upload');
+											setAvatarCreationMode('animated');
+											setAvatarModalVisible(true);
+											// Store the child profile ID for avatar creation
+											(global as any).currentChildProfileId = childProfile.id;
+										}}
+										style={{
+											width: 100,
+											height: 100,
+											borderRadius: 50,
+											backgroundColor: tokens.color.surface,
+											borderWidth: 2,
+											borderColor: tokens.color.primary.default,
+											borderStyle: 'dashed',
+											alignItems: 'center',
+											justifyContent: 'center'
+										}}
+									>
+										<Ionicons
+											name="color-palette"
+											size={24}
+											color={tokens.color.primary.default}
+										/>
+										<Text size="xs" color="primary" style={{ textAlign: 'center', marginTop: 4 }}>
+											Add Animated
+										</Text>
+									</TouchableOpacity>
+								)}
+								<Text weight="medium">{childProfile.childName}</Text>
+								<Text size="xs" color="secondary" style={{
+									backgroundColor: tokens.color.primary.light,
+									color: tokens.color.primary.default,
+									paddingHorizontal: 8,
+									paddingVertical: 2,
+									borderRadius: 10,
+									fontSize: 10
+								}}>
+									Child Profile
+								</Text>
+							</View>
+						);
+					})}
+
+					{/* Adult Characters */}
+					{characters.filter((char: Character) => {
+						// Only show characters that have animated avatar OR legacy avatarUrl
+						return char.avatars?.animated || char.avatarUrl;
+					}).map((char: Character) => {
+						// Get the animated avatar URL
+						let displayAvatarUrl = char.avatarUrl; // Fallback to legacy avatarUrl
+
+						if (char.avatars) {
+							// For characters, use animated avatar or fallback
+							displayAvatarUrl = char.avatars.animated || char.avatarUrl;
+						}
+
+						return (
+							<View key={`character-${char.id}`} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+								<TouchableOpacity
+									onPress={() => {
+										setSelectedProfileForAvatarManagement(char);
+										setAvatarManagementModalVisible(true);
+									}}
+									activeOpacity={0.7}
+								>
+									<Image source={{ uri: displayAvatarUrl }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+								</TouchableOpacity>
 								<Text weight="medium">{char.name}</Text>
-							</TouchableOpacity>
+								<Text size="xs" color="secondary" style={{
+									backgroundColor: tokens.color.surface,
+									color: tokens.color.text.secondary,
+									paddingHorizontal: 8,
+									paddingVertical: 2,
+									borderRadius: 10,
+									fontSize: 10
+								}}>
+									My Character
+								</Text>
+							</View>
 						);
 					})}
 					
-					{/* Add New Character Button - moved to the right */}
-					<TouchableOpacity onPress={() => {
-						resetProgress();
-						setCharacterName('');
-						setSelectedPhoto(null);
-						setGeneratedAvatar(null);
-						setAvatarStep('upload');
-						setAvatarModalVisible(true);
-						// Clear any child profile ID
-						(global as any).currentChildProfileId = undefined;
-					}} style={{
-						width: 100,
-						height: 100,
-						borderRadius: 50,
-						backgroundColor: tokens.color.surface,
-						borderWidth: 2,
-						borderColor: tokens.color.border.default,
-						borderStyle: 'dashed',
-						alignItems: 'center',
-						justifyContent: 'center'
-					}}>
-						<Ionicons name="add" size={32} color={tokens.color.text.secondary} />
-					</TouchableOpacity>
+					{/* Add New Character Button */}
+					<View style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+						<TouchableOpacity onPress={() => {
+							resetProgress();
+							setCharacterName('');
+							setSelectedPhoto(null);
+							setGeneratedAvatar(null);
+							setAvatarStep('upload');
+							setAvatarCreationMode('animated');
+							setAvatarModalVisible(true);
+							// Clear any child profile ID
+							(global as any).currentChildProfileId = undefined;
+						}} style={{
+							width: 100,
+							height: 100,
+							borderRadius: 50,
+							backgroundColor: tokens.color.surface,
+							borderWidth: 2,
+							borderColor: tokens.color.border.default,
+							borderStyle: 'dashed',
+							alignItems: 'center',
+							justifyContent: 'center'
+						}}>
+							<Ionicons name="add" size={24} color={tokens.color.text.secondary} />
+							<Text size="xs" color="secondary" style={{ textAlign: 'center', marginTop: 4 }}>
+								Add New
+							</Text>
+						</TouchableOpacity>
+						<Text weight="medium" style={{ opacity: 0.7 }}>Add Character</Text>
+						<Text size="xs" color="secondary" style={{
+							backgroundColor: tokens.color.surface,
+							color: tokens.color.text.secondary,
+							paddingHorizontal: 8,
+							paddingVertical: 2,
+							borderRadius: 10,
+							fontSize: 10
+						}}>
+							My Character
+						</Text>
+					</View>
 				</View>
 
-				{/* Gestalts Characters Section - Only show in animated mode */}
-				{characterDisplayMode === 'animated' && (
+				{/* Gestalts Characters Section */}
+				{(
 					<>
 						<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.sm }}>Gestalts Characters</Text>
 						<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
@@ -1402,7 +1348,7 @@ export default function StorybookScreen() {
 									setAvatarModalVisible(false);
 									setAvatarStep('upload');
 									setCharacterName('');
-									setCharacterRole('friend');
+									setCharacterRole('Friend');
 									setCharacterAge('');
 									setSelectedPhoto(null);
 									setGeneratedAvatar(null);
@@ -1432,72 +1378,6 @@ export default function StorybookScreen() {
 										Choose avatar style and take a photo or select from your gallery.
 									</Text>
 									
-									{/* Avatar Mode Selection */}
-									<View style={{
-										backgroundColor: tokens.color.surface,
-										borderRadius: tokens.radius.lg,
-										padding: 4,
-										marginBottom: tokens.spacing.gap.lg
-									}}>
-										<View style={{ flexDirection: 'row' }}>
-											<TouchableOpacity
-												onPress={() => setAvatarCreationMode('animated')}
-												style={{
-													flex: 1,
-													paddingVertical: 8,
-													paddingHorizontal: 12,
-													borderRadius: tokens.radius.md,
-													backgroundColor: avatarCreationMode === 'animated' ? tokens.color.primary.default : 'transparent',
-													alignItems: 'center'
-												}}
-											>
-												<Ionicons 
-													name="color-palette" 
-													size={16} 
-													color={avatarCreationMode === 'animated' ? 'white' : tokens.color.text.secondary} 
-													style={{ marginBottom: 4 }} 
-												/>
-												<Text 
-													size="xs"
-													weight="medium" 
-													style={{ 
-														color: avatarCreationMode === 'animated' ? 'white' : tokens.color.text.secondary,
-														textAlign: 'center'
-													}}
-												>
-													Animated
-												</Text>
-											</TouchableOpacity>
-											<TouchableOpacity
-												onPress={() => setAvatarCreationMode('real')}
-												style={{
-													flex: 1,
-													paddingVertical: 8,
-													paddingHorizontal: 12,
-													borderRadius: tokens.radius.md,
-													backgroundColor: avatarCreationMode === 'real' ? tokens.color.primary.default : 'transparent',
-													alignItems: 'center'
-												}}
-											>
-												<Ionicons 
-													name="camera" 
-													size={16} 
-													color={avatarCreationMode === 'real' ? 'white' : tokens.color.text.secondary} 
-													style={{ marginBottom: 4 }} 
-												/>
-												<Text 
-													size="xs"
-													weight="medium" 
-													style={{ 
-														color: avatarCreationMode === 'real' ? 'white' : tokens.color.text.secondary,
-														textAlign: 'center'
-													}}
-												>
-													Real-Life
-												</Text>
-											</TouchableOpacity>
-										</View>
-									</View>
 									
 									{/* Photo Selection Options */}
 									<View style={{ flexDirection: 'row', gap: 12, marginBottom: tokens.spacing.gap.lg }}>
@@ -1634,7 +1514,7 @@ export default function StorybookScreen() {
 											{/* Relationship Selection */}
 											<Text weight="semibold" style={{ marginBottom: 8 }}>Relationship</Text>
 											<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: tokens.spacing.gap.md }}>
-												{(['mum', 'dad', 'brother', 'sister', 'grandparent', 'friend'] as const).map((role) => (
+												{(['Mum', 'Dad', 'Brother', 'Sister', 'Grandparent', 'Friend'] as const).map((role) => (
 													<TouchableOpacity
 														key={role}
 														onPress={() => setCharacterRole(role)}
@@ -1720,7 +1600,7 @@ export default function StorybookScreen() {
 													setAvatarModalVisible(false); 
 													setAvatarStep('upload');
 													setCharacterName('');
-													setCharacterRole('friend');
+													setCharacterRole('Friend');
 													setCharacterAge('');
 													setSelectedPhoto(null);
 													setGeneratedAvatar(null);
@@ -1820,7 +1700,7 @@ export default function StorybookScreen() {
 
 	const renderProgressSteps = () => {
 		// Simplified steps - just numbers with fun colors
-		const allSteps = ['story-mode-selection', 'character-selection', 'child-concept', 'mode-selection', 'advanced-options', 'text-generation', 'text-editing', 'review'];
+		const allSteps = ['character-selection', 'child-concept', 'mode-selection', 'advanced-options', 'text-generation', 'text-editing', 'review'];
 		const activeSteps = conceptLearning.mode === 'simple' 
 			? allSteps.filter(s => s !== 'advanced-options')
 			: allSteps;
@@ -1885,7 +1765,6 @@ export default function StorybookScreen() {
 	
 	const getStepTitle = (step: StoryWizardStep): string => {
 		const titles: Record<StoryWizardStep, string> = {
-			'story-mode-selection': 'Choose Visual Style',
 			'child-concept': 'Story Theme',
 			'concept-selection': 'Choose Learning Message',
 			'mode-selection': 'Select Mode',
@@ -1906,7 +1785,7 @@ export default function StorybookScreen() {
 					onPress={() => {
 						setStoryModalVisible(false);
 						// Reset wizard state for next time
-						setStoryWizardStep('story-mode-selection');
+						setStoryWizardStep('character-selection');
 						setConceptLearning({
 							concept: '',
 							includeChildAsCharacter: false,
@@ -1961,7 +1840,7 @@ export default function StorybookScreen() {
 											setAvatarModalVisible(false);
 											setAvatarStep('upload');
 											setCharacterName('');
-											setCharacterRole('friend');
+											setCharacterRole('Friend');
 											setCharacterAge('');
 											setSelectedPhoto(null);
 											setGeneratedAvatar(null);
@@ -1991,72 +1870,6 @@ export default function StorybookScreen() {
 										Choose avatar style and take a photo or select from your gallery.
 									</Text>
 									
-									{/* Avatar Mode Selection */}
-									<View style={{
-										backgroundColor: tokens.color.surface,
-										borderRadius: tokens.radius.lg,
-										padding: 4,
-										marginBottom: tokens.spacing.gap.lg
-									}}>
-										<View style={{ flexDirection: 'row' }}>
-											<TouchableOpacity
-												onPress={() => setAvatarCreationMode('animated')}
-												style={{
-													flex: 1,
-													paddingVertical: 8,
-													paddingHorizontal: 12,
-													borderRadius: tokens.radius.md,
-													backgroundColor: avatarCreationMode === 'animated' ? tokens.color.primary.default : 'transparent',
-													alignItems: 'center'
-												}}
-											>
-												<Ionicons 
-													name="color-palette" 
-													size={16} 
-													color={avatarCreationMode === 'animated' ? 'white' : tokens.color.text.secondary} 
-													style={{ marginBottom: 4 }} 
-												/>
-												<Text 
-													size="xs"
-													weight="medium" 
-													style={{ 
-														color: avatarCreationMode === 'animated' ? 'white' : tokens.color.text.secondary,
-														textAlign: 'center'
-													}}
-												>
-													Animated
-												</Text>
-											</TouchableOpacity>
-											<TouchableOpacity
-												onPress={() => setAvatarCreationMode('real')}
-												style={{
-													flex: 1,
-													paddingVertical: 8,
-													paddingHorizontal: 12,
-													borderRadius: tokens.radius.md,
-													backgroundColor: avatarCreationMode === 'real' ? tokens.color.primary.default : 'transparent',
-													alignItems: 'center'
-												}}
-											>
-												<Ionicons 
-													name="camera" 
-													size={16} 
-													color={avatarCreationMode === 'real' ? 'white' : tokens.color.text.secondary} 
-													style={{ marginBottom: 4 }} 
-												/>
-												<Text 
-													size="xs"
-													weight="medium" 
-													style={{ 
-														color: avatarCreationMode === 'real' ? 'white' : tokens.color.text.secondary,
-														textAlign: 'center'
-													}}
-												>
-													Real-Life
-												</Text>
-											</TouchableOpacity>
-										</View>
-									</View>
 									
 									{/* Photo Selection Options */}
 									<View style={{ flexDirection: 'row', gap: 12, marginBottom: tokens.spacing.gap.lg }}>
@@ -2193,7 +2006,7 @@ export default function StorybookScreen() {
 											{/* Relationship Selection */}
 											<Text weight="semibold" style={{ marginBottom: 8 }}>Relationship</Text>
 											<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: tokens.spacing.gap.md }}>
-												{(['mum', 'dad', 'brother', 'sister', 'grandparent', 'friend'] as const).map((role) => (
+												{(['Mum', 'Dad', 'Brother', 'Sister', 'Grandparent', 'Friend'] as const).map((role) => (
 													<TouchableOpacity
 														key={role}
 														onPress={() => setCharacterRole(role)}
@@ -2279,7 +2092,7 @@ export default function StorybookScreen() {
 													setAvatarModalVisible(false); 
 													setAvatarStep('upload');
 													setCharacterName('');
-													setCharacterRole('friend');
+													setCharacterRole('Friend');
 													setCharacterAge('');
 													setSelectedPhoto(null);
 													setGeneratedAvatar(null);
@@ -2597,55 +2410,14 @@ export default function StorybookScreen() {
 							</>
 						)}
 
-						{storyWizardStep === 'story-mode-selection' && (
-							<>
-								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Choose Story Style</Text>
-								
-								<TouchableOpacity 
-									onPress={() => setConceptLearning({...conceptLearning, storyMode: 'animated'})}
-									style={{
-										padding: 20,
-										borderRadius: tokens.radius.lg,
-										borderWidth: 2,
-										borderColor: conceptLearning.storyMode === 'animated' ? tokens.color.primary.default : tokens.color.border.default,
-										backgroundColor: conceptLearning.storyMode === 'animated' ? "#F3E8FF" : tokens.color.surface,
-										marginBottom: 16
-									}}
-								>
-									<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-										<Ionicons name="color-palette" size={20} color={tokens.color.primary.default} style={{ marginRight: 8 }} />
-										<Text weight="bold">Animated Style</Text>
-									</View>
-									<Text color="secondary">Pixar-style cartoon characters and backgrounds. Colorful, fun, and perfect for imaginative storytelling.</Text>
-								</TouchableOpacity>
-
-								<TouchableOpacity 
-									onPress={() => setConceptLearning({...conceptLearning, storyMode: 'real'})}
-									style={{
-										padding: 20,
-										borderRadius: tokens.radius.lg,
-										borderWidth: 2,
-										borderColor: conceptLearning.storyMode === 'real' ? tokens.color.primary.default : tokens.color.border.default,
-										backgroundColor: conceptLearning.storyMode === 'real' ? "#F3E8FF" : tokens.color.surface,
-										marginBottom: 30
-									}}
-								>
-									<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-										<Ionicons name="camera" size={20} color={tokens.color.primary.default} style={{ marginRight: 8 }} />
-										<Text weight="bold">Real-Life Style</Text>
-									</View>
-									<Text color="secondary">Photorealistic style using your child's actual photos. Characters look like real people with natural backgrounds.</Text>
-								</TouchableOpacity>
-
-								<View style={{ flexDirection: 'row', gap: 12 }}>
-									<GradientButton 
-										title='Select Characters'
-										onPress={() => setStoryWizardStep('character-selection')}
-										style={{ flex: 1 }}
-									/>
-								</View>
-							</>
-						)}
+						{storyWizardStep === 'story-mode-selection' && (() => {
+							// Automatically set to animated mode and proceed to character selection
+							if (conceptLearning.storyMode !== 'animated') {
+								setConceptLearning({...conceptLearning, storyMode: 'animated'});
+							}
+							setStoryWizardStep('character-selection');
+							return null;
+						})()}
 
 						{storyWizardStep === 'advanced-options' && conceptLearning.mode === 'advanced' && (
 							<>
@@ -2890,189 +2662,162 @@ export default function StorybookScreen() {
 						{storyWizardStep === 'character-selection' && (
 							<>
 								<Text size="h2" weight="bold" style={{ marginBottom: tokens.spacing.gap.md }}>Select Characters</Text>
-								<Text color="secondary" style={{ marginBottom: 16 }}>Select characters for your {conceptLearning.storyMode === 'real' ? 'real-life' : 'animated'} story.</Text>
+								<Text color="secondary" style={{ marginBottom: 16 }}>Select characters for your animated story.</Text>
 								
-								{/* Child Profiles Section */}
-								{profiles.length > 0 && (
-									<>
-										<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>Child Profiles</Text>
-										<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>Your child's personalized avatars for stories.</Text>
-										<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
-											{profiles.map((childProfile) => {
-												const profileId = `profile-${childProfile.id}`;
-												const isSelected = conceptLearning.characterIds.includes(profileId);
-												const storyMode = conceptLearning.storyMode || 'animated';
-												
-												// Check if child profile has the avatar for current story mode
-												const hasCurrentModeAvatar = storyMode === 'real' ? 
-													(childProfile as any).avatars?.real :
-													((childProfile as any).avatars?.animated || childProfile.avatarUrl);
-												
-												// Get the appropriate avatar URL based on story mode
-												let displayAvatarUrl: string | undefined;
-												
-												if (hasCurrentModeAvatar) {
-													// Check for new dual avatar structure first, then fallback to legacy avatarUrl
-													if ((childProfile as any).avatars) {
-														const avatars = (childProfile as any).avatars;
-														displayAvatarUrl = storyMode === 'real' ? 
-															avatars.real :
-															(avatars.animated || childProfile.avatarUrl);
-													} else {
-														displayAvatarUrl = childProfile.avatarUrl;
-													}
-												}
-												
-												return (
-													<View key={childProfile.id} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
-														{hasCurrentModeAvatar && displayAvatarUrl ? (
-															<TouchableOpacity 
-																onPress={() => {
-																	if (isSelected) {
-																		setConceptLearning({...conceptLearning, characterIds: conceptLearning.characterIds.filter(id => id !== profileId)});
-																	} else {
-																		setConceptLearning({...conceptLearning, characterIds: [...conceptLearning.characterIds, profileId]});
-																	}
-																}}
-																onLongPress={() => {
-																	setSelectedProfileForAvatarManagement(childProfile);
-																	setAvatarManagementType(storyMode);
-																	setAvatarManagementModalVisible(true);
-																}}
-																activeOpacity={0.7}
-															>
-																<Image source={{ uri: displayAvatarUrl }} style={{ 
-																	width: 100, 
-																	height: 100, 
-																	borderRadius: 50,
-																	borderWidth: isSelected ? 4 : 0, 
-																	borderColor: tokens.color.primary.default
-																}} />
-															</TouchableOpacity>
-														) : (
-															<TouchableOpacity 
-																onPress={() => {
-																	// Set current child profile for avatar creation
-																	(global as any).currentChildProfileId = childProfile.id;
-																	resetProgress();
-																	setCharacterName(childProfile.childName);
-																	setSelectedPhoto(null);
-																	setGeneratedAvatar(null);
-																	setAvatarStep('upload');
-																	setAvatarCreationMode(storyMode); // Set the mode to current story mode
-																	setAvatarModalVisible(true);
-																}}
-																style={{
-																	width: 100,
-																	height: 100,
-																	borderRadius: 50,
-																	backgroundColor: tokens.color.surface,
-																	borderWidth: 2,
-																	borderColor: tokens.color.primary.default,
-																	borderStyle: 'dashed',
-																	alignItems: 'center',
-																	justifyContent: 'center'
-																}}
-															>
-																<Ionicons 
-																	name={storyMode === 'real' ? "camera" : "color-palette"} 
-																	size={24} 
-																	color={tokens.color.primary.default} 
-																/>
-																<Text size="xs" color="primary" style={{ textAlign: 'center', marginTop: 4 }}>
-																	Add {storyMode === 'real' ? 'Real' : 'Animated'}
-																</Text>
-															</TouchableOpacity>
-														)}
-														<Text weight="medium">{childProfile.childName}</Text>
-													</View>
-												);
-											})}
-										</View>
-									</>
-								)}
-								
-								{/* My Characters Section - Adult Characters */}
-								<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>My Characters</Text>
-								<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>Family members and custom characters you've created.</Text>
+								{/* All Characters Section - Consolidated */}
 								<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.gap.md, marginBottom: tokens.spacing.gap.lg }}>
-									{/* Show adult characters only (not child profiles) */}
-									{characters.filter((char: Character) => {
-										// Filter based on story mode - show characters that have the appropriate avatar
-										const storyMode = conceptLearning.storyMode || 'animated';
-										if (storyMode === 'real') {
-											return char.avatars?.real;
-										} else {
-											return char.avatars?.animated || char.avatarUrl;
+									{/* Child Profiles */}
+									{profiles.length > 0 && profiles.map((childProfile) => {
+										const profileId = `profile-${childProfile.id}`;
+										const isSelected = conceptLearning.characterIds.includes(profileId);
+
+										// Check if child profile has animated avatar
+										const hasAnimatedAvatar = (childProfile as any).avatars?.animated || childProfile.avatarUrl;
+
+										// Get the animated avatar URL
+										let displayAvatarUrl: string | undefined;
+
+										if (hasAnimatedAvatar) {
+											// Check for new dual avatar structure first, then fallback to legacy avatarUrl
+											if ((childProfile as any).avatars) {
+												const avatars = (childProfile as any).avatars;
+												displayAvatarUrl = avatars.animated || childProfile.avatarUrl;
+											} else {
+												displayAvatarUrl = childProfile.avatarUrl;
+											}
 										}
+
+										return (
+											<View key={`child-select-${childProfile.id}`} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+												{hasAnimatedAvatar && displayAvatarUrl ? (
+													<TouchableOpacity
+														onPress={() => {
+															if (isSelected) {
+																setConceptLearning({...conceptLearning, characterIds: conceptLearning.characterIds.filter(id => id !== profileId)});
+															} else {
+																setConceptLearning({...conceptLearning, characterIds: [...conceptLearning.characterIds, profileId]});
+															}
+														}}
+														onLongPress={() => {
+															setSelectedProfileForAvatarManagement(childProfile);
+																			setAvatarManagementModalVisible(true);
+														}}
+														activeOpacity={0.7}
+													>
+														<Image source={{ uri: displayAvatarUrl }} style={{
+															width: 100,
+															height: 100,
+															borderRadius: 50,
+															borderWidth: isSelected ? 4 : 0,
+															borderColor: tokens.color.primary.default
+														}} />
+													</TouchableOpacity>
+												) : (
+													<TouchableOpacity
+														onPress={() => {
+															// Set current child profile for avatar creation
+															(global as any).currentChildProfileId = childProfile.id;
+															resetProgress();
+															setCharacterName(childProfile.childName);
+															setSelectedPhoto(null);
+															setGeneratedAvatar(null);
+															setAvatarStep('upload');
+															setAvatarCreationMode('animated');
+															setAvatarModalVisible(true);
+														}}
+														style={{
+															width: 100,
+															height: 100,
+															borderRadius: 50,
+															backgroundColor: tokens.color.surface,
+															borderWidth: 2,
+															borderColor: tokens.color.primary.default,
+															borderStyle: 'dashed',
+															alignItems: 'center',
+															justifyContent: 'center'
+														}}
+													>
+														<Ionicons
+															name="color-palette"
+															size={24}
+															color={tokens.color.primary.default}
+														/>
+														<Text size="xs" color="primary" style={{ textAlign: 'center', marginTop: 4 }}>
+															Add Animated
+														</Text>
+													</TouchableOpacity>
+												)}
+												<Text weight="medium">{childProfile.childName}</Text>
+												<Text size="xs" color="secondary" style={{
+													backgroundColor: tokens.color.primary.light,
+													color: tokens.color.primary.default,
+													paddingHorizontal: 8,
+													paddingVertical: 2,
+													borderRadius: 10,
+													fontSize: 10
+												}}>
+													Child Profile
+												</Text>
+											</View>
+										);
+									})}
+
+									{/* Adult Characters */}
+									{characters.filter((char: Character) => {
+										// Only show characters that have animated avatar
+										return char.avatars?.animated || char.avatarUrl;
 									}).map((char: Character) => {
 										const isSelected = conceptLearning.characterIds.includes(char.id);
-										
-										// Get the appropriate avatar URL based on story mode
-										const storyMode = conceptLearning.storyMode || 'animated';
+
+										// Get the animated avatar URL
 										let avatarUrl = char.avatarUrl; // Fallback to legacy avatarUrl
-										
+
 										if (char.avatars) {
-											avatarUrl = storyMode === 'real' ? 
-												(char.avatars.real || char.avatars.animated || char.avatarUrl) :
-												(char.avatars.animated || char.avatars.real || char.avatarUrl);
+											avatarUrl = char.avatars.animated || char.avatarUrl;
 										}
-										
+
 										return (
-											<TouchableOpacity 
-												key={char.id} 
-												style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}
-												onPress={() => {
-													if (isSelected) {
-														setConceptLearning({...conceptLearning, characterIds: conceptLearning.characterIds.filter(id => id !== char.id)});
-													} else {
-														setConceptLearning({...conceptLearning, characterIds: [...conceptLearning.characterIds, char.id]});
-													}
-												}}
-												activeOpacity={0.7}
-											>
-												<Image 
-													source={{ uri: avatarUrl }} 
-													style={{ 
-														width: 100, 
-														height: 100, 
-														borderRadius: 50, 
-														borderWidth: isSelected ? 4 : 0, 
-														borderColor: tokens.color.primary.default 
-													}} 
-												/>
+											<View key={`character-select-${char.id}`} style={{ alignItems: 'center', gap: tokens.spacing.gap.xs }}>
+												<TouchableOpacity
+													onPress={() => {
+														if (isSelected) {
+															setConceptLearning({...conceptLearning, characterIds: conceptLearning.characterIds.filter(id => id !== char.id)});
+														} else {
+															setConceptLearning({...conceptLearning, characterIds: [...conceptLearning.characterIds, char.id]});
+														}
+													}}
+													activeOpacity={0.7}
+												>
+													<Image
+														source={{ uri: avatarUrl }}
+														style={{
+															width: 100,
+															height: 100,
+															borderRadius: 50,
+															borderWidth: isSelected ? 4 : 0,
+															borderColor: tokens.color.primary.default
+														}}
+													/>
+												</TouchableOpacity>
 												<Text weight="medium">{char.name}</Text>
-											</TouchableOpacity>
+												<Text size="xs" color="secondary" style={{
+													backgroundColor: tokens.color.surface,
+													color: tokens.color.text.secondary,
+													paddingHorizontal: 8,
+													paddingVertical: 2,
+													borderRadius: 10,
+													fontSize: 10
+												}}>
+													My Character
+												</Text>
+											</View>
 										);
 									})}
 									
-									{/* Add New Character Button - moved to the right */}
-									<TouchableOpacity onPress={() => {
-										resetProgress();
-										setCharacterName('');
-										setSelectedPhoto(null);
-										setGeneratedAvatar(null);
-										setAvatarStep('upload');
-										setAvatarModalVisible(true);
-										// Clear any child profile ID
-										(global as any).currentChildProfileId = undefined;
-									}} style={{
-										width: 100,
-										height: 100,
-										borderRadius: 50,
-										backgroundColor: tokens.color.surface,
-										borderWidth: 2,
-										borderColor: tokens.color.border.default,
-										borderStyle: 'dashed',
-										alignItems: 'center',
-										justifyContent: 'center'
-									}}>
-										<Ionicons name="add" size={32} color={tokens.color.text.secondary} />
-									</TouchableOpacity>
 								</View>
 								
-								{/* Gestalts Characters Section - only for animated mode */}
-								{conceptLearning.storyMode === 'animated' && (
+								{/* Gestalts Characters Section */}
+								{(
 									<>
 										<Text weight="semibold" style={{ marginBottom: tokens.spacing.gap.sm, color: tokens.color.text.primary }}>Gestalts Characters</Text>
 										<Text color="secondary" style={{ marginBottom: tokens.spacing.gap.lg }}>
@@ -3130,16 +2875,16 @@ export default function StorybookScreen() {
 								)}
 
 								<View style={{ flexDirection: 'row', gap: 12, marginTop: 30 }}>
-									<TouchableOpacity 
-										onPress={() => setStoryWizardStep('story-mode-selection')}
+									<TouchableOpacity
+										onPress={() => setStoryModalVisible(false)}
 										style={{ flex: 1, padding: 12, alignItems: 'center' }}
 									>
-										<Text style={{ color: tokens.color.text.secondary }}>Back</Text>
+										<Text style={{ color: tokens.color.text.secondary }}>Cancel</Text>
 									</TouchableOpacity>
-									<GradientButton 
+									<GradientButton
 										title="Design Story"
 										disabled={conceptLearning.characterIds.length === 0}
-										onPress={() => setStoryWizardStep('child-concept')} 
+										onPress={() => setStoryWizardStep('child-concept')}
 										style={{ flex: 2 }}
 									/>
 								</View>
@@ -3316,9 +3061,7 @@ export default function StorybookScreen() {
 													// Check for new dual avatar structure first, then fallback to legacy avatarUrl
 													if ((profile as any).avatars) {
 														const avatars = (profile as any).avatars;
-														avatarUrl = storyMode === 'real' ? 
-															(avatars.real || avatars.animated || (profile as any).avatarUrl) :
-															(avatars.animated || avatars.real || (profile as any).avatarUrl);
+														avatarUrl = avatars.animated || (profile as any).avatarUrl;
 													} else {
 														avatarUrl = (profile as any).avatarUrl;
 													}
@@ -3405,7 +3148,7 @@ export default function StorybookScreen() {
 											console.log('Close Wizard button pressed');
 											setStoryModalVisible(false);
 											// Reset wizard state for next time
-											setStoryWizardStep('story-mode-selection');
+											setStoryWizardStep('character-selection');
 											setConceptLearning({
 												concept: '',
 												includeChildAsCharacter: false,
@@ -3441,7 +3184,7 @@ export default function StorybookScreen() {
 											// Switch to stories tab to see the generating story
 											setActiveTab('stories');
 											// Reset wizard state for next time
-											setStoryWizardStep('story-mode-selection');
+											setStoryWizardStep('character-selection');
 											setConceptLearning({
 												concept: '',
 												includeChildAsCharacter: false,
@@ -3964,7 +3707,6 @@ export default function StorybookScreen() {
 						setSelectedProfileForAvatarManagement(null);
 					}}
 					profile={selectedProfileForAvatarManagement}
-					avatarType={avatarManagementType}
 					isChildProfile={
 						// Check if it's a child profile by looking for specific fields
 						// Child profiles from useMemoriesStore have 'birthDateISO' or come from profiles array
